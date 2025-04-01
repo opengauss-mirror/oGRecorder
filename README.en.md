@@ -1,36 +1,54 @@
 # WR
 
-#### Description
-{**When you're done, you can delete the content in this README and update the file with details for others getting started with your repository**}
+WR: WAL Recorder, a basic component providing WAL log recording services.
 
-#### Software Architecture
-Software architecture description
+## 1. Project Description
 
-#### Installation
+### 1. Programming Language
+- C
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+### 2. Build Tools
+- cmake or make, cmake is recommended
 
-#### Instructions
+### 3. Directory Structure
+- **WR**: Main directory, CMakeLists.txt is the main project entry;
+- **src**: Source code directory, divided into subdirectories for common function modules;
+- **build/build.sh**: Project build script
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+## 2. Compilation Guide
 
-#### Contribution
+### 1. Supported Operating Systems and Software Dependencies
+Supported operating systems:
+- CentOS 7.6 (x86)
+- openEuler-20.03-LTS
+- openEuler-22.03-LTS
+- openEuler-24.03-LTS
 
-1.  Fork the repository
-2.  Create Feat_xxx branch
-3.  Commit your code
-4.  Create Pull Request
+For other systems, refer to the openGauss database compilation guide.
 
+### 2. Download WR
+WR can be downloaded from the open-source community.
 
-#### Gitee Feature
+### 3. Code Compilation
+Use `WR/build/build.sh` to compile the code. The parameters are explained in the table below.
 
-1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
-2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
-3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
-4.  The most valuable open source project [GVP](https://gitee.com/gvp)
-5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
-6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+| Option | Parameter          | Description                                      |
+|--------|--------------------|--------------------------------------------------|
+| -3rd   | [binarylibs path]  | Specify the binarylibs path. It must be an absolute path. |
+| -m     | [version_mode]     | Target version for compilation, Debug or Release. Default is Release. |
+| -t     | [build_tool]       | Specify the build tool, cmake or make. Default is cmake. |
+
+To compile, simply use the following command:
+
+```bash
+[user@linux]$ sh build.sh -3rd [binarylibs path] -m Release -t cmake
+```
+
+After compilation, the dynamic libraries are generated in the `WR/output/lib` directory, and the executables are generated in the `WR/output/bin` directory.
+
+### 4. UT Testing
+Modify `WR/test/test_home/test_env` to set `CODE_BASE` to the absolute path of the WR directory. Execute `WR/test/gtest/build.sh` to compile the UT code.
+
+```bash
+./test_wr_api
+```
