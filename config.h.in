@@ -1,0 +1,3 @@
+#ifndef DEF_WR_VERSION
+#define DEF_WR_VERSION "@WR_VERSION_STR@"
+#endif
