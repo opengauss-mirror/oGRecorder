@@ -36,12 +36,6 @@
 #include "wr_fault_injection.h"
 #include "wr_param_verify.h"
 
-#ifndef WIN32
-static __thread char *g_thv_read_buf = NULL;
-#else
-__declspec(thread) char *g_thv_read_buf = NULL;
-#endif
-
 void wr_proc_broadcast_req(wr_session_t *session, mes_msg_t *msg);
 void wr_proc_syb2active_req(wr_session_t *session, mes_msg_t *msg);
 void wr_proc_loaddisk_req(wr_session_t *session, mes_msg_t *msg);
@@ -1180,85 +1174,6 @@ status_t wr_send2standby(big_packets_ctrl_t *ack, const char *buf)
     LOG_DEBUG_INF("[MES] The wr server send messages to the remote node success, src node:%u, dst node:%u.",
         (uint32)(wr_head->src_inst), (uint32)(wr_head->dst_inst));
     return ret;
-}
-
-static status_t wr_init_readvlm_remote_params(
-    wr_loaddisk_req_t *req, const char *entry, uint32 *currid, uint32 *remoteid, wr_session_t *session)
-{
-    errno_t errcode = memset_s(req, sizeof(wr_loaddisk_req_t), 0, sizeof(wr_loaddisk_req_t));
-    securec_check_ret(errcode);
-    errcode = memcpy_s(req->vg_name, WR_MAX_NAME_LEN, entry, WR_MAX_NAME_LEN);
-    securec_check_ret(errcode);
-    WR_RETURN_IF_ERROR(wr_get_exec_nodeid(session, currid, remoteid));
-    if (*currid == *remoteid) {
-        LOG_DEBUG_ERR("read from current node %u no need to send message.", *currid);
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
-
-static bool32 wr_packets_verify(big_packets_ctrl_t *lastctrl, big_packets_ctrl_t *ctrl, uint32 size)
-{
-    if (ctrl->endflag != CM_TRUE && size != ctrl->totalsize) {
-        LOG_RUN_ERR("[MES] end flag is not CM_TRUE.");
-        return CM_FALSE;
-    }
-    if (ctrl->endflag == CM_TRUE && ctrl->cursize + ctrl->offset != ctrl->totalsize) {
-        LOG_RUN_ERR("[MES]size is not true, cursize is %u, offset is %u, total size is %u.", ctrl->cursize,
-            ctrl->offset, ctrl->totalsize);
-        return CM_FALSE;
-    }
-
-    *lastctrl = *ctrl;
-    return CM_TRUE;
-}
-
-static status_t wr_rec_msgs(ruid_type ruid, void *buf, uint32 size)
-{
-    mes_msg_t msg;
-    big_packets_ctrl_t lastctrl;
-    (void)memset_s(&lastctrl, sizeof(big_packets_ctrl_t), 0, sizeof(big_packets_ctrl_t));
-    big_packets_ctrl_t *ctrl;
-    wr_config_t *inst_cfg = wr_get_inst_cfg();
-    uint32 timeout = inst_cfg->params.mes_wait_timeout;
-    do {
-        status_t ret = wr_get_mes_response(ruid, &msg, timeout);
-        if (ret != CM_SUCCESS) {
-            LOG_RUN_ERR("wr server receive msg from remote node failed, result:%d.", ret);
-            return ret;
-        }
-        wr_message_head_t *ack_head = (wr_message_head_t *)msg.buffer;
-        if (ack_head->result == ERR_WR_VERSION_NOT_MATCH) {
-            mes_release_msg(&msg);
-            return ERR_WR_VERSION_NOT_MATCH;
-        }
-        if (ack_head->size < sizeof(big_packets_ctrl_t)) {
-            ret = CM_ERROR;
-            LOG_RUN_ERR("wr load disk from remote node failed invalid size, msg len(%d) error.", ack_head->size);
-            if (ack_head->size == WR_MES_MSG_HEAD_SIZE) {
-                ret = ack_head->result;
-            }
-            mes_release_msg(&msg);
-            return ret;
-        }
-        ctrl = (big_packets_ctrl_t *)msg.buffer;
-        if (wr_packets_verify(&lastctrl, ctrl, size) == CM_FALSE) {
-            mes_release_msg(&msg);
-            LOG_RUN_ERR("wr server receive msg verify failed.");
-            return CM_ERROR;
-        }
-        if (size < ctrl->offset + ctrl->cursize || ack_head->size != (sizeof(big_packets_ctrl_t) + ctrl->cursize)) {
-            mes_release_msg(&msg);
-            LOG_RUN_ERR("wr server receive msg size is invalid.");
-            return CM_ERROR;
-        }
-        errno_t errcode =
-            memcpy_s((char *)buf + ctrl->offset, ctrl->cursize, msg.buffer + sizeof(big_packets_ctrl_t), ctrl->cursize);
-        mes_release_msg(&msg);
-        securec_check_ret(errcode);
-    } while (ctrl->endflag != CM_TRUE);
-
-    return CM_SUCCESS;
 }
 
 status_t wr_join_cluster(bool32 *join_succ)

@@ -359,46 +359,6 @@ status_t wr_remove_file(wr_session_t *session, const char *file)
     return wr_rm_dir_file(session, file, GFT_FILE, CM_FALSE);
 }
 
-static status_t wr_make_dir_file_core(wr_session_t *session, const char *parent, wr_vg_info_item_t **vg_item,
-    const char *dir_name, gft_item_type_t type, int32_t flag)
-{
-    return CM_SUCCESS;
-}
-
-static status_t wr_make_dir_file(
-    wr_session_t *session, const char *parent, const char *dir_name, gft_item_type_t type, int32 flag)
-{
-    CM_ASSERT(parent != NULL);
-    CM_ASSERT(dir_name != NULL);
-    status_t status;
-    char name[WR_MAX_NAME_LEN];
-    uint32_t beg_pos = 0;
-    if (wr_get_name_from_path(parent, &beg_pos, name) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to get name from path %s.", parent);
-        return CM_ERROR;
-    }
-
-    if (wr_check_name(dir_name) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("The name %s is invalid.", dir_name);
-        return CM_ERROR;
-    }
-    WR_LOG_DEBUG_OP("Begin to make dir or file:%s in vg:%s.", dir_name, name);
-    wr_vg_info_item_t *vg_item = wr_find_vg_item(name);
-    if (vg_item == NULL) {
-        WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, name);
-        LOG_DEBUG_ERR("Failed to mkdir or file:%s in path:%s, cant get vg item, vg name:%s.", dir_name, parent, name);
-        return CM_ERROR;
-    }
-    wr_lock_vg_mem_and_shm_x(session, vg_item);
-    status = wr_make_dir_file_core(session, parent, &vg_item, dir_name, type, flag);
-
-    wr_unlock_vg_mem_and_shm(session, vg_item);
-    if (status == CM_SUCCESS) {
-        LOG_RUN_INF("Succeed to mk dir or file:%s in path:%s in vg:%s.", dir_name, parent, name);
-    }
-    return status;
-}
-
 status_t wr_make_dir(wr_session_t *session, const char *dir_name)
 {
     char path[WR_FILE_PATH_MAX_LENGTH];

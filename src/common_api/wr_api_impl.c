@@ -153,28 +153,10 @@ static status_t wr_check_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *
     return CM_SUCCESS;
 }
 
-static status_t wr_check_find_fs_block(files_rw_ctx_t *rw_ctx, wr_fs_pos_desc_t *fs_pos)
-{
-    return CM_SUCCESS;
-}
-
 static status_t wr_check_refresh_file_by_offset(
     wr_conn_t *conn, wr_file_context_t *context, int64 offset, bool32 is_read)
 {
     return CM_SUCCESS;
-}
-
-static status_t wr_check_apply_extending_file(
-    wr_conn_t *conn, wr_file_context_t *context, int32 handle, int64 size, int64 offset)
-{
-    WR_UNLOCK_VG_META_S(context->vg_item, conn->session);
-    status_t status = wr_apply_extending_file(conn, handle, size, offset);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to apply extending file, fid:%llu.", context->fid);
-        return CM_ERROR;
-    }
-    WR_LOCK_VG_META_S_RETURN_ERROR(context->vg_item, conn->session);
-    return wr_check_apply_refresh_file(conn, context, offset);
 }
 
 status_t wr_refresh_volume_handle(wr_conn_t *conn, wr_file_context_t *context, auid_t auid)

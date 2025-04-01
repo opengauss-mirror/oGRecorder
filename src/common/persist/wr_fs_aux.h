@@ -214,8 +214,6 @@ status_t wr_get_gft_node_with_cache(
     wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 fid, wr_block_id_t ftid, gft_node_t **node_out);
 status_t wr_get_entry_block_with_cache(
     wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, wr_fs_block_t **fs_block_out);
-status_t wr_get_second_block_with_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node,
-    wr_block_id_t block_id, uint32 block_count, wr_fs_block_t **fs_block_out);
 status_t wr_get_fs_aux_with_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node,
     wr_block_id_t block_id, uint32 block_au_count, wr_fs_aux_t **fs_aux_out);
 void wr_check_fs_aux_free(wr_fs_aux_header_t *block);

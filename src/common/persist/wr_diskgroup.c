@@ -368,57 +368,6 @@ void wr_unlock_vg_mem(wr_vg_info_item_t *vg_item)
     wr_unlatch(&vg_item->disk_latch);
 }
 
-#ifndef VG_FILE_LOCK
-status_t wr_file_lock_vg_w(wr_config_t *inst_cfg)
-{
-    return CM_SUCCESS;
-}
-
-void wr_file_unlock_vg(void)
-{}
-
-status_t wr_lock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_lock_vg_storage_r(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_lock_vg_storage_w(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_lock_disk_vg(const char *entry_path, wr_config_t *inst_cfg)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_unlock_vg_raid(wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_unlock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_unlock_vg_storage(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_check_lock_remain_inner(
-    int32 wr_mode, wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id, bool32 *is_remain)
-{
-    return CM_SUCCESS;
-}
-#else
-
 static void wr_free_vglock_fp(const char *lock_file, FILE *fp)
 {
     int32 i;
@@ -880,7 +829,6 @@ status_t wr_check_lock_remain_inner(
     LOG_DEBUG_ERR("Invalid wr mode %d when check lock remain.", wr_mode);
     return CM_ERROR;
 }
-#endif
 
 status_t wr_write_ctrl_to_disk(wr_vg_info_item_t *vg_item, int64 offset, void *buf, uint32 size)
 {
@@ -1177,38 +1125,6 @@ status_t wr_add_volume_core(
         wr_exit(1);
     }
     return CM_SUCCESS;
-}
-
-static status_t wr_remove_volume_impl_core(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, uint32 id, const char *volume_name)
-{
-#ifndef WIN32
-    char buf[WR_ALIGN_SIZE] __attribute__((__aligned__(WR_DISK_UNIT_SIZE)));
-#else
-    char buf[WR_ALIGN_SIZE];
-#endif
-    errno_t errcode;
-    wr_redo_volhead_t redo;
-    wr_volume_header_t *vol_head = (wr_volume_header_t *)buf;
-    status_t status = CM_ERROR;
-    do {
-        if (wr_read_volume(&vg_item->volume_handle[id], 0, vol_head, (int32)WR_ALIGN_SIZE) != CM_SUCCESS) {
-            break;
-        }
-        vol_head->valid_flag = 0;
-        vol_head->software_version = 0;
-        errcode = memcpy_sp(redo.head, WR_ALIGN_SIZE, vol_head, WR_ALIGN_SIZE);
-        securec_check_ret(errcode);
-        int32 ret = snprintf_s(redo.name, WR_MAX_NAME_LEN, strlen(volume_name), "%s", volume_name);
-        if (ret == -1) {
-            WR_THROW_ERROR(ERR_SYSTEM_CALL, ret);
-            break;
-        }
-
-        wr_put_log(session, vg_item, WR_RT_UPDATE_VOLHEAD, &redo, sizeof(redo));
-        status = CM_SUCCESS;
-    } while (0);
-    return status;
 }
 
 status_t wr_refresh_meta_info(wr_session_t *session)

@@ -799,8 +799,7 @@ static status_t rmdir_proc(void)
     if (cmd_rmdir_args[WR_ARG_IDX_0].convert_result != NULL) {
         path = cmd_rmdir_args[WR_ARG_IDX_0].convert_result;
     }
-    //TODO: 预留recursive参数
-    bool32 recursive = cmd_rmdir_args[WR_ARG_IDX_1].inputed ? CM_TRUE : CM_FALSE;
+
     status_t status = CM_SUCCESS;
     const char *input_args = cmd_rmdir_args[WR_ARG_IDX_2].input_args;
     wr_conn_t *conn = wr_get_connection_opt(input_args);

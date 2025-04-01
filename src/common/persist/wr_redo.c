@@ -814,8 +814,6 @@ status_t rp_redo_rename_file(wr_session_t *session, wr_vg_info_item_t *vg_item, 
     WR_RETURN_IFERR2(
         status, LOG_DEBUG_ERR("[REDO] Failed to update fs block: %s to disk.", wr_display_metaid(data->node.id)));
 
-    wr_block_ctrl_t *block_ctrl = WR_GET_BLOCK_CTRL_FROM_META(cur_block);
-
     LOG_DEBUG_INF(
         "Succeed to replay rename file:%s, old_name:%s, name:%s.", data->name, data->old_name, vg_item->vg_name);
     return CM_SUCCESS;
@@ -886,7 +884,6 @@ status_t rp_redo_set_fs_block(wr_session_t *session, wr_vg_info_item_t *vg_item,
     status = wr_update_fs_bitmap_block_disk(vg_item, block, WR_FILE_SPACE_BLOCK_SIZE, CM_FALSE);
     WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to update fs block: %s to disk.", wr_display_metaid(data->id)));
 
-    wr_block_ctrl_t *block_ctrl = WR_GET_BLOCK_CTRL_FROM_META(block);
     LOG_DEBUG_INF("[REDO] Succeed to replay set fs block: %s, used_num:%hu, vg name:%s.", wr_display_metaid(data->id),
         block->head.used_num, vg_item->vg_name);
     return CM_SUCCESS;
@@ -1155,32 +1152,6 @@ status_t rb_redo_set_fs_aux_block_batch(wr_session_t *session, wr_vg_info_item_t
     return CM_SUCCESS;
 }
 
-static void print_redo_set_fs_aux_block_batch(wr_redo_entry_t *entry)
-{
-    wr_redo_set_fs_aux_block_batch_t *data = (wr_redo_set_fs_aux_block_batch_t *)entry->data;
-    (void)printf("    fs_aux_block_batch = {\n");
-    (void)printf("     fs_block_id = {\n");
-    printf_auid(&data->fs_block_id);
-    (void)printf("      }\n");
-    (void)printf("     first_batch_au = {\n");
-    printf_auid(&data->first_batch_au);
-    (void)printf("      }\n");
-    (void)printf("     node_id = {\n");
-    printf_auid(&data->node_id);
-    (void)printf("      }\n");
-    (void)printf("     old_used_num = %hu\n", data->old_used_num);
-    (void)printf("     batch_count = %hu\n", data->batch_count);
-    (void)printf("     new_free_list = {\n");
-    printf_wr_fs_block_list(&data->new_free_list);
-    (void)printf("      }\n");
-    for (uint16 i = 0; i < data->batch_count; i++) {
-        (void)printf("     id_set[%hu] = {\n", i);
-        printf_auid(&data->id_set[i]);
-        (void)printf("      }\n");
-    }
-    (void)printf("    }\n");
-}
-
 status_t rp_redo_truncate_fs_block_batch(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_entry_t *entry)
 {
     return CM_SUCCESS;
@@ -1189,28 +1160,6 @@ status_t rp_redo_truncate_fs_block_batch(wr_session_t *session, wr_vg_info_item_
 status_t rb_redo_truncate_fs_block_batch(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_entry_t *entry)
 {
     return CM_SUCCESS;
-}
-static void print_redo_truncate_fs_block_batch(wr_redo_entry_t *entry)
-{
-    wr_redo_truncate_fs_block_batch_t *data = (wr_redo_truncate_fs_block_batch_t *)entry->data;
-    (void)printf("    truncate_fs_block_batch = {\n");
-    (void)printf("     src_id = {\n");
-    printf_auid(&data->src_id);
-    (void)printf("      }\n");
-    (void)printf("     dst_id = {\n");
-    printf_auid(&data->dst_id);
-    (void)printf("      }\n");
-    (void)printf("     src_begin = %hu\n", data->src_begin);
-    (void)printf("     dst_begin = %hu\n", data->dst_begin);
-    (void)printf("     src_old_used_num = %hu\n", data->src_old_used_num);
-    (void)printf("     dst_old_used_num = %hu\n", data->dst_old_used_num);
-    (void)printf("     count = %hu\n", data->count);
-    for (uint16 i = 0; i < data->count; i++) {
-        (void)printf("     id_set[%hu] = {\n", i);
-        printf_auid(&data->id_set[i]);
-        (void)printf("      }\n");
-    }
-    (void)printf("    }\n");
 }
 
 static wr_redo_handler_t g_wr_handlers[] = {
@@ -1270,13 +1219,6 @@ status_t wr_process_redo_log_inner(wr_session_t *session, wr_vg_info_item_t *vg_
 status_t wr_process_redo_log(wr_session_t *session, wr_vg_info_item_t *vg_item)
 {
     return CM_SUCCESS;
-}
-
-static status_t wr_rollback(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_entry_t *entry)
-{
-    WR_LOG_DEBUG_OP("[REDO][ROLLBACK] rollback redo, type:%u.", entry->type);
-    wr_redo_handler_t *handler = &g_wr_handlers[entry->type];
-    return handler->rollback(session, vg_item, entry);
 }
 
 status_t wr_rollback_log(wr_session_t *session, wr_vg_info_item_t *vg_item, char *log_buf)

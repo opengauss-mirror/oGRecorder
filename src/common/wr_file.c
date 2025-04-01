@@ -317,29 +317,10 @@ static status_t wr_exist_item_core(
     return CM_SUCCESS;
 }
 
-static char *wr_file_type_to_str(gft_item_type_t type)
-{
-    switch (type) {
-        case GFT_PATH:
-            return WR_GFT_PATH_STR;
-        case GFT_FILE:
-            return WR_GFT_FILE_STR;
-        default:
-            return WR_GFT_INVALID_STR;
-    }
-}
-
 status_t wr_check_dir(wr_session_t *session, const char *dir_path, gft_item_type_t type,
     wr_check_dir_output_t *output_info, bool32 is_throw_err)
 {
     return CM_SUCCESS;
-}
-
-static status_t wr_refresh_dir_r(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *parent_node, bool8 is_refresh_all_node)
-{
-    status_t status = CM_SUCCESS;
-    return status;
 }
 
 status_t wr_open_dir(wr_session_t *session, const char *dir_path, bool32 is_refresh, wr_find_node_t *find_info)
@@ -1786,21 +1767,6 @@ status_t wr_update_fs_bitmap_block_disk(
     return CM_SUCCESS;
 }
 
-static status_t wr_get_second_block(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t second_block_id, wr_fs_block_t **second_block)
-{
-    *second_block = (wr_fs_block_t *)wr_find_block_in_shm(
-        session, vg_item, second_block_id, WR_BLOCK_TYPE_FS, CM_TRUE, NULL, CM_FALSE);
-    if (!*second_block) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, LOG_DEBUG_ERR("Failed to find the second block:%s.", wr_display_metaid(second_block_id)));
-    }
-    bool32 is_changed;
-    status_t status = wr_check_refresh_fs_block(vg_item, second_block_id, (char *)(*second_block), &is_changed);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to alloc au,vg name %s.", vg_item->wr_ctrl->vg_info.vg_name));
-    return CM_SUCCESS;
-}
-
 static status_t wr_get_block_entry(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_config_t *inst_cfg,
     uint64 fid, ftid_t ftid, gft_node_t **node_out, wr_fs_block_t **entry_out)
 {
@@ -1877,11 +1843,6 @@ status_t wr_extend_inner(wr_session_t *session, wr_node_data_t *node_data)
     return CM_SUCCESS;
 }
 
-static bool is_free_space_enough(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 needed_size)
-{
-    return false;
-}
-
 status_t wr_extend_from_offset(
     wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, wr_node_data_t *node_data)
 {
@@ -1934,47 +1895,6 @@ status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data)
     return status;
 }
 
-static void wr_init_truncate_fs_block_batch_redo(wr_fs_block_t *src_fsb, wr_fs_block_t *dst_fsb, uint16 src_idx,
-    uint16 dst_idx, wr_redo_truncate_fs_block_batch_t *redo)
-{
-    redo->src_id = src_fsb->head.common.id;
-    redo->dst_id = dst_fsb->head.common.id;
-    WR_ASSERT_LOG(!wr_cmp_blockid(redo->src_id, WR_INVALID_64), "src id should not be invalid id.");
-    WR_ASSERT_LOG(!wr_cmp_blockid(redo->dst_id, WR_INVALID_64), "dst id should not be invalid id.");
-    redo->src_begin = src_idx;
-    redo->dst_begin = dst_idx;
-    redo->dst_old_used_num = dst_fsb->head.used_num;
-    redo->src_old_used_num = src_fsb->head.used_num;
-}
-static void wr_transfer_remaining_au_inner(wr_session_t *session, wr_vg_info_item_t *vg_item,
-    wr_fs_block_t *src_partial_sfsb, wr_fs_block_t *dst_sfsb, uint32 *src_au_idx, uint32 *dst_au_idx,
-    wr_redo_truncate_fs_block_batch_t *redo, auid_t *auid)
-{
-    uint16 count = 0;
-    uint32 au_idx_limit = (uint32)(WR_FILE_SPACE_BLOCK_BITMAP_COUNT);
-    wr_init_truncate_fs_block_batch_redo(
-        src_partial_sfsb, dst_sfsb, (uint16)(*src_au_idx), (uint16)(*dst_au_idx), redo);
-    while (*src_au_idx < au_idx_limit && !wr_cmp_auid(*auid, WR_INVALID_ID64) && (*dst_au_idx) < au_idx_limit) {
-        redo->id_set[count] = src_partial_sfsb->bitmap[*src_au_idx];
-        dst_sfsb->bitmap[*dst_au_idx] = src_partial_sfsb->bitmap[*src_au_idx];
-        wr_set_blockid(&src_partial_sfsb->bitmap[*src_au_idx], WR_INVALID_64);
-        dst_sfsb->head.used_num++;
-        src_partial_sfsb->head.used_num--;
-        LOG_DEBUG_INF(
-            "Success to transfer the partial FSB, curr src_au_idx:%u, curr dst_au_idx:%u, dst SFSB used num:%d, "
-            "src SFSB used num:%d.",
-            *src_au_idx, *dst_au_idx, dst_sfsb->head.used_num, src_partial_sfsb->head.used_num);
-        (*src_au_idx)++;
-        (*dst_au_idx)++;
-        (*auid) = src_partial_sfsb->bitmap[*src_au_idx];
-        count++;
-    }
-    redo->count = count;
-    if (count != 0) {
-        wr_put_log(session, vg_item, WR_RT_TRUNCATE_FS_BLOCK_BATCH, redo, sizeof(wr_redo_truncate_fs_block_batch_t));
-    }
-}
-
 /* validate params, lock VG and process recovery for truncate */
 static status_t wr_prepare_truncate(wr_session_t *session, wr_vg_info_item_t *vg_item, int64 length)
 {
@@ -1986,20 +1906,6 @@ static status_t wr_prepare_truncate(wr_session_t *session, wr_vg_info_item_t *vg
             LOG_DEBUG_ERR("Failed to check file,errcode:%d.", cm_get_error_code()));
     }
     return CM_SUCCESS;
-}
-
-static void wr_truncate_set_recycle_size(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, gft_node_t *trunc_ftn, int64 length)
-{
-    uint64 align_length = CM_CALC_ALIGN((uint64)length, wr_get_vg_au_size(vg_item->wr_ctrl));
-    wr_redo_set_file_size_t redo_size;
-    uint64 old_size = (uint64)trunc_ftn->size;
-    (void)cm_atomic_set(&trunc_ftn->size, (int64)((uint64)node->size - align_length));
-    trunc_ftn->written_size = 0;
-    redo_size.ftid = trunc_ftn->id;
-    redo_size.size = (uint64)trunc_ftn->size;
-    redo_size.oldsize = old_size;
-    wr_put_log(session, vg_item, WR_RT_SET_FILE_SIZE, &redo_size, sizeof(redo_size));
 }
 
 static void wr_truncate_set_size(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 length)
@@ -2216,18 +2122,6 @@ bool32 wr_try_revalidate_file(wr_session_t *session, wr_vg_info_item_t *vg_item,
     return CM_FALSE;
 }
 
-static status_t wr_refresh_file_ft_core(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 fid, ftid_t ftid,
-    bool32 check_fid, gft_node_t **node_out)
-{
-    return CM_SUCCESS;
-}
-
-static status_t wr_refresh_file_core(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 fid, ftid_t ftid, int64 offset)
-{
-    return CM_SUCCESS;
-}
-
 status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64 offset)
 {
     return CM_SUCCESS;
@@ -2336,14 +2230,6 @@ status_t wr_update_file_written_size(
     }
 
     wr_ft_block_t *cur_block = wr_get_ft_by_node(node);
-    wr_block_ctrl_t *block_ctrl = WR_GET_BLOCK_CTRL_FROM_META(cur_block);
-
-    if (WR_IS_FILE_INNER_INITED(node->flags) && node->min_inited_size < written_size) {
-        bool32 is_init_tail = CM_FALSE;
-        if ((offset % WR_PAGE_SIZE != 0 || written_size % WR_PAGE_SIZE != 0)) {
-            is_init_tail = CM_TRUE;
-        }
-    }
 
     bool32 has_updt_min_written_size = CM_FALSE;
     bool32 has_updt_written_size = CM_FALSE;
@@ -2432,82 +2318,6 @@ void wr_clean_all_sessions_latch()
         wr_clean_session_latch(session, CM_TRUE);
         wr_server_session_unlock(session);
     }
-}
-
-static status_t wr_clean_delay_file_node(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *parent_node, gft_node_t *node)
-{
-    return CM_SUCCESS;
-}
-
-static status_t wr_clean_delay_node(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *parent_node, gft_node_t *node)
-{
-    LOG_DEBUG_INF("[DELAY_CLEAN]Delay File begin to clean name %s ftid:%s.", node->name, wr_display_metaid(node->id));
-    if (node->type == GFT_PATH) {
-        // clean delay path only when they have no children node
-        LOG_DEBUG_INF("[DELAY_CLEAN]Delay File %s ftid:%s is path, children node count %u .", node->name,
-            wr_display_metaid(node->id), node->items.count);
-        wr_free_ft_node(session, vg_item, parent_node, node, CM_TRUE);
-    } else {
-        status_t status = wr_clean_delay_file_node(session, vg_item, parent_node, node);
-        WR_RETURN_IF_ERROR(status);
-    }
-    if (wr_process_redo_log(session, vg_item) != CM_SUCCESS) {
-        LOG_RUN_ERR("[WR] ABORT INFO: redo log process failed, errcode:%d, OS errno:%d, OS errmsg:%s.",
-            cm_get_error_code(), errno, strerror(errno));
-        cm_fync_logfile();
-        wr_exit(1);
-    }
-    LOG_DEBUG_INF("[DELAY_CLEAN]Delay File clean success.");
-    return CM_SUCCESS;
-}
-
-// node is must delay file
-static status_t wr_check_delay_node(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *parent_node, gft_node_t *node)
-{
-    LOG_DEBUG_INF("[DELAY_CLEAN]Delay File begin to check name %s ftid:%s.", node->name, wr_display_metaid(node->id));
-    LOG_DEBUG_INF("Parent name:%s ftid:%s", parent_node->name, wr_display_metaid(parent_node->id));
-    bool32 is_open = CM_FALSE;
-    // check delay file open local
-    status_t status = wr_check_open_file(session, vg_item, WR_ID_TO_U64(node->id), &is_open);
-    WR_RETURN_IFERR2(status,
-        LOG_RUN_WAR("[DELAY_CLEAN]Failed to check local, name %s ftid:%s.", node->name, wr_display_metaid(node->id)));
-    if (is_open) {
-        LOG_DEBUG_INF("[DELAY_CLEAN]File %s ftid:%s is delay node, but have opened local, check next time.", node->name,
-            wr_display_metaid(node->id));
-        return CM_SUCCESS;
-    }
-
-    wr_block_ctrl_t *block_ctrl = wr_get_block_ctrl_by_node(node);
-    if (block_ctrl != NULL) {
-        uint64 bg_task_ref_cnt = (uint64)cm_atomic_get((atomic_t *)&block_ctrl->bg_task_ref_cnt);
-        if (bg_task_ref_cnt > 0) {
-            LOG_DEBUG_INF(
-                "[DELAY_CLEAN]File %s ftid:%llu is delay node, but have ref by bg task local, check next time.",
-                node->name, WR_ID_TO_U64(node->id));
-            return CM_SUCCESS;
-        }
-    }
-
-    if (broadcast_check_file_open_proc != NULL) {
-        // broadcast to check file open
-        status = broadcast_check_file_open_proc(vg_item, WR_ID_TO_U64(node->id), &is_open);
-        WR_RETURN_IFERR2(status, LOG_RUN_WAR("[DELAY_CLEAN]Failed check broadcast, name %s ftid:%llu.", node->name,
-                                      WR_ID_TO_U64(node->id)));
-        if (is_open) {
-            LOG_DEBUG_INF(
-                "[DELAY_CLEAN]File %s ftid:%s is delay node, but have opened other instance, check next time.",
-                node->name, wr_display_metaid(node->id));
-            return CM_SUCCESS;
-        }
-    }
-
-    status = wr_clean_delay_node(session, vg_item, parent_node, node);
-    WR_RETURN_IFERR2(status,
-        LOG_RUN_WAR("[DELAY_CLEAN]Failed to clean delay node,name %s ftid:%llu.", node->name, WR_ID_TO_U64(node->id)));
-    return CM_SUCCESS;
 }
 
 gft_node_t *wr_get_next_node(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node)

@@ -53,24 +53,6 @@ bool32 wr_can_alloc_from_recycle(const gft_node_t *root_node, bool32 is_before)
     return CM_FALSE;
 }
 
-static status_t wr_alloc_au_recycle_fs_aux(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, wr_block_id_t *auid, uint16 sec_index)
-{
-    return CM_SUCCESS;
-}
-
-static void wr_remove_last_au_from_sec_fs_block(wr_session_t *session, wr_vg_info_item_t *vg_item,
-    gft_node_t *ft_node, wr_fs_block_t *entry_fs_block, uint16 entry_fs_idx, ga_obj_id_t obj_id, wr_fs_block_t *block)
-{
-    return;
-}
-
-static void wr_remove_last_sec_fs_from_entry_fs(wr_session_t *session, wr_vg_info_item_t *vg_item,
-    gft_node_t *recycle_root_node, gft_node_t *ft_node, wr_fs_block_t *entry_fs_block, ga_obj_id_t entry_objid)
-{
-    return;
-}
-
 status_t wr_alloc_au_core(wr_session_t *session, wr_ctrl_t *wr_ctrl, wr_vg_info_item_t *vg_item, auid_t *auid)
 {
     return CM_SUCCESS;

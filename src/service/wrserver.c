@@ -141,57 +141,6 @@ static status_t wr_delay_clean_background_task(wr_instance_t *inst)
     return status;
 }
 
-static status_t wr_create_bg_task_set(wr_instance_t *inst, char *task_name, uint32 max_task_num,
-    wr_get_bg_task_idx_func_t get_bg_task_idx, thread_entry_t bg_task_entry, wr_bg_task_info_t *bg_task_info_set,
-    void *task_args)
-{
-    LOG_RUN_INF("create wr background task set for:%s.", task_name);
-
-    uint32 task_num = g_vgs_info->group_num;
-    if (task_num > max_task_num) {
-        task_num = max_task_num;
-    }
-
-    uint32 vg_per_task = g_vgs_info->group_num / task_num;
-    uint32 vg_left = g_vgs_info->group_num % task_num;
-
-    uint32 vg_id = 0;
-    uint32 cur_range = 0;
-
-    for (uint32 i = 0; i < task_num; i++) {
-        bg_task_info_set[i].task_num_max = task_num;
-        bg_task_info_set[i].my_task_id = i;
-        bg_task_info_set[i].vg_id_beg = vg_id;
-        bg_task_info_set[i].task_args = task_args;
-        if (vg_left > 0) {
-            cur_range = vg_per_task + 1;
-            vg_left--;
-        } else {
-            cur_range = vg_per_task;
-        }
-        bg_task_info_set[i].vg_id_end = bg_task_info_set[i].vg_id_beg + cur_range;
-        vg_id = bg_task_info_set[i].vg_id_end;
-        LOG_RUN_INF("task:%s id:%u, vg_range:[%u-%u).", task_name, bg_task_info_set[i].my_task_id,
-            bg_task_info_set[i].vg_id_beg, bg_task_info_set[i].vg_id_end);
-
-        uint32 work_idx = get_bg_task_idx(i);
-        status_t status = cm_create_thread(bg_task_entry, 0, &(bg_task_info_set[i]), &(inst->threads[work_idx]));
-        if (status != CM_SUCCESS) {
-            return CM_ERROR;
-        }
-    }
-    return CM_SUCCESS;
-}
-
-static status_t wr_alarm_check_background_task(wr_instance_t *inst)
-{
-    LOG_RUN_INF("create wr alarm check background task.");
-    uint32 vg_usgae_alarm_thread_id = wr_get_alarm_check_task_idx();
-    status_t status =
-        cm_create_thread(wr_alarm_check_proc, 0, &g_wr_instance, &(g_wr_instance.threads[vg_usgae_alarm_thread_id]));
-    return status;
-}
-
 static status_t wr_init_background_tasks(void)
 {
     status_t status = wr_recovery_background_task(&g_wr_instance);
