@@ -91,7 +91,6 @@ status_t cmd_check_convert_wr_home(const char *input_args, void **convert_result
 status_t cmd_realpath_home(const char *input_args, char **convert_result, int *convert_size);
 void cmd_clean_check_convert(char *convert_result, int convert_size);
 status_t set_config_info(char *home, wr_config_t *inst_cfg);
-status_t wr_get_vg_item(wr_vg_info_item_t **vg_item, const char *vg_name);
 status_t wr_check_meta_type(const char *type);
 status_t wr_check_meta_id(const char *intput);
 status_t cmd_parse_check(wr_args_t *cmd_args_set, int set_size);

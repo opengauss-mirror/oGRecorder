@@ -1032,12 +1032,7 @@ static uint32 wr_try_find_recycle_meta_by_bucket(wr_session_t *session, wr_vg_in
 
 static void wr_meta_init_owner_fs_block_cache(wr_block_ctrl_t *owner_block_ctrl)
 {
-    owner_block_ctrl->fs_block_cache_info.entry_block_addr = NULL;
-    owner_block_ctrl->fs_block_cache_info.entry_block_id = 0;
-    owner_block_ctrl->fs_block_cache_info.fs_block_addr = NULL;
-    owner_block_ctrl->fs_block_cache_info.fs_block_id = 0;
-    owner_block_ctrl->fs_block_cache_info.fs_aux_addr = NULL;
-    owner_block_ctrl->fs_block_cache_info.fs_aux_block_id = 0;
+    return;
 }
 
 static bool32 wr_try_clean_cache_meta(wr_session_t *session, wr_block_ctrl_t *block_ctrl)

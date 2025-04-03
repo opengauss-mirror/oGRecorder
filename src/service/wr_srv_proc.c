@@ -373,23 +373,6 @@ status_t wr_create_file(wr_session_t *session, const char *parent, const char *n
     return wr_filesystem_touch(path);
 }
 
-void wr_clean_open_files_in_vg(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 pid)
-{
-    wr_open_file_info_t *open_file = NULL;
-    wr_latch_x2(&vg_item->open_file_latch, session->id);
-    bilist_node_t *curr_node = cm_bilist_head(&vg_item->open_file_list);
-    bilist_node_t *next_node = NULL;
-    while (curr_node != NULL) {
-        next_node = curr_node->next;
-        open_file = BILIST_NODE_OF(wr_open_file_info_t, curr_node, link);
-        if (open_file->pid == pid) {
-            wr_free_open_file_node(curr_node, &vg_item->open_file_list);
-        }
-        curr_node = next_node;
-    }
-    wr_unlatch(&vg_item->open_file_latch);
-}
-
 #ifdef __cplusplus
 }
 #endif

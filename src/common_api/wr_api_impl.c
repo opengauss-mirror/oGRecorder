@@ -62,8 +62,6 @@ status_t wr_kick_host_sync(wr_conn_t *conn, int64 kick_hostid)
 }
 
 status_t wr_apply_refresh_volume(wr_conn_t *conn, wr_file_context_t *context, auid_t auid);
-status_t wr_refresh_volume_handle(wr_conn_t *conn, wr_file_context_t *context, auid_t auid);
-status_t wr_reopen_volume_handle(wr_conn_t *conn, wr_file_context_t *context, auid_t auid);
 
 status_t wr_apply_extending_file(wr_conn_t *conn, int32 handle, int64 size, int64 offset)
 {
@@ -155,16 +153,6 @@ static status_t wr_check_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *
 
 static status_t wr_check_refresh_file_by_offset(
     wr_conn_t *conn, wr_file_context_t *context, int64 offset, bool32 is_read)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_refresh_volume_handle(wr_conn_t *conn, wr_file_context_t *context, auid_t auid)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_reopen_volume_handle(wr_conn_t *conn, wr_file_context_t *context, auid_t auid)
 {
     return CM_SUCCESS;
 }
@@ -957,11 +945,6 @@ int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin)
     return new_offset;
 }
 
-static status_t wr_check_ready_fs_block(files_rw_ctx_t *rw_ctx, wr_fs_pos_desc_t *fs_pos)
-{
-    return CM_SUCCESS;
-}
-
 status_t wr_read_write_file_core(wr_rw_param_t *param, void *buf, int32 size, int32 *read_size)
 {
     status_t status = CM_SUCCESS;
@@ -1457,64 +1440,6 @@ status_t wr_fstat_impl(wr_conn_t *conn, int handle, wr_stat_info_t item)
     status_t ret = wr_set_stat_info(item, context->node);
     wr_unlatch(&context->latch);
     return ret;
-}
-
-status_t wr_aio_check_need_updt_fs_aux(wr_rw_param_t *param, int32 size, bool32 *need_update)
-{
-    wr_conn_t *conn = param->conn;
-    wr_file_context_t *context = param->context;
-    long long offset = param->offset;
-
-    *need_update = CM_FALSE;
-    if (context->node->min_inited_size >= (uint64)(offset + size)) {
-        return CM_SUCCESS;
-    }
-
-    uint64 au_size = wr_get_vg_au_size(context->vg_item->wr_ctrl);
-
-    wr_fs_pos_desc_t fs_pos = {0};
-    files_rw_ctx_t rw_ctx;
-    rw_ctx.conn = conn;
-    rw_ctx.env = param->wr_env;
-    rw_ctx.file_ctx = context;
-    rw_ctx.handle = param->handle;
-    rw_ctx.read = CM_TRUE;  // should NOT apply extend for aio post
-
-    int64 top_size = (context->node->size > (param->offset + size)) ? (offset + size) : context->node->size;
-    int64 left_size = size;
-    int64 cur_size = 0;
-
-    do {
-        int64 align_size = (int64)CM_CALC_ALIGN((uint64)(offset + 1), au_size);
-        if (offset + left_size > align_size) {
-            cur_size = align_size - offset;
-        } else {
-            cur_size = left_size;
-        }
-
-        rw_ctx.offset = offset;
-        rw_ctx.size = (int32)cur_size;
-
-        status_t status = wr_check_ready_fs_block(&rw_ctx, &fs_pos);
-        WR_RETURN_IF_ERROR(status);
-        if (!fs_pos.is_valid) {
-            LOG_RUN_ERR("Fail to find fs block for file:%s, fid:%llu, fti:%llu, cur offset:%llu, size:%lld,"
-                        "written_size:%llu, file size:%llu.",
-                context->node->name, context->node->fid, WR_ID_TO_U64(context->node->id), offset, cur_size,
-                context->node->written_size, (uint64)context->node->size);
-            return CM_ERROR;
-        }
-
-        offset += cur_size;
-        left_size -= cur_size;
-    } while (offset < top_size);
-
-    return CM_SUCCESS;
-}
-
-status_t wr_aio_post_pwrite_file_impl(wr_conn_t *conn, int handle, long long offset, int size)
-{
-    return CM_SUCCESS;
 }
 
 static status_t wr_get_phy_size_prepare(wr_conn_t *conn, wr_file_context_t *context, long long *size)

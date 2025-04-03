@@ -289,14 +289,11 @@ bool32 rp_check_block_addr(const wr_block_addr_his_t *addr_his, const void *bloc
 status_t wr_write_redolog_to_disk(wr_vg_info_item_t *item, uint32 volume_id, int64 offset, char *buf, uint32 size);
 void wr_put_log(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_type_t type, void *data, uint32 size);
 status_t wr_flush_log(wr_vg_info_item_t *vg_item, char *log_buf);
-status_t wr_apply_log(wr_session_t *session, wr_vg_info_item_t *vg_item, char *log_buf);
 status_t wr_process_redo_log(wr_session_t *session, wr_vg_info_item_t *vg_item);
 status_t wr_reset_log_slot_head(uint32 vg_id, char *log_buf);
 void wr_rollback_mem_update(wr_session_t *session, wr_vg_info_item_t *vg_item);
 void rb_redo_clean_resource(
     wr_session_t *session, wr_vg_info_item_t *item, auid_t auid, ga_pool_id_e pool_id, uint32 first, uint32 count);
-status_t wr_update_redo_info(wr_vg_info_item_t *vg_item, char *log_buf);
-void wr_print_redo_entry(wr_redo_entry_t *entry);
 
 #ifdef __cplusplus
 }

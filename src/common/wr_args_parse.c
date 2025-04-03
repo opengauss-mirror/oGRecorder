@@ -319,17 +319,6 @@ status_t set_config_info(char *home, wr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-status_t wr_get_vg_item(wr_vg_info_item_t **vg_item, const char *vg_name)
-{
-    wr_vg_info_item_t *tmp_vg_item = wr_find_vg_item(vg_name);
-    if (tmp_vg_item == NULL) {
-        LOG_DEBUG_ERR("vg_name %s is not exist.\n", vg_name);
-        return CM_ERROR;
-    }
-    *vg_item = tmp_vg_item;
-    return CM_SUCCESS;
-}
-
 config_item_t g_wr_admin_parameters[] = {
     // name (30B)                     isdefault readonly  defaultvalue value runtime_value description range  datatype
     // comment

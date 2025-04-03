@@ -85,17 +85,12 @@ void wr_free_vg_info();
 wr_vg_info_item_t *wr_find_vg_item(const char *vg_name);
 wr_vg_info_item_t *wr_find_vg_item_by_id(uint32 vg_id);
 
-status_t wr_load_vg_ctrl(wr_vg_info_item_t *vg_item, bool32 is_lock);
 
 status_t wr_load_vg_ctrl_part(wr_vg_info_item_t *vg_item, int64 offset, void *buf, int32 size, bool32 *remote);
-status_t wr_check_refresh_core(wr_vg_info_item_t *vg_item);
 
 void wr_lock_vg_mem_x(wr_vg_info_item_t *vg_item);
-void wr_lock_vg_mem_x2ix(wr_vg_info_item_t *vg_item);
-void wr_lock_vg_mem_ix2x(wr_vg_info_item_t *vg_item);
 void wr_lock_vg_mem_s(wr_vg_info_item_t *vg_item);
 void wr_lock_vg_mem_s_force(wr_vg_info_item_t *vg_item);
-void wr_lock_vg_mem_degrade(wr_vg_info_item_t *vg_item);
 void wr_unlock_vg_mem(wr_vg_info_item_t *vg_item);
 
 status_t wr_file_lock_vg_w(wr_config_t *inst_cfg);
@@ -108,14 +103,12 @@ status_t wr_unlock_vg_raid(wr_vg_info_item_t *vg_item, const char *entry_path, i
 status_t wr_unlock_vg_share_disk(wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id);
 status_t wr_unlock_vg(int32 wr_mode, wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id);
 status_t wr_lock_vg_storage_r(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
-status_t wr_lock_vg_storage_w(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
 status_t wr_unlock_vg_storage(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
 status_t wr_lock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
 status_t wr_unlock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
 status_t wr_add_volume(wr_session_t *session, const char *vg_name, const char *volume_name);
 status_t wr_remove_volume(wr_session_t *session, const char *vg_name, const char *volume_name);
 status_t wr_refresh_meta_info(wr_session_t *session);
-status_t wr_load_volume_ctrl(wr_vg_info_item_t *vg_item, wr_volume_ctrl_t *volume_ctrl);
 
 status_t wr_write_ctrl_to_disk(wr_vg_info_item_t *vg_item, int64 offset, void *buf, uint32 size);
 status_t wr_update_core_ctrl_disk(wr_vg_info_item_t *vg_item);

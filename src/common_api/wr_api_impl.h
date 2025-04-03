@@ -227,7 +227,6 @@ status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, co
 status_t wr_getcfg_impl(wr_conn_t *conn, const char *name, char *out_str, size_t str_len);
 status_t wr_stop_server_impl(wr_conn_t *conn);
 void wr_get_api_volume_error(void);
-status_t wr_aio_post_pwrite_file_impl(wr_conn_t *conn, int handle, long long offset, int size);
 status_t wr_get_phy_size_impl(wr_conn_t *conn, int handle, long long *size);
 status_t wr_msg_interact(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack);
 status_t wr_fallocate_impl(wr_conn_t *conn, int handle, int mode, long long int offset, long long int length);

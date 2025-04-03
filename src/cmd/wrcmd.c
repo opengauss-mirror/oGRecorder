@@ -1448,43 +1448,6 @@ status_t wr_load_wr_ctrl_group_from_file(
     return CM_SUCCESS;
 }
 
-status_t wr_load_vg_item_and_pool_from_file(const char *file_name, const char *vg_name, wr_vg_info_item_t *vg_item)
-{
-    int32 file_fd = wr_open_memory_file(file_name);
-    if (file_fd == -1) {
-        LOG_DEBUG_ERR("Failed to open memory file %s", file_name);
-        return CM_ERROR;
-    }
-    int64 size = cm_file_size(file_fd);
-    if (size == -1) {
-        cm_close_file(file_fd);
-        LOG_DEBUG_ERR("Failed to read file size %s", file_name);
-        return CM_ERROR;
-    }
-    int64 length = -1;
-    status_t status;
-    bool32 result = (bool32)(cm_seek_file(file_fd, 0, SEEK_SET) != -1);
-    WR_RETURN_IF_FALSE2(result, LOG_DEBUG_ERR("Failed to seek file %s", file_name));
-    do {
-        status = wr_load_wr_ctrl_group_from_file(file_fd, &length, vg_name, vg_item);
-        if (status != CM_SUCCESS) {
-            if (length == -1) {
-                break;
-            }
-            result = (bool32)(cm_seek_file(file_fd, length, SEEK_SET) != -1);
-            WR_RETURN_IF_FALSE2(result, LOG_DEBUG_ERR("Failed to seek file %s", file_name));
-        }
-
-        status = wr_load_buffer_cache_group_from_file(file_fd, &length, vg_name, vg_item);
-        WR_BREAK_IF_ERROR(status);
-    } while (CM_FALSE);
-    cm_close_file(file_fd);
-    if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to load vg item %s", vg_name);
-    }
-    return status;
-}
-
 static wr_args_t cmd_rename_args[] = {
     {'o', "old_name", CM_TRUE, CM_TRUE, wr_cmd_check_device_path, cmd_check_convert_path, cmd_clean_check_convert, 0,
         NULL, NULL, 0},

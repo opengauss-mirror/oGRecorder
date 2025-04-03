@@ -53,28 +53,7 @@ bool32 wr_can_alloc_from_recycle(const gft_node_t *root_node, bool32 is_before)
     return CM_FALSE;
 }
 
-status_t wr_alloc_au_core(wr_session_t *session, wr_ctrl_t *wr_ctrl, wr_vg_info_item_t *vg_item, auid_t *auid)
-{
-    return CM_SUCCESS;
-}
-
-bool32 wr_alloc_au_batch(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t *auid, uint32 count)
-{
-    return CM_TRUE;
-}
-
 status_t wr_alloc_au(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t *auid)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_get_core_version(wr_vg_info_item_t *item, uint64 *version)
-{
-    return CM_SUCCESS;
-}
-
-// shoud lock in caller
-status_t wr_load_core_ctrl(wr_vg_info_item_t *item, wr_core_ctrl_t *core)
 {
     return CM_SUCCESS;
 }

@@ -40,17 +40,7 @@ void printf_auid(const auid_t *first)
 
 void printf_wr_fs_block_list(wr_fs_block_list_t *free)
 {
-    (void)printf("      count = %llu\n", free->count);
-
-    auid_t *first = &free->first;
-    (void)printf("      first = {\n");
-    printf_auid(first);
-    (void)printf("      }\n");
-
-    auid_t *last = &free->last;
-    (void)printf("      last = {\n");
-    printf_auid(last);
-    (void)printf("      }\n");
+    return;
 }
 
 void printf_wr_fs_aux_root(wr_fs_aux_root_t *root)
@@ -65,12 +55,7 @@ void printf_wr_fs_aux_root(wr_fs_aux_root_t *root)
 
 void printf_wr_fs_block_root(wr_fs_block_root_t *root)
 {
-    (void)printf("    version = %llu\n", root->version);
-
-    wr_fs_block_list_t *free = &root->free;
-    (void)printf("    free = {\n");
-    printf_wr_fs_block_list(free);
-    (void)printf("    }\n");
+    return;
 }
 
 void printf_wr_volume_attr(const wr_volume_attr_t *volume_attrs)
@@ -108,35 +93,7 @@ void printf_wr_au_root(wr_au_root_t *au_root)
 
 void wr_printf_core_ctrl_base(wr_core_ctrl_t *core_ctrl)
 {
-    (void)printf("core_ctrl = {\n");
-    (void)printf("  checksum = %u\n", core_ctrl->checksum);
-    (void)printf("  reserve = %u\n", core_ctrl->reserve);
-    (void)printf("  version = %llu\n", core_ctrl->version);
-    (void)printf("  au_size = %u\n", core_ctrl->au_size);
-    (void)printf("  volume_count = %u\n", core_ctrl->volume_count);
-    (void)printf("  fs_block_root = {\n");
-
-    wr_fs_block_root_t *root = (wr_fs_block_root_t *)(core_ctrl->fs_block_root);
-    printf_wr_fs_block_root(root);
-    (void)printf("  }\n");
-    (void)printf("  au_root = {\n");
-
-    wr_au_root_t *au_root = (wr_au_root_t *)(core_ctrl->au_root);
-    printf_wr_au_root(au_root);
-    (void)printf("  }\n");
-
-    wr_volume_attr_t *volume_attrs = core_ctrl->volume_attrs;
-    for (uint32 i = 0; i < WR_MAX_VOLUMES; ++i) {
-        if (i == 0 || volume_attrs->id != 0) {
-            (void)printf("  volume_attrs[%u] = {\n", i);
-            printf_wr_volume_attr(volume_attrs);
-            (void)printf("  }\n");
-        }
-        volume_attrs++;
-        continue;
-    }
-
-    (void)printf("}\n");
+    return;
 }
 
 void printf_gft_list(gft_list_t *items)

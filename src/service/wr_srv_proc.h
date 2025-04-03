@@ -39,7 +39,6 @@ status_t wr_remove_dir(wr_session_t *session, const char *dir, bool32 recursive)
 status_t wr_remove_file(wr_session_t *session, const char *file);
 status_t wr_remove_link(wr_session_t *session, const char *file);
 status_t wr_remove_dir_file_by_node(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node);
-void wr_clean_open_files_in_vg(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 pid);
 #ifdef __cplusplus
 }
 #endif

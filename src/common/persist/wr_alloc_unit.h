@@ -73,10 +73,7 @@ typedef struct st_wr_au_root_t {
 bool32 wr_can_alloc_from_recycle(const gft_node_t *root_node, bool32 is_before);
 void wr_init_au_root(wr_ctrl_t *wr_ctrl);
 status_t wr_alloc_au(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t *auid);
-bool32 wr_alloc_au_batch(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t *auid, uint32 count);
 
-status_t wr_get_core_version(wr_vg_info_item_t *item, uint64 *version);
-status_t wr_load_core_ctrl(wr_vg_info_item_t *item, wr_core_ctrl_t *core);
 void wr_update_core_ctrl(
     wr_session_t *session, wr_vg_info_item_t *item, wr_core_ctrl_t *core, uint32 volume_id, bool32 is_only_root);
 status_t wr_get_au_head(wr_vg_info_item_t *item, auid_t auid, wr_au_head_t *au_head);
