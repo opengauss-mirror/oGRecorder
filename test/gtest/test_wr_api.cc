@@ -8,6 +8,7 @@ extern "C" {
 #define ONE_GB 1024 * 1024 * 1024
 int errorcode = 0;
 const char *errormsg = NULL;
+wr_instance_handle *g_inst_handle;
 
 TEST(WrApiTest, TestInitLogger) {
     int result = wr_init_logger(TEST_LOG_DIR, 255, 100, ONE_GB);
@@ -23,8 +24,17 @@ TEST(WrApiTest, TestInitLoggerNegative) {
     EXPECT_NE(result, WR_SUCCESS);
 }
 
+TEST(WrApiTest, TestWrCreateInstance) {
+    int result = wr_create_instance("20.20.20.135:15430", g_inst_handle);
+    if (result != 0) {
+        wr_get_error(&errorcode, &errormsg);
+        printf("%d : %s\n", errorcode, errormsg);
+    }
+    EXPECT_EQ(result, WR_SUCCESS);
+}
+
 TEST(WrApiTest, TestWrVfsCreate) {
-    int result = wr_vfs_create(TEST_DIR);
+    int result = wr_vfs_create(TEST_DIR, *g_inst_handle);
     if (result != 0) {
         wr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
@@ -34,7 +44,7 @@ TEST(WrApiTest, TestWrVfsCreate) {
 
 TEST(WrApiTest, TestWrVfsCreateNegative) {
     // Negative test case: create directory with invalid name
-    int result = wr_vfs_create("");
+    int result = wr_vfs_create("", NULL);
     EXPECT_NE(result, WR_SUCCESS);
 }
 

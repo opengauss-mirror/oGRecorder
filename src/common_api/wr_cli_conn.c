@@ -82,7 +82,7 @@ void wr_clt_env_init(void)
     }
 }
 
-status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn)
+status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn, const char *addr)
 {
     // establish connection
     status_t status = CM_ERROR;
@@ -90,7 +90,7 @@ status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn)
     do {
         // avoid buffer leak when disconnect
         wr_free_packet_buffer(&conn->pack);
-        status = wr_connect("127.0.0.1:19225", options, conn);
+        status = wr_connect(addr, options, conn);
         WR_BREAK_IFERR2(status, LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client connet server failed."));
         uint32 max_open_file = WR_MAX_OPEN_FILES;
         conn->proto_version = WR_PROTO_VERSION;
@@ -104,7 +104,7 @@ status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn)
     return status;
 }
 
-status_t wr_conn_opts_create(pointer_t *result)
+status_t wr_conn_opts_create(pointer_t *result, const char *addr)
 {
     wr_conn_opt_t *options = (wr_conn_opt_t *)cm_malloc(sizeof(wr_conn_opt_t));
     if (options == NULL) {
@@ -116,12 +116,12 @@ status_t wr_conn_opts_create(pointer_t *result)
     return CM_SUCCESS;
 }
 
-static status_t wr_conn_sync(wr_conn_opt_t *options, wr_conn_t *conn)
+static status_t wr_conn_sync(wr_conn_opt_t *options, wr_conn_t *conn, const char *addr)
 {
     status_t ret = CM_ERROR;
     int timeout = (options != NULL ? options->timeout : g_wr_uds_conn_timeout);
     do {
-        ret = wr_try_conn(options, conn);
+        ret = wr_try_conn(options, conn, addr);
         if (ret == CM_SUCCESS) {
             break;
         }
@@ -132,7 +132,7 @@ static status_t wr_conn_sync(wr_conn_opt_t *options, wr_conn_t *conn)
     return ret;
 }
 
-status_t wr_conn_create(pointer_t *result)
+status_t wr_conn_create(pointer_t *result, const char *addr)
 {
     wr_conn_t *conn = (wr_conn_t *)cm_malloc(sizeof(wr_conn_t));
     if (conn == NULL) {
@@ -145,8 +145,8 @@ status_t wr_conn_create(pointer_t *result)
     // init packet
     wr_init_packet(&conn->pack, conn->pipe.options);
     wr_conn_opt_t *options = NULL;
-    (void)cm_get_thv(GLOBAL_THV_OBJ1, CM_FALSE, (pointer_t *)&options);
-    if (wr_conn_sync(options, conn) != CM_SUCCESS) {
+    (void)cm_get_thv(GLOBAL_THV_OBJ1, CM_FALSE, (pointer_t *)&options, addr);
+    if (wr_conn_sync(options, conn, addr) != CM_SUCCESS) {
         WR_THROW_ERROR(ERR_WR_CONNECT_FAILED, cm_get_os_error(), strerror(cm_get_os_error()));
         WR_FREE_POINT(conn);
         return CM_ERROR;
@@ -158,11 +158,11 @@ status_t wr_conn_create(pointer_t *result)
     return CM_SUCCESS;
 }
 
-static status_t wr_get_conn(wr_conn_t **conn)
+static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
 {
     cm_reset_error();
     wr_clt_env_init();
-    if (cm_get_thv(GLOBAL_THV_OBJ0, CM_TRUE, (pointer_t *)conn) != CM_SUCCESS) {
+    if (cm_get_thv(GLOBAL_THV_OBJ0, CM_TRUE, (pointer_t *)conn, addr) != CM_SUCCESS) {
         LOG_RUN_ERR("[WR API] ABORT INFO : wr server stoped, application need restart.");
         cm_fync_logfile();
         wr_exit(1);
@@ -172,7 +172,7 @@ static status_t wr_get_conn(wr_conn_t **conn)
     if ((*conn)->flag && (*conn)->conn_pid != getpid()) {
         LOG_RUN_INF("wr client need re-connect, last conn pid:%llu.", (uint64)(*conn)->conn_pid);
         wr_disconnect(*conn);
-        if (wr_conn_sync(NULL, *conn) != CM_SUCCESS) {
+        if (wr_conn_sync(NULL, *conn, addr) != CM_SUCCESS) {
             LOG_RUN_ERR("[WR API] ABORT INFO: wr server stoped, application need restart.");
             cm_fync_logfile();
             wr_exit(1);
@@ -189,16 +189,16 @@ static status_t wr_get_conn(wr_conn_t **conn)
     return CM_SUCCESS;
 }
 
-status_t wr_enter_api(wr_conn_t **conn)
+status_t wr_enter_api(wr_conn_t **conn, const char *addr)
 {
-    status_t status = wr_get_conn(conn);
+    status_t status = wr_get_conn(conn, addr);
     if (status != CM_SUCCESS) {
         return status;
     }
     while (wr_cli_session_lock((*conn), (*conn)->session) != CM_SUCCESS) {
         wr_destroy_thv(GLOBAL_THV_OBJ0);
         LOG_RUN_INF("Begin to reconnect wr server.");
-        status = wr_get_conn(conn);
+        status = wr_get_conn(conn, addr);
         if (status != CM_SUCCESS) {
             LOG_RUN_ERR("Failed to reconnect wr server.");
             return status;

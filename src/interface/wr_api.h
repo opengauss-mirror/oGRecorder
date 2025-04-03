@@ -50,6 +50,9 @@ extern "C" {
 struct __wr_dir;
 typedef struct __wr_dir *wr_vfs_handle;
 
+struct __wr_instance_handle;
+typedef struct __wr_instance_handle *wr_instance_handle;
+
 typedef enum en_wr_log_level {
     WR_LOG_LEVEL_ERROR = 0,  // error conditions
     WR_LOG_LEVEL_WARN,       // warning conditions
@@ -139,29 +142,29 @@ typedef void (*wr_log_output)(wr_log_id_t log_type, wr_log_level_t log_level, co
     unsigned int code_line_num, const char *module_name, const char *format, ...);
 typedef void (*wr_exit_callback_t)(int exit_code);
 // vfs
-WR_DECLARE int wr_vfs_create(const char *vfs_name);
-WR_DECLARE int wr_vfs_delete(const char *vfs_name);
-WR_DECLARE int wr_vfs_mount(const char *vfs_name, wr_vfs_handle *vfs_handle);
-WR_DECLARE int wr_vfs_unmount(wr_vfs_handle vfs_handle);
+WR_DECLARE int wr_vfs_create(const char *vfs_name, wr_instance_handle inst_handle);
+WR_DECLARE int wr_vfs_delete(const char *vfs_name, wr_instance_handle inst_handle);
+WR_DECLARE int wr_vfs_mount(const char *vfs_name, wr_vfs_handle *vfs_handle, wr_instance_handle inst_handle);
+WR_DECLARE int wr_vfs_unmount(wr_vfs_handle vfs_handle, wr_instance_handle inst_handle);
 
-WR_DECLARE int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
+WR_DECLARE int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result, wr_instance_handle inst_handle);
 WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
 WR_DECLARE int wr_vfs_query_file_num(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
 
 // file
-WR_DECLARE int wr_file_create(const char *name, int flag);
-WR_DECLARE int wr_file_delete(const char *file);
-WR_DECLARE int wr_file_open(const char *file, int flag, int *handle);
-WR_DECLARE int wr_file_close(int handle);
-WR_DECLARE long long wr_fseek(int handle, long long offset, int origin);
-WR_DECLARE int wr_file_write(int handle, const void *buf, int size);
-WR_DECLARE int wr_file_read(int handle, void *buf, int size, int *read_size);
+WR_DECLARE int wr_file_create(const char *name, int flag, wr_instance_handle inst_handle);
+WR_DECLARE int wr_file_delete(const char *file, wr_instance_handle inst_handle);
+WR_DECLARE int wr_file_open(const char *file, int flag, int *handle, wr_instance_handle inst_handle);
+WR_DECLARE int wr_file_close(int handle, wr_instance_handle inst_handle);
+WR_DECLARE long long wr_fseek(int handle, long long offset, int origin, wr_instance_handle inst_handle);
+WR_DECLARE int wr_file_write(int handle, const void *buf, int size, wr_instance_handle inst_handle);
+WR_DECLARE int wr_file_read(int handle, void *buf, int size, int *read_size, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_rename(const char *src, const char *dst);
-WR_DECLARE int wr_file_truncate(int handle, long long length);
+WR_DECLARE int wr_file_truncate(int handle, long long length, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_size_physical(int handle, long long *fsize);
 WR_DECLARE void wr_file_size_maxwr(const char *fname, long long *fsize);
-WR_DECLARE int wr_file_pwrite(int handle, const void *buf, int size, long long offset);
-WR_DECLARE int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_size);
+WR_DECLARE int wr_file_pwrite(int handle, const void *buf, int size, long long offset, wr_instance_handle inst_handle);
+WR_DECLARE int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_size, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_fallocate(int handle, int mode, long long offset, long long length);
 
 // aio
@@ -179,22 +182,24 @@ WR_DECLARE void wr_refresh_logger(char *log_field, unsigned long long *value);
 // connection
 WR_DECLARE int wr_set_svr_path(const char *conn_path);
 WR_DECLARE int wr_set_conn_timeout(int timeout);
-WR_DECLARE int wr_set_conn_opts(wr_conn_opt_key_e key, void *value);
+WR_DECLARE int wr_set_conn_opts(wr_conn_opt_key_e key, void *value, const char *addr);
 WR_DECLARE void wr_set_default_conn_timeout(int timeout);
+WR_DECLARE int wr_create_instance(const char *addr, wr_instance_handle *inst_handle);
+WR_DECLARE int wr_delete_instance(wr_instance_handle inst_handle);
 // instance param
-WR_DECLARE int wr_set_main_inst(void);
+WR_DECLARE int wr_set_main_inst(wr_instance_handle inst_handle);
 WR_DECLARE int wr_disable_grab_lock(void);
 WR_DECLARE int wr_enable_grab_lock(void);
-WR_DECLARE int wr_get_inst_status(wr_server_status_t *wr_status);
-WR_DECLARE int wr_is_maintain(unsigned int *is_maintain);
+WR_DECLARE int wr_get_inst_status(wr_server_status_t *wr_status, wr_instance_handle inst_handle);
+WR_DECLARE int wr_is_maintain(unsigned int *is_maintain, wr_instance_handle inst_handle);
 
-WR_DECLARE int wr_stat(const char *path, wr_stat_info_t item);
-WR_DECLARE int wr_lstat(const char *path, wr_stat_info_t item);
-WR_DECLARE int wr_fstat(int handle, wr_stat_info_t item);
+WR_DECLARE int wr_stat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle);
+WR_DECLARE int wr_lstat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle);
+WR_DECLARE int wr_fstat(int handle, wr_stat_info_t item, wr_instance_handle inst_handle);
 
 // config
-WR_DECLARE int wr_set_conf(const char *name, const char *value, const char *scope);
-WR_DECLARE int wr_get_conf(const char *name, char *value, int value_size);
+WR_DECLARE int wr_set_conf(const char *name, const char *value, const char *scope, wr_instance_handle inst_handle);
+WR_DECLARE int wr_get_conf(const char *name, char *value, int value_size, wr_instance_handle inst_handle);
 // version
 WR_DECLARE int wr_get_lib_version(void);
 WR_DECLARE void wr_show_version(char *version);

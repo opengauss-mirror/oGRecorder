@@ -62,13 +62,18 @@ typedef struct st_wr_conn_opt {
     char *user_name;
 } wr_conn_opt_t;
 
-status_t wr_conn_create(pointer_t *result);
-status_t wr_conn_opts_create(pointer_t *result);
+typedef struct st_wr_instance_handle {
+    wr_conn_t *conn;
+    char addr[CM_MAX_IP_LEN];
+} st_wr_instance_handle;
+
+status_t wr_conn_create(pointer_t *result, const char *addr);
+status_t wr_conn_opts_create(pointer_t *result, const char *addr);
 void wr_conn_opts_release(pointer_t thv_addr);
 void wr_conn_release(pointer_t thv_addr);
-status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn);
+status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn, const char *addr);
 void wr_clt_env_init(void);
-status_t wr_enter_api(wr_conn_t **conn);
+status_t wr_enter_api(wr_conn_t **conn, const char *addr);
 void wr_leave_api(wr_conn_t *conn, bool32 get_api_volume_error);
 
 #ifdef __cplusplus

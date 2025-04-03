@@ -65,51 +65,115 @@ void wr_set_default_conn_timeout(int timeout)
     g_wr_uds_conn_timeout = timeout;
 }
 
-int wr_vfs_create(const char *vfs_name)
+int wr_create_instance(const char *addr, wr_instance_handle *inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("dmake get conn error."));
-    ret = wr_vfs_create_impl(conn, vfs_name);
-    wr_leave_api(conn, CM_TRUE);
-    return (int)ret;
-}
-
-int wr_vfs_delete(const char *vfs_name)
-{
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("dremove get conn error."));
-    ret = wr_vfs_delete_impl(conn, vfs_name);
-    wr_leave_api(conn, CM_TRUE);
-    return (int)ret;
-}
-
-int wr_vfs_mount(const char *vfs_name, wr_vfs_handle *vfs_handle)
-{
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    if (ret != CM_SUCCESS) {
-        LOG_RUN_ERR("wr_vfs_mount get conn error.");
-        return CM_ERROR;
+    if (addr == NULL || inst_handle == NULL) {
+        LOG_RUN_ERR("create instance get invalid parameter.");
+        return WR_ERROR;
     }
-    wr_vfs_t *dir = wr_open_dir_impl(conn, vfs_name, CM_TRUE);
-    wr_leave_api(conn, CM_TRUE);
-    *vfs_handle = (wr_vfs_handle)dir;
-    return CM_SUCCESS;
-}
 
-int wr_vfs_unmount(wr_vfs_handle vfs_handle)
-{
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("wr_vfs_unmount get conn error"));
-    ret = wr_close_dir_impl(conn, (wr_vfs_t *)vfs_handle);
-    wr_leave_api(conn, CM_TRUE);
+    size_t addr_len = strlen(addr);
+    if (addr_len == 0 || addr_len >= CM_MAX_IP_LEN) {
+        LOG_RUN_ERR("invalid address length: %u", addr_len);
+        return WR_ERROR;
+    }
+
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)malloc(sizeof(st_wr_instance_handle));
+    if (hdl == NULL) {
+        LOG_RUN_ERR("failed to allocate memory for instance handle");
+        return WR_ERROR;
+    }
+    hdl->conn = NULL;
+    errno_t err = memcpy_s(hdl->addr, addr_len + 1, addr, addr_len + 1);
+    if (err != EOK) {
+        LOG_RUN_ERR("Error occured when copying addr, errno code is %d.\n", err);
+        free(hdl);
+        return (int)err;
+    }
+
+    status_t ret = wr_enter_api(&hdl->conn, addr);
+    if (ret != WR_SUCCESS) {
+        LOG_RUN_ERR("create instance get conn error.");
+        free(hdl);
+        return (int)ret;
+    }
+    *inst_handle = (wr_instance_handle)hdl;
     return (int)ret;
 }
 
-int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result)
+int wr_delete_instance(wr_instance_handle inst_handle)
+{
+    if (inst_handle != NULL) {
+        st_wr_instance_handle *hdl = (st_wr_instance_handle *)inst_handle;
+        if (hdl->conn != NULL) {
+            wr_leave_api(hdl->conn, WR_TRUE);
+        }
+        free(hdl);
+    }
+}
+
+int wr_vfs_create(const char *vfs_name, wr_instance_handle inst_handle)
+{
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("vfs create get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_vfs_create_impl(hdl->conn, vfs_name);
+    return (int)ret;
+}
+
+int wr_vfs_delete(const char *vfs_name, wr_instance_handle inst_handle)
+{
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("dremove get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_vfs_delete_impl(hdl->conn, vfs_name);
+    return (int)ret;
+}
+
+int wr_vfs_mount(const char *vfs_name, wr_vfs_handle *vfs_handle, wr_instance_handle inst_handle)
+{
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("wr_vfs_mount get conn error.");
+        return WR_ERROR;
+    }
+    wr_vfs_t *dir = wr_open_dir_impl(hdl->conn, vfs_name, CM_TRUE);
+    *vfs_handle = (wr_vfs_handle)dir;
+    return WR_SUCCESS;
+}
+
+int wr_vfs_unmount(wr_vfs_handle vfs_handle, wr_instance_handle inst_handle)
+{
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("wr_vfs_unmount get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_close_dir_impl(hdl->conn, (wr_vfs_t *)vfs_handle);
+    return (int)ret;
+}
+
+int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result, wr_instance_handle inst_handle)
 {
     if (item == NULL || result == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "wr_dir_item_t");
@@ -119,12 +183,18 @@ int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result)
     if (dir == NULL) {
         return WR_SUCCESS;
     }
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("dread get conn error."));
 
-    gft_node_t *node = wr_read_dir_impl(conn, (wr_vfs_t *)dir, CM_TRUE);
-    wr_leave_api(conn, CM_FALSE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("dread get conn error.");
+        return WR_ERROR;
+    }
+
+    gft_node_t *node = wr_read_dir_impl(hdl->conn, (wr_vfs_t *)dir, CM_TRUE);
     if (node == NULL) {
         return WR_SUCCESS;
     }
@@ -138,7 +208,7 @@ int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result)
     return WR_SUCCESS;
 }
 
-int wr_stat(const char *path, wr_stat_info_t item)
+int wr_stat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle)
 {
     if (item == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "wr_stat_info_t");
@@ -146,32 +216,44 @@ int wr_stat(const char *path, wr_stat_info_t item)
     }
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
-    wr_conn_t *conn = NULL;
-    status_t status = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("stat get conn error."));
-    gft_node_t *node = wr_get_node_by_path_impl(conn, path);
+
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("stat get conn error.");
+        return WR_ERROR;
+    }
+
+    gft_node_t *node = wr_get_node_by_path_impl(hdl->conn, path);
     if (node == NULL) {
-        wr_leave_api(conn, CM_FALSE);
         return WR_ERROR;
     }
 
     int ret = wr_set_stat_info(item, node);
-    wr_session_end_stat(conn->session, &begin_tv, WR_STAT);
-    wr_leave_api(conn, CM_FALSE);
+    wr_session_end_stat(hdl->conn->session, &begin_tv, WR_STAT);
     return ret;
 }
 
-int wr_lstat(const char *path, wr_stat_info_t item)
+int wr_lstat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle)
 {
     if (item == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "wr_stat_info_t");
         return WR_ERROR;
     }
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("lstat get conn error."));
-    gft_node_t *node = wr_get_node_by_path_impl(conn, path);
-    wr_leave_api(conn, CM_FALSE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("lstat get conn error.");
+        return WR_ERROR;
+    }
+
+    gft_node_t *node = wr_get_node_by_path_impl(hdl->conn, path);
     if (node == NULL) {
         LOG_DEBUG_INF("lstat get node by path :%s error", path);
         return WR_ERROR;
@@ -179,138 +261,188 @@ int wr_lstat(const char *path, wr_stat_info_t item)
     return wr_set_stat_info(item, node);
 }
 
-int wr_fstat(int handle, wr_stat_info_t item)
+int wr_fstat(int handle, wr_stat_info_t item, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
     if (item == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "wr_stat_info_t");
         return WR_ERROR;
     }
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fstat get conn error"));
-    ret = wr_fstat_impl(conn, HANDLE_VALUE(handle), item);
-    wr_leave_api(conn, CM_FALSE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fstat get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_fstat_impl(hdl->conn, HANDLE_VALUE(handle), item);
     return (int)ret;
 }
 
-int wr_file_create(const char *name, int flag)
+int wr_file_create(const char *name, int flag, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fcreate get conn error"));
-    ret = wr_create_file_impl(conn, name, flag);
-    wr_leave_api(conn, CM_TRUE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fcreate get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_create_file_impl(hdl->conn, name, flag);
     return (int)ret;
 }
 
-int wr_file_delete(const char *file)
+int wr_file_delete(const char *file, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fremove get conn error"));
-    ret = wr_remove_file_impl(conn, file);
-    wr_leave_api(conn, CM_TRUE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fremove get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_remove_file_impl(hdl->conn, file);
     return (int)ret;
 }
 
-int wr_file_open(const char *file, int flag, int *handle)
+int wr_file_open(const char *file, int flag, int *handle, wr_instance_handle inst_handle)
 {
     timeval_t begin_tv;
     *handle = -1;
 
     wr_begin_stat(&begin_tv);
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fopen get conn error"));
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fopen get conn error.");
+        return WR_ERROR;
+    }
 
-    ret = wr_open_file_impl(conn, file, flag, handle);
+    status_t ret = wr_open_file_impl(hdl->conn, file, flag, handle);
     // if open fails, -1 is returned. DB determines based on -1
-    if (ret == CM_SUCCESS) {
+    if (ret == WR_SUCCESS) {
         *handle += WR_HANDLE_BASE;
     }
-    wr_session_end_stat(conn->session, &begin_tv, WR_FOPEN);
-    wr_leave_api(conn, CM_TRUE);
+    wr_session_end_stat(hdl->conn->session, &begin_tv, WR_FOPEN);
     return (int)ret;
 }
 
-int wr_get_inst_status(wr_server_status_t *wr_status)
+int wr_get_inst_status(wr_server_status_t *wr_status, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("get conn error when get inst status"));
-    ret = wr_get_inst_status_on_server(conn, wr_status);
-    wr_leave_api(conn, CM_FALSE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("get conn error when get inst status.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_get_inst_status_on_server(hdl->conn, wr_status);
     return (int)ret;
 }
 
-int wr_is_maintain(unsigned int *is_maintain)
+int wr_is_maintain(unsigned int *is_maintain, wr_instance_handle inst_handle)
 {
     if (is_maintain == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "expected is_maintain not a null pointer");
         return CM_ERROR;
     }
     wr_server_status_t wr_status = {0};
-    status_t ret = wr_get_inst_status(&wr_status);
+    status_t ret = wr_get_inst_status(&wr_status, inst_handle);
     WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("get error when get inst status"));
     *is_maintain = wr_status.is_maintain;
     return CM_SUCCESS;
 }
 
-int wr_set_main_inst(void)
+int wr_set_main_inst(wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("get conn error when set main inst"));
-    ret = wr_set_main_inst_on_server(conn);
-    wr_leave_api(conn, CM_FALSE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("get conn error when set main inst.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_set_main_inst_on_server(hdl->conn);
     return (int)ret;
 }
 
-int wr_file_close(int handle)
+int wr_file_close(int handle, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("fclose get conn error"));
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fclose get conn error.");
+        return WR_ERROR;
+    }
 
-    ret = wr_close_file_impl(conn, HANDLE_VALUE(handle));
-    wr_leave_api(conn, CM_TRUE);
+    status_t ret = wr_close_file_impl(hdl->conn, HANDLE_VALUE(handle));
     return (int)ret;
 }
 
-long long wr_fseek(int handle, long long offset, int origin)
+long long wr_fseek(int handle, long long offset, int origin, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fseek get conn error."));
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fseek get conn error.");
+        return WR_ERROR;
+    }
 
-    long long status = wr_seek_file_impl(conn, HANDLE_VALUE(handle), offset, origin);
-    wr_leave_api(conn, CM_TRUE);
+    long long status = wr_seek_file_impl(hdl->conn, HANDLE_VALUE(handle), offset, origin);
     return status;
 }
 
-int wr_file_write(int handle, const void *buf, int size)
+int wr_file_write(int handle, const void *buf, int size, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fwrite get conn error"));
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fwrite get conn error.");
+        return WR_ERROR;
+    }
 
-    ret = wr_write_file_impl(conn, HANDLE_VALUE(handle), buf, size);
-    wr_leave_api(conn, CM_TRUE);
+    status_t ret = wr_write_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size);
     return (int)ret;
 }
 
-int wr_file_read(int handle, void *buf, int size, int *read_size)
+int wr_file_read(int handle, void *buf, int size, int *read_size, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fread get conn error."));
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fread get conn error.");
+        return WR_ERROR;
+    }
 
-    ret = wr_read_file_impl(conn, HANDLE_VALUE(handle), buf, size, read_size);
-    wr_leave_api(conn, CM_TRUE);
+    status_t ret = wr_read_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, read_size);
     return (int)ret;
 }
 
-int wr_file_pwrite(int handle, const void *buf, int size, long long offset)
+int wr_file_pwrite(int handle, const void *buf, int size, long long offset, wr_instance_handle inst_handle)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -324,19 +456,24 @@ int wr_file_pwrite(int handle, const void *buf, int size, long long offset)
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
     }
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("pwrite get conn error."));
-
-    ret = wr_pwrite_file_impl(conn, HANDLE_VALUE(handle), buf, size, offset);
-    if (ret == CM_SUCCESS) {
-        wr_session_end_stat(conn->session, &begin_tv, WR_PWRITE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
     }
-    wr_leave_api(conn, CM_TRUE);
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("pwrite get conn error.");
+        return WR_ERROR;
+    }
+
+    status_t ret = wr_pwrite_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, offset);
+    if (ret == CM_SUCCESS) {
+        wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PWRITE);
+    }
     return (int)ret;
 }
 
-int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_size)
+int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_size, wr_instance_handle inst_handle)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -355,41 +492,56 @@ int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_s
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
     }
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("pread get conn error."));
-
-    ret = wr_pread_file_impl(conn, HANDLE_VALUE(handle), buf, size, offset, read_size);
-    if (ret == CM_SUCCESS) {
-        wr_session_end_stat(conn->session, &begin_tv, WR_PREAD);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
     }
-    wr_leave_api(conn, CM_TRUE);
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("pread get conn error.");
+        return WR_ERROR;
+    }
+
+    status_t ret = wr_pread_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, offset, read_size);
+    if (ret == CM_SUCCESS) {
+        wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PREAD);
+    }
     return (int)ret;
 }
 
-int wr_frename(const char *src, const char *dst)
+int wr_frename(const char *src, const char *dst, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("frename get conn error."));
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("frename get conn error.");
+        return WR_ERROR;
+    }
 
-    ret = wr_rename_file_impl(conn, src, dst);
-    wr_leave_api(conn, CM_TRUE);
+    status_t ret = wr_rename_file_impl(hdl->conn, src, dst);
     return (int)ret;
 }
 
-int wr_file_truncate(int handle, long long length)
+int wr_file_truncate(int handle, long long length, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("ftruncate get conn error."));
-    ret = wr_truncate_impl(conn, HANDLE_VALUE(handle), length);
-    wr_leave_api(conn, CM_TRUE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("ftruncate get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_truncate_impl(hdl->conn, HANDLE_VALUE(handle), length);
     return (int)ret;
 }
 
 
-static void wr_fsize_with_options(const char *fname, long long *fsize, int origin)
+static void wr_fsize_with_options(const char *fname, long long *fsize, int origin, wr_instance_handle inst_handle)
 {
     int32 handle;
     status_t status;
@@ -399,43 +551,48 @@ static void wr_fsize_with_options(const char *fname, long long *fsize, int origi
         return;
     }
 
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    if (ret != CM_SUCCESS) {
-        LOG_RUN_ERR("fszie with options get conn error.");
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fszie with option get conn error.");
         return;
     }
 
-    status = wr_open_file_impl(conn, fname, O_RDONLY, &handle);
+    status = wr_open_file_impl(hdl->conn, fname, O_RDONLY, &handle);
     if (status != CM_SUCCESS) {
         LOG_DEBUG_ERR("Open file :%s failed.\n", fname);
-        wr_leave_api(conn, CM_FALSE);
         return;
     }
 
-    *fsize = wr_seek_file_impl(conn, handle, 0, origin);
+    *fsize = wr_seek_file_impl(hdl->conn, handle, 0, origin);
     if (*fsize == CM_INVALID_INT64) {
         LOG_DEBUG_ERR("Seek file :%s failed.\n", fname);
-        wr_leave_api(conn, CM_FALSE);
     }
 
-    (void)wr_close_file_impl(conn, handle);
-    wr_leave_api(conn, CM_FALSE);
+    (void)wr_close_file_impl(hdl->conn, handle);
 }
 
-int wr_fsize_physical(int handle, long long *fsize)
+int wr_fsize_physical(int handle, long long *fsize, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("get conn error."));
-    ret = wr_get_phy_size_impl(conn, HANDLE_VALUE(handle), fsize);
-    wr_leave_api(conn, CM_FALSE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fszie get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_get_phy_size_impl(hdl->conn, HANDLE_VALUE(handle), fsize);
     return (int)ret;
 }
 
-void wr_fsize_maxwr(const char *fname, long long *fsize)
+void wr_fsize_maxwr(const char *fname, long long *fsize, wr_instance_handle inst_handle)
 {
-    wr_fsize_with_options(fname, fsize, WR_SEEK_MAXWR);
+    wr_fsize_with_options(fname, fsize, WR_SEEK_MAXWR, inst_handle);
 }
 
 void wr_get_error(int *errcode, const char **errmsg)
@@ -450,13 +607,18 @@ int wr_get_fname(int handle, char *fname, int fname_size)
     return (int)ret;
 }
 
-int wr_fallocate(int handle, int mode, long long offset, long long length)
+int wr_fallocate(int handle, int mode, long long offset, long long length, wr_instance_handle inst_handle)
 {
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("fallocate get conn error."));
-    ret = wr_fallocate_impl(conn, HANDLE_VALUE(handle), mode, offset, length);
-    wr_leave_api(conn, CM_TRUE);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fallocate get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_fallocate_impl(hdl->conn, HANDLE_VALUE(handle), mode, offset, length);
 
     return (int)ret;
 }
@@ -620,11 +782,11 @@ int wr_set_thread_conn_timeout(wr_conn_opt_t *thv_opts, int32 timeout)
     return CM_SUCCESS;
 }
 
-int wr_set_conn_opts(wr_conn_opt_key_e key, void *value)
+int wr_set_conn_opts(wr_conn_opt_key_e key, void *value, const char *addr)
 {
     wr_clt_env_init();
     wr_conn_opt_t *thv_opts = NULL;
-    if (cm_get_thv(GLOBAL_THV_OBJ1, CM_TRUE, (pointer_t *)&thv_opts) != CM_SUCCESS) {
+    if (cm_get_thv(GLOBAL_THV_OBJ1, CM_TRUE, (pointer_t *)&thv_opts, addr) != CM_SUCCESS) {
         return CM_ERROR;
     }
     switch (key) {
@@ -651,7 +813,7 @@ int wr_aio_post_pwrite(void *iocb, int handle, size_t count, long long offset)
     return CM_SUCCESS;
 }
 
-int wr_set_conf(const char *name, const char *value, const char *scope)
+int wr_set_conf(const char *name, const char *value, const char *scope, wr_instance_handle inst_handle)
 {
     if (name == NULL || value == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid name or value when set cfg");
@@ -671,16 +833,21 @@ int wr_set_conf(const char *name, const char *value, const char *scope)
         tmp_scope = (char *)scope;
     }
 
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IF_ERROR(ret);
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("setcfg get conn error.");
+        return WR_ERROR;
+    }
 
-    ret = wr_setcfg_impl(conn, name, value, tmp_scope);
-    wr_leave_api(conn, CM_FALSE);
+    status_t ret = wr_setcfg_impl(hdl->conn, name, value, tmp_scope);
     return (int)ret;
 }
 
-int wr_get_conf(const char *name, char *value, int value_size)
+int wr_get_conf(const char *name, char *value, int value_size, wr_instance_handle inst_handle)
 {
     if (name == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid name when get cfg");
@@ -690,12 +857,17 @@ int wr_get_conf(const char *name, char *value, int value_size)
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid value_size when get cfg");
         return WR_ERROR;
     }
-    wr_conn_t *conn = NULL;
-    status_t ret = wr_enter_api(&conn);
-    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("getcfg get conn error."));
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("getcfg get conn error.");
+        return WR_ERROR;
+    }
 
-    ret = wr_getcfg_impl(conn, name, value, (size_t)value_size);
-    wr_leave_api(conn, CM_FALSE);
+    status_t ret = wr_getcfg_impl(hdl->conn, name, value, (size_t)value_size);
     return (int)ret;
 }
 
