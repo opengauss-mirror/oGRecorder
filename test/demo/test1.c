@@ -14,9 +14,8 @@ int main(void) {
     int fd = -1;
     int errorcode = 0;
     const char *errormsg = NULL;
-    char *fileName = "+data/test";
-    char *targetName = "+data/name";
-    ret = wr_fcreate(fileName, 0777)
+    char *fileName = "wr_file_write";
+    int ret = wr_file_write(0x20000001, "hello world", 10);
     if (ret != 0) {
         wr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);

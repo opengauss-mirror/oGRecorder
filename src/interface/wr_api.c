@@ -410,38 +410,6 @@ long long wr_fseek(int handle, long long offset, int origin, wr_instance_handle 
     return status;
 }
 
-int wr_file_write(int handle, const void *buf, int size, wr_instance_handle inst_handle)
-{
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("fwrite get conn error.");
-        return WR_ERROR;
-    }
-
-    status_t ret = wr_write_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size);
-    return (int)ret;
-}
-
-int wr_file_read(int handle, void *buf, int size, int *read_size, wr_instance_handle inst_handle)
-{
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("fread get conn error.");
-        return WR_ERROR;
-    }
-
-    status_t ret = wr_read_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, read_size);
-    return (int)ret;
-}
-
 int wr_file_pwrite(int handle, const void *buf, int size, long long offset, wr_instance_handle inst_handle)
 {
     timeval_t begin_tv;
@@ -466,22 +434,18 @@ int wr_file_pwrite(int handle, const void *buf, int size, long long offset, wr_i
         return WR_ERROR;
     }
 
-    status_t ret = wr_pwrite_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, offset);
+    status_t ret = wr_write_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, offset);
     if (ret == CM_SUCCESS) {
         wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PWRITE);
     }
     return (int)ret;
 }
 
-int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_size, wr_instance_handle inst_handle)
+int wr_file_pread(int handle, void *buf, int size, long long offset, wr_instance_handle inst_handle)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
 
-    if (read_size == NULL) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "read _size is NULL");
-        return CM_ERROR;
-    }
     if (size < 0) {
         LOG_DEBUG_ERR("File size is invalid:%d.", size);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "size must be a positive integer");
@@ -502,7 +466,7 @@ int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_s
         return WR_ERROR;
     }
 
-    status_t ret = wr_pread_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, offset, read_size);
+    status_t ret = wr_pread_file_impl(hdl->conn, HANDLE_VALUE(handle), buf, size, offset);
     if (ret == CM_SUCCESS) {
         wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PREAD);
     }
@@ -621,28 +585,6 @@ int wr_fallocate(int handle, int mode, long long offset, long long length, wr_in
     status_t ret = wr_fallocate_impl(hdl->conn, HANDLE_VALUE(handle), mode, offset, length);
 
     return (int)ret;
-}
-
-int wr_set_svr_path(const char *conn_path)
-{
-    if (conn_path == NULL) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "conn path");
-        return WR_ERROR;
-    }
-
-    size_t len = strlen(conn_path);
-    if (len == 0) {
-        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, conn_path, ", conn path is empty");
-        return WR_ERROR;
-    } else if (len > CM_MAX_PATH_LEN) {
-        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, conn_path, ", conn path is too long");
-        return WR_ERROR;
-    }
-    if (strcpy_s(g_wr_inst_path, CM_MAX_PATH_LEN, conn_path) != EOK) {
-        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, conn_path, ", conn path copy fail");
-        return WR_ERROR;
-    }
-    return WR_SUCCESS;
 }
 
 void wr_register_log_callback(wr_log_output cb_log_output, unsigned int log_level)

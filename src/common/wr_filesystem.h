@@ -13,6 +13,11 @@ status_t wr_filesystem_mkdir(const char *name, mode_t mode);
 status_t wr_filesystem_rmdir(const char *name);
 status_t wr_filesystem_touch(const char *name);
 status_t wr_filesystem_rm(const char *name);
+status_t wr_filesystem_write(int64_t handle, int64_t offset, int64_t size, const char *buf);
+status_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char *buf);
+int wr_filesystem_open(const char *file_path);
+int wr_filesystem_close(int fd);
+
 
 #ifdef __cplusplus
 }

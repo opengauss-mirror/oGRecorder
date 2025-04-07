@@ -58,7 +58,7 @@ void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item)
 
 status_t wr_create_file(wr_session_t *session, const char *parent, const char *name, int32_t flag);
 status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type);
-status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, wr_find_node_t *find_info);
+status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64_t *fd);
 status_t wr_close_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid);
 status_t wr_extend(wr_session_t *session, wr_node_data_t *node_data);
 status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data);

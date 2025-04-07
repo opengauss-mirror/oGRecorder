@@ -73,6 +73,35 @@ status_t wr_filesystem_rm(const char *name)
     return CM_SUCCESS;
 }
 
+status_t wr_filesystem_write(int64_t handle, int64_t offset, int64_t size, const char *buf)
+{
+    if (pwrite(handle, buf, size, offset) == -1) {
+        LOG_RUN_ERR("[FS]Failed to write handle:%lld, offset:%lld, size:%lld.", handle, offset, size);
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
+status_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char *buf)
+{
+    if (pread(handle, buf, size, offset) == -1) {
+        LOG_RUN_ERR("[FS]Failed to pread handle:%lld, offset:%lld, size:%lld.", handle, offset, size);
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
+int wr_filesystem_open(const char *file_path)
+{
+    return open(file_path, O_RDWR, 0644);
+}
+
+int wr_filesystem_close(int fd)
+{
+    return close(fd);
+}
+
+
 #ifdef __cplusplus
 }
 #endif

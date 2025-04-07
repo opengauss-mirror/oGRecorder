@@ -61,10 +61,7 @@ typedef struct st_wr_open_file_info {
 } wr_open_file_info_t;
 
 typedef struct st_wr_close_file_info {
-    uint64 fid;
-    const char *vg_name;
-    uint32 vg_id;
-    uint64 ftid;
+    int64_t fd;
 } wr_close_file_info_t;
 
 typedef struct st_wr_create_file_info {
@@ -127,6 +124,20 @@ typedef struct st_wr_truncate_file_info {
     const char *vg_name;
     uint32 vg_id;
 } wr_truncate_file_info_t;
+
+typedef struct st_wr_write_file_info {
+    int64 offset;
+    int64 handle;
+    int64 size;
+    void *buf;
+} wr_write_file_info_t;
+
+typedef struct st_wr_read_file_info {
+    int64 offset;
+    int64 handle;
+    int64 size;
+    void *buf;
+} wr_read_file_info_t;
 
 typedef struct st_wr_refresh_file_table_info {
     uint64 block_id;
@@ -206,8 +217,7 @@ status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int
 status_t wr_close_file_impl(wr_conn_t *conn, int handle);
 status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_item_type_t *type);
 int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin);
-status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, int size);
-status_t wr_read_file_impl(wr_conn_t *conn, int handle, void *buf, int size, int *read_size);
+status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long int offset);
 status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst);
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long int length);
 status_t wr_fstat_impl(wr_conn_t *conn, int handle, wr_stat_info_t item);
@@ -219,7 +229,7 @@ void wr_destroy(void);
 status_t wr_get_fname_impl(int handle, char *fname, int fname_size);
 
 status_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset);
-status_t wr_pread_file_impl(wr_conn_t *conn, int handle, void *buf, int size, long long offset, int *read_size);
+status_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset);
 status_t wr_get_addr_impl(wr_conn_t *conn, int32 handle, long long offset, char *pool_name, char *image_name,
     char *obj_addr, unsigned int *obj_id, unsigned long int *obj_offset);
 gft_node_t *wr_get_node_by_path_impl(wr_conn_t *conn, const char *path);
@@ -235,7 +245,7 @@ void wr_set_conn_wait_event(wr_conn_t *conn, wr_wait_event_e event);
 void wr_unset_conn_wait_event(wr_conn_t *conn);
 status_t wr_msg_interact_with_stat(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack);
 
-status_t wr_close_file_on_server(wr_conn_t *conn, wr_vg_info_item_t *vg_item, uint64 fid, ftid_t ftid);
+status_t wr_close_file_on_server(wr_conn_t *conn, int64_t fd);
 status_t wr_get_inst_status_on_server(wr_conn_t *conn, wr_server_status_t *wr_status);
 status_t wr_get_time_stat_on_server(wr_conn_t *conn, wr_stat_item_t *time_stat, uint64 size);
 status_t wr_set_main_inst_on_server(wr_conn_t *conn);

@@ -46,6 +46,7 @@ wr_env_t *wr_get_env(void)
 {
     return &g_wr_env;
 }
+
 // CAUTION: wr_admin manager command just like wr_create_vg,cannot call it,
 wr_config_t *wr_get_inst_cfg(void)
 {
@@ -416,14 +417,15 @@ static status_t wr_open_file_core(
     return CM_SUCCESS;
 }
 
-status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, wr_find_node_t *find_info)
+status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64_t *fd)
 {
     WR_LOG_DEBUG_OP("Begin to open file:%s, session id:%u.", file, session->id);
-    gft_node_t *out_node = NULL;
-    CM_RETURN_IFERR(wr_open_file_core(session, file, GFT_FILE, &out_node, find_info));
-    uint64 fid = out_node->fid;
-    WR_LOG_DEBUG_OP("Succeed to open file:%s, fid:%llu, ftid:%s, session:%u.", file, fid,
-        wr_display_metaid(out_node->id), session->id);
+    *fd = wr_filesystem_open(file);
+    if (*fd == -1) {
+        LOG_RUN_ERR("[FS]Failed to open file:%s.", file);
+        return CM_ERROR;
+    }
+    WR_LOG_DEBUG_OP("Succeed to open file:%s, fd:%d, session:%u.", file, *fd, session->id);
     return CM_SUCCESS;
 }
 

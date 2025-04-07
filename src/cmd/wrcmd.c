@@ -1135,9 +1135,6 @@ static status_t print_file_proc(wr_conn_t *conn, int32 handle, int64 offset, int
     int64 offset_shift = offset - row_aligned_offset;
 
     while (read_cnt < read_size) {
-        CM_RETURN_IFERR_EX(wr_read_file_impl(conn, handle, o_buf, sizeof(o_buf), &cur_read_size),
-            LOG_DEBUG_ERR("Failed to read file.\n"));
-
         if (cur_read_size > read_size - read_cnt) {
             cur_read_size = read_size - read_cnt;
         }

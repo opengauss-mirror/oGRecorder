@@ -222,7 +222,7 @@ typedef struct st_wr_file_context {
     int64 vol_offset;
     wr_vg_info_item_t *vg_item;
     uint64 fid;
-    char vg_name[WR_MAX_NAME_LEN];
+    char file_path[WR_MAX_NAME_LEN];
     uint32 vgid;
     uint32 id;
     wr_file_mode_e mode;

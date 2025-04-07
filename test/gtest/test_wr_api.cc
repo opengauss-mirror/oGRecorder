@@ -5,27 +5,24 @@ extern "C" {
 }
 #define TEST_LOG_DIR "./test_log"
 #define TEST_DIR "testdir1"
+#define TEST_FILE "testdir1/testfile1"
 #define ONE_GB 1024 * 1024 * 1024
 int errorcode = 0;
 const char *errormsg = NULL;
-wr_instance_handle *g_inst_handle;
+wr_instance_handle g_inst_handle = NULL;
+int handle = 0;
 
-TEST(WrApiTest, TestInitLogger) {
-    int result = wr_init_logger(TEST_LOG_DIR, 255, 100, ONE_GB);
-    if (result != WR_SUCCESS) {
-        printf("wr_init_logger failed, result: %d\n", result);
+class WrApiTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // 初始化日志
+        int result = wr_init_logger(TEST_LOG_DIR, 255, 100, ONE_GB);
+        ASSERT_EQ(result, WR_SUCCESS) << "Failed to initialize logger";
     }
-    EXPECT_EQ(result, WR_SUCCESS);
-}
+};
 
-TEST(WrApiTest, TestInitLoggerNegative) {
-    // Negative test case: invalid log directory
-    int result = wr_init_logger(NULL, 255, 100, ONE_GB);
-    EXPECT_NE(result, WR_SUCCESS);
-}
-
-TEST(WrApiTest, TestWrCreateInstance) {
-    int result = wr_create_instance("20.20.20.135:15430", g_inst_handle);
+TEST_F(WrApiTest, TestWrCreateInstance) {
+    int result = wr_create_instance("127.0.0.1:19225", &g_inst_handle);
     if (result != 0) {
         wr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
@@ -33,8 +30,8 @@ TEST(WrApiTest, TestWrCreateInstance) {
     EXPECT_EQ(result, WR_SUCCESS);
 }
 
-TEST(WrApiTest, TestWrVfsCreate) {
-    int result = wr_vfs_create(TEST_DIR, *g_inst_handle);
+TEST_F(WrApiTest, TestWrVfsCreate) {
+    int result = wr_vfs_create(TEST_DIR, g_inst_handle);
     if (result != 0) {
         wr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
@@ -42,36 +39,58 @@ TEST(WrApiTest, TestWrVfsCreate) {
     EXPECT_EQ(result, WR_SUCCESS);
 }
 
-TEST(WrApiTest, TestWrVfsCreateNegative) {
+TEST_F(WrApiTest, TestWrVfsCreateNegative) {
     // Negative test case: create directory with invalid name
-    int result = wr_vfs_create("", NULL);
+    int result = wr_vfs_create("", g_inst_handle);
     EXPECT_NE(result, WR_SUCCESS);
 }
 
-TEST(WrApiTest, TestWrVfsCreateFile) {
-    char *path = (char *)malloc(strlen(TEST_DIR) + strlen("/testfile1") + 1);
-    strcpy(path, TEST_DIR);
-    strcat(path, "/testfile1");
-    int result = wr_file_create(path, 0);
+TEST_F(WrApiTest, TestWrVfsCreateFile) {
+    int result = wr_file_create(TEST_FILE, 0, g_inst_handle);
     if (result != 0) {
         wr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
     }
     EXPECT_EQ(result, WR_SUCCESS);
-    free(path);
 }
 
-TEST(WrApiTest, TestWrVfsCreateFileNegative) {
+TEST_F(WrApiTest, TestWrVfsCreateFileNegative) {
     // Negative test case: create file with invalid path
-    int result = wr_file_create(NULL, 0);
+    int result = wr_file_create(NULL, 0, g_inst_handle);
     EXPECT_NE(result, WR_SUCCESS);
 }
 
-TEST(WrApiTest, TestWrVfsDeleteFile) {
+TEST_F(WrApiTest, TestWrfileOpen) {
+    int result = wr_file_open(TEST_FILE, 0, &handle, g_inst_handle);
+    EXPECT_EQ(result, WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrfileWrite) {
+    int result = wr_file_pwrite(handle, "hello world", sizeof("hello world"), 0, g_inst_handle);
+    EXPECT_EQ(result, WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrfileRead) {
+    char buf[100];
+    int result = wr_file_pread(handle, buf, sizeof("hello world"), 0, g_inst_handle);
+    if (result != 0) {
+        wr_get_error(&errorcode, &errormsg);
+        printf("%d : %s\n", errorcode, errormsg);
+    }
+    EXPECT_EQ(result, WR_SUCCESS);
+    printf("buf: %s\n", buf);
+}
+
+TEST_F(WrApiTest, TestWrfileClose) {
+    int result = wr_file_close(handle, g_inst_handle);
+    EXPECT_EQ(result, WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrVfsDeleteFile) {
     char *path = (char *)malloc(strlen(TEST_DIR) + strlen("/testfile1") + 1);
     strcpy(path, TEST_DIR);
     strcat(path, "/testfile1");
-    int result = wr_file_delete(path);
+    int result = wr_file_delete(path, g_inst_handle);
     if (result != 0) {
         wr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
@@ -80,14 +99,14 @@ TEST(WrApiTest, TestWrVfsDeleteFile) {
     free(path);
 }
 
-TEST(WrApiTest, TestWrVfsDeleteFileNegative) {
+TEST_F(WrApiTest, TestWrVfsDeleteFileNegative) {
     // Negative test case: delete non-existent file
-    int result = wr_file_delete("non_existent_file");
+    int result = wr_file_delete("non_existent_file", g_inst_handle);
     EXPECT_NE(result, WR_SUCCESS);
 }
 
-TEST(WrApiTest, TestWrVfsDelete) {
-    int result = wr_vfs_delete(TEST_DIR);
+TEST_F(WrApiTest, TestWrVfsDelete) {
+    int result = wr_vfs_delete(TEST_DIR, g_inst_handle);
     if (result != 0) {
         wr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
@@ -95,9 +114,9 @@ TEST(WrApiTest, TestWrVfsDelete) {
     EXPECT_EQ(result, WR_SUCCESS);
 }
 
-TEST(WrApiTest, TestWrVfsDeleteNegative) {
+TEST_F(WrApiTest, TestWrVfsDeleteNegative) {
     // Negative test case: delete non-existent directory
-    int result = wr_vfs_delete("non_existent_dir");
+    int result = wr_vfs_delete("non_existent_dir", g_inst_handle);
     EXPECT_NE(result, WR_SUCCESS);
 }
 

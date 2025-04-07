@@ -157,14 +157,12 @@ WR_DECLARE int wr_file_delete(const char *file, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_open(const char *file, int flag, int *handle, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_close(int handle, wr_instance_handle inst_handle);
 WR_DECLARE long long wr_fseek(int handle, long long offset, int origin, wr_instance_handle inst_handle);
-WR_DECLARE int wr_file_write(int handle, const void *buf, int size, wr_instance_handle inst_handle);
-WR_DECLARE int wr_file_read(int handle, void *buf, int size, int *read_size, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_rename(const char *src, const char *dst);
 WR_DECLARE int wr_file_truncate(int handle, long long length, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_size_physical(int handle, long long *fsize);
 WR_DECLARE void wr_file_size_maxwr(const char *fname, long long *fsize);
 WR_DECLARE int wr_file_pwrite(int handle, const void *buf, int size, long long offset, wr_instance_handle inst_handle);
-WR_DECLARE int wr_file_pread(int handle, void *buf, int size, long long offset, int *read_size, wr_instance_handle inst_handle);
+WR_DECLARE int wr_file_pread(int handle, void *buf, int size, long long offset, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_fallocate(int handle, int mode, long long offset, long long length);
 
 // aio
@@ -180,7 +178,6 @@ WR_DECLARE int wr_init_logger(
     char *log_home, unsigned int log_level, unsigned int log_backup_file_count, unsigned long long log_max_file_size);
 WR_DECLARE void wr_refresh_logger(char *log_field, unsigned long long *value);
 // connection
-WR_DECLARE int wr_set_svr_path(const char *conn_path);
 WR_DECLARE int wr_set_conn_timeout(int timeout);
 WR_DECLARE int wr_set_conn_opts(wr_conn_opt_key_e key, void *value, const char *addr);
 WR_DECLARE void wr_set_default_conn_timeout(int timeout);
@@ -188,8 +185,6 @@ WR_DECLARE int wr_create_instance(const char *addr, wr_instance_handle *inst_han
 WR_DECLARE int wr_delete_instance(wr_instance_handle inst_handle);
 // instance param
 WR_DECLARE int wr_set_main_inst(wr_instance_handle inst_handle);
-WR_DECLARE int wr_disable_grab_lock(void);
-WR_DECLARE int wr_enable_grab_lock(void);
 WR_DECLARE int wr_get_inst_status(wr_server_status_t *wr_status, wr_instance_handle inst_handle);
 WR_DECLARE int wr_is_maintain(unsigned int *is_maintain, wr_instance_handle inst_handle);
 

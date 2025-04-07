@@ -82,7 +82,7 @@ status_t wr_apply_extending_file(wr_conn_t *conn, int32 handle, int64 size, int6
     send_info.ftid = *(uint64 *)&(context->node->id);
     send_info.offset = offset;
     send_info.size = size;
-    send_info.vg_name = context->vg_name;
+    // send_info.vg_name = context->vg_name;
     send_info.vg_id = context->vgid;
     return wr_msg_interact_with_stat(conn, WR_CMD_EXTEND_FILE, (void *)&send_info, NULL);
 }
@@ -115,18 +115,7 @@ status_t wr_apply_fallocate_file(wr_conn_t *conn, int32 handle, int32 mode, int6
 
 status_t wr_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *context, int64 offset)
 {
-    ftid_t ftid = context->node->id;
-    LOG_DEBUG_INF(
-        "Apply refresh file:%s, curr size:%llu, refresh ft id:%llu, refresh entry id:%llu, refresh offset:%llu.",
-        context->node->name, context->node->size, WR_ID_TO_U64(ftid), WR_ID_TO_U64(context->node->entry), offset);
-
-    wr_refresh_file_info_t send_info;
-    send_info.fid = context->fid;
-    send_info.ftid = *(uint64 *)(&ftid);
-    send_info.vg_name = context->vg_name;
-    send_info.vg_id = context->vgid;
-    send_info.offset = offset;
-    return wr_msg_interact_with_stat(conn, WR_CMD_REFRESH_FILE, (void *)&send_info, NULL);
+    return CM_SUCCESS;
 }
 
 static status_t wr_check_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *context, int64 offset)
@@ -148,12 +137,6 @@ static status_t wr_check_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *
             wr_display_metaid(context->node->id), context->node->name);
         cm_sleep(WR_READ_REMOTE_INTERVAL);
     } while (!is_valid);
-    return CM_SUCCESS;
-}
-
-static status_t wr_check_refresh_file_by_offset(
-    wr_conn_t *conn, wr_file_context_t *context, int64 offset, bool32 is_read)
-{
     return CM_SUCCESS;
 }
 
@@ -599,7 +582,7 @@ gft_node_t *wr_get_node_by_path_impl(wr_conn_t *conn, const char *path)
     WR_UNLOCK_VG_META_S(vg_item, conn->session);
     return node;
 }
-
+// TODO: 这里要大改
 status_t wr_init_file_context(
     wr_file_context_t *context, gft_node_t *out_node, wr_vg_info_item_t *vg_item, wr_file_mode_e mode)
 {
@@ -612,7 +595,7 @@ status_t wr_init_file_context(
     context->fid = out_node->fid;
     context->vol_offset = 0;
     context->tid = cm_get_current_thread_id();
-    if (strcpy_s(context->vg_name, WR_MAX_NAME_LEN, vg_item->vg_name) != EOK) {
+    if (strcpy_s(context->file_path, WR_MAX_NAME_LEN, out_node->name) != EOK) {
         return CM_ERROR;
     }
     context->mode = mode;
@@ -694,12 +677,12 @@ status_t wr_open_file_inner(wr_vg_info_item_t *vg_item, gft_node_t *ft_node, wr_
     return CM_SUCCESS;
 }
 
-status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag, wr_find_node_t **find_node)
+status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag, int64_t *fd)
 {
     wr_open_file_info_t send_info;
     send_info.file_path = file_path;
     send_info.flag = flag;
-    return wr_msg_interact(conn, WR_CMD_OPEN_FILE, (void *)&send_info, (void *)find_node);
+    return wr_msg_interact(conn, WR_CMD_OPEN_FILE, (void*)&send_info, (void*)fd);
 }
 
 status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int *handle)
@@ -709,35 +692,8 @@ status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int
     wr_find_node_t *find_node = NULL;
     LOG_DEBUG_INF("wr begin to open file, file path:%s, flag:%d", file_path, flag);
     WR_RETURN_IF_ERROR(wr_check_device_path(file_path));
-    WR_RETURN_IF_ERROR(wr_open_file_on_server(conn, file_path, flag, &find_node));
-    wr_vg_info_item_t *vg_item = wr_find_vg_item(find_node->vg_name);
-    if (vg_item == NULL) {
-        LOG_RUN_ERR("Failed to find vg, vg name %s.", find_node->vg_name);
-        WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, find_node->vg_name);
-        return CM_ERROR;
-    }
-    WR_LOCK_VG_META_S_RETURN_ERROR(vg_item, conn->session);
-    do {
-        ft_node = wr_get_ft_node_by_ftid(conn->session, vg_item, find_node->ftid, CM_FALSE, CM_FALSE);
-        if (ft_node == NULL) {
-            WR_THROW_ERROR(ERR_WR_INVALID_ID, "find_node ftid", *(uint64 *)&find_node->ftid);
-            status = CM_ERROR;
-            break;
-        }
-        status = wr_open_file_inner(vg_item, ft_node, WR_OPEN_MODE(flag), handle);
-    } while (0);
-    WR_UNLOCK_VG_META_S(vg_item, conn->session);
-
-    if (status != CM_SUCCESS) {
-        // Try to close the handle opened on the server to avoid resource leakage.
-        // But here in theory it shouldn't depend on ft_node not being NULL
-        if (ft_node != NULL) {
-            (void)wr_close_file_on_server(conn, vg_item, ft_node->fid, ft_node->id);
-        }
-        return status;
-    }
-    LOG_DEBUG_INF("wr open file successfully, file_path:%s, flag:%d, handle:%d, fsize:%llu, fwritten_size:%llu",
-        file_path, flag, *handle, ft_node->size, ft_node->written_size);
+    WR_RETURN_IF_ERROR(wr_open_file_on_server(conn, file_path, flag, handle));
+    LOG_DEBUG_INF("wr open file successfully, file_path:%s, flag:%d, handle:%d", file_path, flag, *handle);
     return CM_SUCCESS;
 }
 
@@ -759,9 +715,9 @@ status_t wr_latch_context_by_handle(
     }
 
     wr_file_context_t *file_cxt = wr_get_file_context_by_handle(file_run_ctx, handle);
-    wr_latch(&file_cxt->latch, latch_mode, ((wr_session_t *)conn->session)->id);
+    // wr_latch(&file_cxt->latch, latch_mode, ((wr_session_t *)conn->session)->id);
     if (file_cxt->flag == WR_FILE_CONTEXT_FLAG_FREE) {
-        wr_unlatch(&file_cxt->latch);
+        // wr_unlatch(&file_cxt->latch);
         LOG_DEBUG_ERR("Failed to r/w, file is closed, handle:%d, context id:%u.", handle, file_cxt->id);
         return CM_ERROR;
     }
@@ -769,7 +725,7 @@ status_t wr_latch_context_by_handle(
     WR_ASSERT_LOG(handle == (int32)file_cxt->id, "handle %d not equal to file id %u", handle, file_cxt->id);
 
     if (file_cxt->node == NULL) {
-        wr_unlatch(&file_cxt->latch);
+        // wr_unlatch(&file_cxt->latch);
         LOG_DEBUG_ERR("file node is null, handle:%d, context id:%u.", handle, file_cxt->id);
         return CM_ERROR;
     }
@@ -783,32 +739,12 @@ status_t wr_close_file_impl(wr_conn_t *conn, int handle)
     char *fname = NULL;
 
     LOG_DEBUG_INF("wr close file entry, handle:%d", handle);
-
-    wr_file_context_t *context = NULL;
-    WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_EXCLUSIVE));
-    fname = context->node->name;
-
-    status_t ret = wr_close_file_on_server(conn, context->vg_item, context->fid, context->node->id);
+    status_t ret = wr_close_file_on_server(conn, handle);
     if (ret != CM_SUCCESS) {
-        wr_unlatch(&context->latch);
-        LOG_DEBUG_INF("Failed to fclose, handle:%d, fname:%s, fid:%llu.", handle, fname, context->fid);
+        LOG_DEBUG_INF("Failed to fclose, handle:%d.", handle);
         return ret;
     }
-    context->flag = WR_FILE_CONTEXT_FLAG_FREE;
-    context->offset = 0;
-    context->node = NULL;
-    context->tid = 0;
-    wr_unlatch(&context->latch);
-    LOG_DEBUG_INF("Success to fclose, handle:%d, fname:%s, fid:%llu.", handle, fname, context->fid);
-
-    /* release file context to freelist */
-    wr_env_t *wr_env = wr_get_env();
-    wr_latch_x(&wr_env->latch);
-    wr_file_run_ctx_t *file_run_ctx = &wr_env->file_run_ctx;
-    context->next = file_run_ctx->file_free_first;
-    file_run_ctx->file_free_first = context->id;
-    file_run_ctx->has_opened_files--;
-    wr_unlatch(&wr_env->latch);
+    LOG_DEBUG_INF("Success to fclose, handle:%d.", handle);
     return CM_SUCCESS;
 }
 
@@ -945,13 +881,21 @@ int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin)
     return new_offset;
 }
 
-status_t wr_read_write_file_core(wr_rw_param_t *param, void *buf, int32 size, int32 *read_size)
+status_t wr_read_write_file_core(wr_conn_t *conn, int64 offset, void *buf, int32 size, int64_t handle) 
 {
-    status_t status = CM_SUCCESS;
+    LOG_DEBUG_INF("wr write file entry, handle:%lld, size:%d", handle, size);   
+    wr_write_file_info_t send_info;
+    send_info.offset = offset;
+    send_info.handle = handle;
+    send_info.size = size;
+    send_info.buf = buf;
+
+    status_t status = wr_msg_interact(conn, WR_CMD_WRITE_FILE, (void *)&send_info, NULL);
+    LOG_DEBUG_INF("wr write file leave");
     return status;
 }
 
-status_t wr_read_write_file(wr_conn_t *conn, int32 handle, void *buf, int32 size, int32 *read_size, bool32 is_read)
+status_t wr_read_write_file(wr_conn_t *conn, int32 handle, void *buf, int32 size, int64 offset, bool32 is_read)
 {
     status_t status;
     wr_file_context_t *context = NULL;
@@ -963,118 +907,65 @@ status_t wr_read_write_file(wr_conn_t *conn, int32 handle, void *buf, int32 size
     }
     LOG_DEBUG_INF("wr read write file entry, handle:%d, is_read:%u", handle, is_read);
 
-    WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_EXCLUSIVE));
+    /* WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_EXCLUSIVE));
     bool mode_match = is_read ? (context->mode & WR_FILE_MODE_READ) : (context->mode & WR_FILE_MODE_WRITE);
     if (!mode_match) {
         wr_unlatch(&context->latch);
         WR_THROW_ERROR(ERR_WR_FILE_RDWR_INSUFF_PER, is_read ? "read" : "write", context->mode);
         return CM_ERROR;
     }
-    wr_init_rw_param(&param, conn, handle, context, context->offset, WR_FALSE);
-    param.is_read = is_read;
-    status = wr_read_write_file_core(&param, buf, size, read_size);
-    wr_unlatch(&context->latch);
+    */
+    // wr_init_rw_param(&param, conn, handle, context, context->offset, WR_FALSE);
+    // param.is_read = is_read;
+    status = wr_read_write_file_core(conn, offset, buf, size, handle);
+    // wr_unlatch(&context->latch);
     LOG_DEBUG_INF("wr read write file leave");
 
     return status;
 }
 
-status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, int size)
+status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset)
 {
-    return wr_read_write_file(conn, handle, (void *)buf, size, NULL, WR_FALSE);
-}
-
-status_t wr_read_file_impl(wr_conn_t *conn, int handle, void *buf, int size, int *read_size)
-{
-    if (read_size == NULL) {
-        return CM_ERROR;
-    }
-
-    return wr_read_write_file(conn, handle, buf, size, read_size, WR_TRUE);
-}
-
-static status_t wr_pwrite_file_prepare(wr_conn_t *conn, wr_file_context_t *context, long long offset)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset)
-{
-    status_t status;
     wr_file_context_t *context = NULL;
+    wr_write_file_info_t send_info;
     wr_rw_param_t param;
 
-    CM_RETURN_IFERR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_SHARE));
-    LOG_DEBUG_INF("wr pwrite file %s, handle:%d, offset:%lld, size:%d", context->node->name, handle, offset, size);
-    if (!(context->mode & WR_FILE_MODE_WRITE)) {
-        wr_unlatch(&context->latch);
-        WR_THROW_ERROR(ERR_WR_FILE_RDWR_INSUFF_PER, "pwrite", context->mode);
+    if (size < 0) {
+        LOG_DEBUG_ERR("File size is invalid: %d.", size);
         return CM_ERROR;
     }
+    LOG_DEBUG_INF("wr pwrite file entry, handle:%lld, size:%d, offset:%lld", handle, size, offset);   
 
-    wr_init_rw_param(&param, conn, handle, context, offset, WR_TRUE);
-    param.is_read = WR_FALSE;
-    wr_set_conn_wait_event(conn, WR_PWRITE_SYN_META);
-    if (wr_pwrite_file_prepare(conn, context, offset) != CM_SUCCESS) {
-        wr_unset_conn_wait_event(conn);
-        wr_unlatch(&context->latch);
-        return CM_ERROR;
-    }
-    status = wr_read_write_file_core(&param, (void *)buf, size, NULL);
-    wr_unset_conn_wait_event(conn);
-    wr_unlatch(&context->latch);
-    LOG_DEBUG_INF("wr pwrite file leave, result: %d", status);
+    send_info.offset = offset;
+    send_info.handle = handle;
+    send_info.size = size;
+    send_info.buf = buf;
+
+    status_t status = wr_msg_interact(conn, WR_CMD_WRITE_FILE, (void *)&send_info, NULL);
+    LOG_DEBUG_INF("wr pwrite file leave");
 
     return status;
 }
 
-static status_t wr_pread_file_prepare(
-    wr_conn_t *conn, wr_file_context_t *context, int size, long long offset, bool32 *read_end)
+status_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset)
 {
-    *read_end = CM_FALSE;
-    WR_LOCK_VG_META_S_RETURN_ERROR(context->vg_item, conn->session);
-    status_t status = wr_check_refresh_file_by_offset(conn, context, offset, CM_TRUE);
-    if (status != CM_SUCCESS) {
-        return status;
-    }
-    if ((uint64)offset == context->node->size || size == 0) {
-        *read_end = CM_TRUE;
-    }
-    WR_UNLOCK_VG_META_S(context->vg_item, conn->session);
-    return CM_SUCCESS;
-}
-
-status_t wr_pread_file_impl(wr_conn_t *conn, int handle, void *buf, int size, long long offset, int *read_size)
-{
-    status_t status;
-    wr_file_context_t *context = NULL;
+    wr_write_file_info_t send_info;
     wr_rw_param_t param;
 
-    CM_RETURN_IFERR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_SHARE));
-    LOG_DEBUG_INF(
-        "wr pread file entry, name:%s, handle:%d, offset:%lld, size:%d", context->node->name, handle, offset, size);
-    if (!(context->mode & WR_FILE_MODE_READ)) {
-        wr_unlatch(&context->latch);
-        WR_THROW_ERROR(ERR_WR_FILE_RDWR_INSUFF_PER, "pread", context->mode);
+    if (size < 0) {
+        LOG_DEBUG_ERR("File size is invalid: %d.", size);
         return CM_ERROR;
     }
+    LOG_DEBUG_INF("wr pwrite file entry, handle:%lld, size:%d, offset:%lld", handle, size, offset);   
 
-    wr_init_rw_param(&param, conn, handle, context, offset, WR_TRUE);
-    param.is_read = WR_TRUE;
-    wr_set_conn_wait_event(conn, WR_PREAD_SYN_META);
-    do {
-        bool32 read_end = CM_FALSE;
-        status = wr_pread_file_prepare(conn, context, size, offset, &read_end);
-        WR_BREAK_IF_ERROR(status);
-        if (read_end) {
-            *read_size = 0;
-            break;
-        }
-        status = wr_read_write_file_core(&param, buf, size, read_size);
-    } while (0);
-    wr_unset_conn_wait_event(conn);
-    wr_unlatch(&context->latch);
-    LOG_DEBUG_INF("wr pread file leave, result: %d", status);
+    send_info.offset = offset;
+    send_info.handle = handle;
+    send_info.size = size;
+    send_info.buf = buf;
+
+    status_t status = wr_msg_interact(conn, WR_CMD_READ_FILE, (void *)&send_info, (void *)&send_info);
+    LOG_DEBUG_INF("wr pread file leave");
+
     return status;
 }
 
@@ -1159,7 +1050,7 @@ status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long int length)
     send_info.fid = context->fid;
     send_info.ftid = *(uint64 *)&(context->node->id);
     send_info.length = (uint64)length;
-    send_info.vg_name = context->vg_name;
+    // send_info.vg_name = context->vg_name;
     send_info.vg_id = context->vgid;
     status_t status = wr_msg_interact(conn, WR_CMD_TRUNCATE_FILE, (void *)&send_info, NULL);
     wr_unlatch(&context->latch);
@@ -1403,13 +1294,10 @@ status_t wr_set_main_inst_on_server(wr_conn_t *conn)
     return wr_msg_interact(conn, WR_CMD_SET_MAIN_INST, NULL, NULL);
 }
 
-status_t wr_close_file_on_server(wr_conn_t *conn, wr_vg_info_item_t *vg_item, uint64 fid, ftid_t ftid)
+status_t wr_close_file_on_server(wr_conn_t *conn, int64_t fd)
 {
     wr_close_file_info_t send_info;
-    send_info.fid = fid;
-    send_info.vg_name = vg_item->vg_name;
-    send_info.vg_id = vg_item->id;
-    send_info.ftid = *(uint64 *)&ftid;
+    send_info.fd = fd;
     return wr_msg_interact(conn, WR_CMD_CLOSE_FILE, (void *)&send_info, NULL);
 }
 
@@ -1483,6 +1371,19 @@ static status_t wr_encode_setcfg(wr_conn_t *conn, wr_packet_t *pack, void *send_
 static status_t wr_encode_handshake(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     CM_RETURN_IFERR(wr_put_data(pack, send_info, sizeof(wr_cli_info_t)));
+    return CM_SUCCESS;
+}
+
+static status_t wr_decode_read_file(wr_packet_t *ack_pack, void *ack)
+{
+    text_t buf = CM_NULL_TEXT;
+    wr_read_file_info_t *info = (wr_read_file_info_t *)ack;
+    CM_RETURN_IFERR(wr_get_text(ack_pack, &buf));
+    errno_t errcode = memcpy_s(info->buf, info->size, buf.str, buf.len);
+    if (errcode != EOK) {
+        WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_READ_FILE), "get read file data error");
+        return CM_ERROR;
+    }
     return CM_SUCCESS;
 }
 
@@ -1579,6 +1480,25 @@ static status_t wr_encode_truncate_file(wr_conn_t *conn, wr_packet_t *pack, void
     return CM_SUCCESS;
 }
 
+static status_t wr_encode_write_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_write_file_info_t *info = (wr_write_file_info_t *)send_info;
+    CM_RETURN_IFERR(wr_put_int64(pack, info->offset));
+    CM_RETURN_IFERR(wr_put_int64(pack, info->handle));
+    CM_RETURN_IFERR(wr_put_int64(pack, info->size));
+    CM_RETURN_IFERR(wr_put_data(pack, info->buf, info->size));
+    return CM_SUCCESS;
+}
+
+static status_t wr_encode_read_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_read_file_info_t *info = (wr_read_file_info_t *)send_info;
+    CM_RETURN_IFERR(wr_put_int64(pack, info->offset));
+    CM_RETURN_IFERR(wr_put_int64(pack, info->handle));
+    CM_RETURN_IFERR(wr_put_int64(pack, info->size));
+    return CM_SUCCESS;
+}
+
 static status_t wr_encode_extend_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     wr_extend_info_t *info = (wr_extend_info_t *)send_info;
@@ -1661,10 +1581,7 @@ static status_t wr_encode_close_dir(wr_conn_t *conn, wr_packet_t *pack, void *se
 static status_t wr_encode_close_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     wr_close_file_info_t *info = (wr_close_file_info_t *)send_info;
-    CM_RETURN_IFERR(wr_put_int64(pack, info->fid));
-    CM_RETURN_IFERR(wr_put_str(pack, info->vg_name));
-    CM_RETURN_IFERR(wr_put_int32(pack, info->vg_id));
-    CM_RETURN_IFERR(wr_put_int64(pack, info->ftid));
+    CM_RETURN_IFERR(wr_put_int64(pack, info->fd));
     return CM_SUCCESS;
 }
 
@@ -1683,7 +1600,7 @@ static status_t wr_encode_delete_file(wr_conn_t *conn, wr_packet_t *pack, void *
 
 static status_t wr_decode_open_file(wr_packet_t *ack_pack, void *ack)
 {
-    CM_RETURN_IFERR(wr_get_data(ack_pack, sizeof(wr_find_node_t), (void **)ack));
+    CM_RETURN_IFERR(wr_get_int64(ack_pack, (int64_t *)ack));
     return CM_SUCCESS;
 }
 
@@ -1713,7 +1630,9 @@ typedef struct st_wr_packet_proc {
     char *cmd_info;
 } wr_packet_proc_t;
 
-wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] = {[WR_CMD_MKDIR] = {wr_encode_make_dir, NULL, "make dir"},
+wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] = 
+{   
+    [WR_CMD_MKDIR] = {wr_encode_make_dir, NULL, "make dir"},
     [WR_CMD_RMDIR] = {wr_encode_remove_dir, NULL, "remove dir"},
     [WR_CMD_OPEN_DIR] = {wr_encode_open_dir, wr_decode_open_dir, "open dir"},
     [WR_CMD_CLOSE_DIR] = {wr_encode_close_dir, NULL, "close dir"},
@@ -1721,6 +1640,8 @@ wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] = {[WR_CMD_MKDIR] = {wr_encode_mak
     [WR_CMD_CLOSE_FILE] = {wr_encode_close_file, NULL, "close file"},
     [WR_CMD_CREATE_FILE] = {wr_encode_create_file, NULL, "create file"},
     [WR_CMD_DELETE_FILE] = {wr_encode_delete_file, NULL, "delete file"},
+    [WR_CMD_WRITE_FILE] = {wr_encode_write_file, NULL, "write file"},
+    [WR_CMD_READ_FILE] = {wr_encode_read_file, wr_decode_read_file, "read file"},
     [WR_CMD_EXTEND_FILE] = {wr_encode_extend_file, NULL, "extend file"},
     [WR_CMD_RENAME_FILE] = {wr_encode_rename_file, NULL, "rename file"},
     [WR_CMD_TRUNCATE_FILE] = {wr_encode_truncate_file, NULL, "truncate file"},

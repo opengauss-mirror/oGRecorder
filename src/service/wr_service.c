@@ -28,6 +28,7 @@
 #include "wr_io_fence.h"
 #include "wr_malloc.h"
 #include "wr_open_file.h"
+#include "wr_filesystem.h"
 #include "wr_srv_proc.h"
 #include "wr_mes.h"
 #include "wr_api.h"
@@ -366,36 +367,26 @@ static status_t wr_process_open_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
-    wr_find_node_t find_info;
-    status_t status = wr_open_file(session, (const char *)name, flag, &find_info);
+    int64_t fd = 0;
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s", g_inst_cfg->data_dir, name);
+    status_t status = wr_open_file(session, (const char *)path, flag, &fd);
     if (status == CM_SUCCESS) {
-        WR_RETURN_IF_ERROR(wr_put_data(&session->send_pack, &find_info, sizeof(wr_find_node_t)));
+        WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, fd));
     }
     return status;
 }
 
 static status_t wr_process_close_file(wr_session_t *session)
 {
-    uint64 fid;
-    char *vg_name = NULL;
-    uint32 vgid;
-    ftid_t ftid;
+    int64_t fd;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fid));
-    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vg_name));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&vgid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "vg_name:%s, fid:%llu, ftid:%llu", vg_name, fid, *(uint64 *)&ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fd));
+    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%lld", fd));
 
-    wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
-    bool32 result = (bool32)(vg_item != NULL);
-    WR_RETURN_IF_FALSE2(result, WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, vg_name));
-
-    WR_LOG_DEBUG_OP("Begin to close file, fid:%llu, %s", fid, wr_display_metaid(ftid));
-    WR_RETURN_IF_ERROR(wr_close_file(session, vg_item, *(uint64 *)&ftid));
-    LOG_DEBUG_INF("Succeed to close file, ftid:%s, fid:%llu, vg: %s, session pid:%llu.", wr_display_metaid(ftid), fid,
-        vg_item->vg_name, session->cli_info.cli_pid);
+    WR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
+    WR_RETURN_IF_ERROR(wr_filesystem_close(fd));
+    LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
     return CM_SUCCESS;
 }
 
@@ -434,6 +425,49 @@ static status_t wr_process_close_dir(wr_session_t *session)
     WR_LOG_DEBUG_OP("Begin to close dir, ftid:%llu, vg:%s.", ftid, vg_name);
     wr_close_dir(session, vg_name, ftid);
     return CM_SUCCESS;
+}
+
+static status_t wr_process_write_file(wr_session_t *session)
+{
+    int64 offset;
+    int64 file_size;
+    int64 handle;
+    char *buf;
+
+    wr_init_get(&session->recv_pack);
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &file_size));
+    WR_RETURN_IF_ERROR(wr_get_data(&session->recv_pack, file_size, &buf));
+
+    WR_RETURN_IF_ERROR(wr_set_audit_resource(
+        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%lld, offset:%lld, size:%lld", handle, offset, file_size));
+
+    return wr_filesystem_write(handle, offset, file_size, buf);
+}
+
+static status_t wr_process_read_file(wr_session_t *session)
+{
+    int64 offset;
+    int64 size;
+    int64 handle;
+
+    wr_init_get(&session->recv_pack);
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &size));
+    char *buf = (char *)malloc(size);
+    if (buf == NULL) {
+        LOG_DEBUG_ERR("Failed to malloc buffer for read file.");
+        return CM_ERROR;
+    }
+    WR_RETURN_IF_ERROR(wr_filesystem_pread(handle, offset, size, buf));
+    text_t data;
+    cm_str2text(buf, &data);
+    if (buf != NULL) {
+        data.len++;  // for keeping the '\0'
+    }
+    return wr_put_text(&session->send_pack, &data);
 }
 
 static status_t wr_process_extending_file(wr_session_t *session)
@@ -914,6 +948,8 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_FILE)] = {WR_CMD_CLOSE_FILE, wr_process_close_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_CREATE_FILE)] = {WR_CMD_CREATE_FILE, wr_process_create_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_DELETE_FILE)] = {WR_CMD_DELETE_FILE, wr_process_delete_file, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_WRITE_FILE)] = {WR_CMD_WRITE_FILE, wr_process_write_file, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_READ_FILE)] = {WR_CMD_READ_FILE, wr_process_read_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXTEND_FILE)] = {WR_CMD_EXTEND_FILE, wr_process_extending_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RENAME_FILE)] = {WR_CMD_RENAME_FILE, wr_process_rename, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_REFRESH_FILE)] = {WR_CMD_REFRESH_FILE, wr_process_refresh_file, NULL, CM_FALSE},
