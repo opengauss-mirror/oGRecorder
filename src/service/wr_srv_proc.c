@@ -361,15 +361,13 @@ status_t wr_remove_file(wr_session_t *session, const char *file)
 
 status_t wr_make_dir(wr_session_t *session, const char *dir_name)
 {
-    char path[WR_FILE_PATH_MAX_LENGTH];
-    snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s", g_inst_cfg->data_dir, dir_name);
-    return wr_filesystem_mkdir(path, 0777);
+    return wr_filesystem_mkdir(dir_name, 0777);
 }
 
 status_t wr_create_file(wr_session_t *session, const char *parent, const char *name, int32 flag)
 {
     char path[WR_FILE_PATH_MAX_LENGTH];
-    snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s/%s", g_inst_cfg->data_dir, parent, name);
+    snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s", parent, name);
     return wr_filesystem_touch(path);
 }
 

@@ -59,10 +59,10 @@ extern "C" {
 void wr_set_default_conn_timeout(int timeout)
 {
     if (timeout <= 0) {
-        g_wr_uds_conn_timeout = WR_CONN_NEVER_TIMEOUT;
+        g_wr_tcp_conn_timeout = WR_CONN_NEVER_TIMEOUT;
         return;
     }
-    g_wr_uds_conn_timeout = timeout;
+    g_wr_tcp_conn_timeout = timeout;
 }
 
 int wr_create_instance(const char *addr, wr_instance_handle *inst_handle)
@@ -237,10 +237,10 @@ int wr_stat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handl
     return ret;
 }
 
-int wr_lstat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle)
+int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, int *file_num)
 {
-    if (item == NULL) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "wr_stat_info_t");
+    if (file_num == NULL) {
+        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "file_num");
         return WR_ERROR;
     }
     if (inst_handle == NULL) {
@@ -253,12 +253,13 @@ int wr_lstat(const char *path, wr_stat_info_t item, wr_instance_handle inst_hand
         return WR_ERROR;
     }
 
-    gft_node_t *node = wr_get_node_by_path_impl(hdl->conn, path);
-    if (node == NULL) {
-        LOG_DEBUG_INF("lstat get node by path :%s error", path);
+    status_t ret = wr_vfs_query_file_num_impl(hdl->conn, vfs_name, file_num);
+    if (ret != WR_SUCCESS) {
+        *file_num = 0;
+        LOG_DEBUG_INF("vfs query file num :%s error", vfs_name);
         return WR_ERROR;
     }
-    return wr_set_stat_info(item, node);
+    return WR_SUCCESS;
 }
 
 int wr_fstat(int handle, wr_stat_info_t item, wr_instance_handle inst_handle)
@@ -710,7 +711,7 @@ int wr_set_conn_timeout(int32 timeout)
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid timeout when set connection timeout");
         return CM_ERROR;
     }
-    g_wr_uds_conn_timeout = timeout;
+    g_wr_tcp_conn_timeout = timeout;
     return CM_SUCCESS;
 }
 

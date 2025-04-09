@@ -276,9 +276,7 @@ static status_t wr_process_rmdir(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &recursive));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", dir));
     WR_LOG_DEBUG_OP("Begin to rmdir:%s.", dir);
-    char path[WR_FILE_PATH_MAX_LENGTH];
-    snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s", g_inst_cfg->data_dir, dir);
-    status_t status = wr_filesystem_rmdir(path);
+    status_t status = wr_filesystem_rmdir(dir);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to rmdir:%s", dir);
         return status;
@@ -286,7 +284,21 @@ static status_t wr_process_rmdir(wr_session_t *session)
     LOG_DEBUG_ERR("Failed to rmdir:%s", dir);
     return status;
 }
-// TODO: walsender && walreceiver
+
+static status_t wr_process_query_file_num(wr_session_t *session)
+{
+    char *vfs_name = NULL;
+    uint32 file_num = 0;
+    wr_init_get(&session->recv_pack);
+    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vfs_name));
+    if (wr_filesystem_query_file_num(vfs_name, &file_num) != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Failed to query file num for vfs:%s", vfs_name);
+        return CM_ERROR;
+    }
+    (void)wr_put_int32(&session->send_pack, file_num);
+    return CM_SUCCESS;
+}
+
 static status_t wr_process_create_file(wr_session_t *session)
 {
     char *file_ptr = NULL;
@@ -333,9 +345,7 @@ static status_t wr_process_delete_file(wr_session_t *session)
     WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("delete file get file name failed."));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
     WR_LOG_DEBUG_OP("Begin to rm file:%s", name);
-    char path[WR_FILE_PATH_MAX_LENGTH];
-    snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s", g_inst_cfg->data_dir, name);
-    status = wr_filesystem_rm(path);
+    status = wr_filesystem_rm(name);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to rm file:%s", name);
         return status;
@@ -368,9 +378,7 @@ static status_t wr_process_open_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
     int64_t fd = 0;
-    char path[WR_FILE_PATH_MAX_LENGTH];
-    snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s", g_inst_cfg->data_dir, name);
-    status_t status = wr_open_file(session, (const char *)path, flag, &fd);
+    status_t status = wr_open_file(session, (const char *)name, flag, &fd);
     if (status == CM_SUCCESS) {
         WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, fd));
     }
@@ -461,13 +469,13 @@ static status_t wr_process_read_file(wr_session_t *session)
         LOG_DEBUG_ERR("Failed to malloc buffer for read file.");
         return CM_ERROR;
     }
+    memset(buf, 0, size);
     WR_RETURN_IF_ERROR(wr_filesystem_pread(handle, offset, size, buf));
     text_t data;
     cm_str2text(buf, &data);
-    if (buf != NULL) {
-        data.len++;  // for keeping the '\0'
-    }
-    return wr_put_text(&session->send_pack, &data);
+    WR_RETURN_IF_ERROR(wr_put_text(&session->send_pack, &data));
+    free(buf);
+    return CM_SUCCESS;
 }
 
 static status_t wr_process_extending_file(wr_session_t *session)
@@ -942,6 +950,7 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     // modify
     [WR_CMD_TYPE_OFFSET(WR_CMD_MKDIR)] = {WR_CMD_MKDIR, wr_process_mkdir, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RMDIR)] = {WR_CMD_RMDIR, wr_process_rmdir, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_NUM)] = {WR_CMD_QUERY_FILE_NUM, wr_process_query_file_num, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_DIR)] = {WR_CMD_OPEN_DIR, wr_process_open_dir, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_DIR)] = {WR_CMD_CLOSE_DIR, wr_process_close_dir, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_FILE)] = {WR_CMD_OPEN_FILE, wr_process_open_file, NULL, CM_FALSE},

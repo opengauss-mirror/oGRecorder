@@ -41,7 +41,7 @@ extern "C" {
 #define HANDLE_VALUE(handle) ((handle) - (WR_HANDLE_BASE))
 #define DB_WR_DEFAULT_UDS_PATH "UDS:/tmp/.wr_unix_d_socket"
 extern char g_wr_inst_path[CM_MAX_PATH_LEN];
-extern int32 g_wr_uds_conn_timeout;
+extern int32 g_wr_tcp_conn_timeout;
 
 typedef struct st_wr_conn {
     wr_packet_t pack;  // for sending

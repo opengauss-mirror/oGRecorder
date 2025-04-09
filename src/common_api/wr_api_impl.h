@@ -139,6 +139,11 @@ typedef struct st_wr_read_file_info {
     void *buf;
 } wr_read_file_info_t;
 
+typedef struct st_wr_query_file_num_info {
+    const char *vfs_name;
+    uint32 file_num;
+} wr_query_file_num_info_t;
+
 typedef struct st_wr_refresh_file_table_info {
     uint64 block_id;
     const char *vg_name;
@@ -227,6 +232,7 @@ status_t wr_cli_handshake(wr_conn_t *conn, uint32 max_open_file);
 status_t wr_init_client(uint32 max_open_files, char *home);
 void wr_destroy(void);
 status_t wr_get_fname_impl(int handle, char *fname, int fname_size);
+status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32 *file_num);
 
 status_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset);
 status_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset);

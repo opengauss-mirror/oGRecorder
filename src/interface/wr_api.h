@@ -149,7 +149,8 @@ WR_DECLARE int wr_vfs_unmount(wr_vfs_handle vfs_handle, wr_instance_handle inst_
 
 WR_DECLARE int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result, wr_instance_handle inst_handle);
 WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
-WR_DECLARE int wr_vfs_query_file_num(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
+
+WR_DECLARE int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, int *file_num);
 
 // file
 WR_DECLARE int wr_file_create(const char *name, int flag, wr_instance_handle inst_handle);

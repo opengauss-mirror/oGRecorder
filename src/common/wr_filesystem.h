@@ -15,8 +15,9 @@ status_t wr_filesystem_touch(const char *name);
 status_t wr_filesystem_rm(const char *name);
 status_t wr_filesystem_write(int64_t handle, int64_t offset, int64_t size, const char *buf);
 status_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char *buf);
-int wr_filesystem_open(const char *file_path);
-int wr_filesystem_close(int fd);
+status_t wr_filesystem_query_file_num(const char *vfs_name, uint32 *file_num);
+status_t wr_filesystem_open(const char *file_path, int *fd);
+status_t wr_filesystem_close(int fd);
 
 
 #ifdef __cplusplus

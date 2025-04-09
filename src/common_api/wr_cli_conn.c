@@ -119,7 +119,7 @@ status_t wr_conn_opts_create(pointer_t *result, const char *addr)
 static status_t wr_conn_sync(wr_conn_opt_t *options, wr_conn_t *conn, const char *addr)
 {
     status_t ret = CM_ERROR;
-    int timeout = (options != NULL ? options->timeout : g_wr_uds_conn_timeout);
+    int timeout = (options != NULL ? options->timeout : g_wr_tcp_conn_timeout);
     do {
         ret = wr_try_conn(options, conn, addr);
         if (ret == CM_SUCCESS) {

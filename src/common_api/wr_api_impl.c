@@ -43,7 +43,7 @@ extern "C" {
 
 #define WR_ACCMODE 00000003
 #define WR_OPEN_MODE(flag) ((flag + 1) & WR_ACCMODE)
-int32 g_wr_uds_conn_timeout = WR_UDS_CONNECT_TIMEOUT;
+int32 g_wr_tcp_conn_timeout = WR_TCP_CONNECT_TIMEOUT;
 uint32 g_wr_server_pid = 0;
 
 typedef struct str_files_rw_ctx {
@@ -173,46 +173,6 @@ void wr_free_conn(wr_conn_t *conn)
     return;
 }
 
-/*
-status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn)
-{
-    if (server_locator == NULL) {
-        WR_THROW_ERROR(ERR_WR_UDS_INVALID_URL, "NULL", 0);
-        return CM_ERROR;
-    }
-
-    if ((conn->flag == CM_TRUE) && (conn->pipe.link.uds.closed == CM_FALSE)) {
-        return CM_SUCCESS;
-    }
-
-    conn->flag = CM_FALSE;
-    text_t uds = {"UDS:", 4};
-    if (wr_check_url_format(server_locator, &uds) != CM_SUCCESS) {
-        WR_THROW_ERROR(ERR_WR_UDS_INVALID_URL, server_locator, strlen(server_locator));
-        return ERR_WR_UDS_INVALID_URL;
-    }
-    conn->cli_vg_handles = NULL;
-    conn->pipe.options = 0;
-    int32 timeout = options != NULL ? options->timeout : g_wr_uds_conn_timeout;
-    conn->pipe.connect_timeout = timeout < 0 ? WR_UDS_CONNECT_TIMEOUT : timeout;
-    conn->pipe.socket_timeout = WR_UDS_SOCKET_TIMEOUT;
-    conn->pipe.link.uds.sock = CS_INVALID_SOCKET;
-    conn->pipe.link.uds.closed = CM_TRUE;
-    conn->pipe.type = CS_TYPE_DOMAIN_SCOKET;
-    conn->session = NULL;
-    status_t ret = cs_connect_ex(
-        server_locator, &conn->pipe, NULL, (const char *)(server_locator + uds.len), (const char *)CM_NULL_TEXT.str);
-    if (ret != CM_SUCCESS) {
-        LOG_DEBUG_ERR("connect server failed, uds path:%s", server_locator);
-        return ret;
-    }
-    wr_init_packet(&conn->pack, conn->pipe.options);
-
-    conn->flag = CM_TRUE;
-
-    return CM_SUCCESS;
-}
-*/
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn)
 {
     if (server_locator == NULL) {
@@ -228,12 +188,12 @@ status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_
 
     conn->cli_vg_handles = NULL;
     conn->pipe.options = 0;
-    int32 timeout = options != NULL ? options->timeout : g_wr_uds_conn_timeout;
-    conn->pipe.connect_timeout = timeout < 0 ? WR_UDS_CONNECT_TIMEOUT : timeout;
-    conn->pipe.socket_timeout = WR_UDS_SOCKET_TIMEOUT;
+    int32 timeout = options != NULL ? options->timeout : g_wr_tcp_conn_timeout;
+    conn->pipe.connect_timeout = timeout < 0 ? WR_TCP_CONNECT_TIMEOUT : timeout;
+    conn->pipe.socket_timeout = WR_TCP_SOCKET_TIMEOUT;
     conn->pipe.link.tcp.sock = CS_INVALID_SOCKET;
     conn->pipe.link.tcp.closed = CM_FALSE;
-    conn->pipe.type = CS_TYPE_TCP;
+    conn->pipe.type = CS_TYPE_SSL;
     conn->session = NULL;
     status_t ret = cs_connect(
         server_locator, &conn->pipe, NULL);
@@ -468,6 +428,22 @@ wr_vfs_t *wr_open_dir_impl(wr_conn_t *conn, const char *dir_path, bool32 refresh
         return NULL;
     }
     return wr_open_dir_impl_core(conn, find_node);
+}
+
+status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32 *file_num)
+{
+    LOG_DEBUG_INF("wr query file num entry, vfs_name:%s", vfs_name);
+    wr_query_file_num_info_t send_info;
+    send_info.vfs_name = vfs_name;
+    send_info.file_num = file_num;
+    status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_NUM, (void *)&send_info, (void *)&send_info);
+    if (status != CM_SUCCESS) {
+        LOG_DEBUG_ERR("wr query file num error");
+        return CM_ERROR;
+    }
+    *file_num = send_info.file_num;
+    LOG_DEBUG_INF("wr query file num leave");
+    return status;
 }
 
 gft_node_t *wr_read_dir_impl(wr_conn_t *conn, wr_vfs_t *dir, bool32 skip_delete)
@@ -1374,6 +1350,20 @@ static status_t wr_encode_handshake(wr_conn_t *conn, wr_packet_t *pack, void *se
     return CM_SUCCESS;
 }
 
+static status_t wr_encode_query_file_num(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_query_file_num_info_t *info = (wr_query_file_num_info_t *)send_info;
+    CM_RETURN_IFERR(wr_put_str(pack, info->vfs_name));
+    return CM_SUCCESS;
+}
+
+static status_t wr_decode_query_file_num(wr_packet_t *ack_pack, void *ack)
+{
+    wr_query_file_num_info_t *info = (wr_query_file_num_info_t *)ack;
+    CM_RETURN_IFERR(wr_get_int32(ack_pack, &(info->file_num)));
+    return CM_SUCCESS;
+}
+
 static status_t wr_decode_read_file(wr_packet_t *ack_pack, void *ack)
 {
     text_t buf = CM_NULL_TEXT;
@@ -1634,6 +1624,7 @@ wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] =
 {   
     [WR_CMD_MKDIR] = {wr_encode_make_dir, NULL, "make dir"},
     [WR_CMD_RMDIR] = {wr_encode_remove_dir, NULL, "remove dir"},
+    [WR_CMD_QUERY_FILE_NUM] = {wr_encode_query_file_num, wr_decode_query_file_num, "query file num"},
     [WR_CMD_OPEN_DIR] = {wr_encode_open_dir, wr_decode_open_dir, "open dir"},
     [WR_CMD_CLOSE_DIR] = {wr_encode_close_dir, NULL, "close dir"},
     [WR_CMD_OPEN_FILE] = {wr_encode_open_file, wr_decode_open_file, "open file"},

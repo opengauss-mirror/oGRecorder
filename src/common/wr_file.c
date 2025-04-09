@@ -419,9 +419,10 @@ static status_t wr_open_file_core(
 
 status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64_t *fd)
 {
+    status_t status;
     WR_LOG_DEBUG_OP("Begin to open file:%s, session id:%u.", file, session->id);
-    *fd = wr_filesystem_open(file);
-    if (*fd == -1) {
+    status = wr_filesystem_open(file, fd);
+    if (status != CM_SUCCESS) {
         LOG_RUN_ERR("[FS]Failed to open file:%s.", file);
         return CM_ERROR;
     }
