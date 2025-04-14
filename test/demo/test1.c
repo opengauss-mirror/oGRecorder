@@ -1,26 +1,123 @@
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+/* gcc test1.c -I WR/src/interface -lwrapi -L WR/output/lib */
 #include <stdio.h>
-#include <errno.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include "wr_api.h"
+#include "wr_errno.h"
 
-/* gcc 1.c -I /home/czk/bianyi/WalRecord/src/interface -lwrapi -L /home/czk/bianyi/WalRecord/output/lib */
+#define TEST_LOG_DIR "./test_log"
+#define TEST_DIR "testdir1"
+#define TEST_FILE1 "testdir1/testfile1"
+#define ONE_GB 1024 * 1024 * 1024
+#define SERVER_ADDR "127.0.0.1:19225"
 
-int main(void) {
-    bool result = false;
-    int fd = -1;
+int main() {
     int errorcode = 0;
     const char *errormsg = NULL;
-    char *fileName = "wr_file_write";
-    int ret = wr_file_write(0x20000001, "hello world", 10);
-    if (ret != 0) {
-        wr_get_error(&errorcode, &errormsg);
-        printf("%d : %s\n", errorcode, errormsg);
+    wr_instance_handle g_inst_handle = NULL;
+    int handle1 = 0;
+
+    // 初始化日志
+    if (wr_init_logger(TEST_LOG_DIR, 255, 100, ONE_GB) != WR_SUCCESS) {
+        fprintf(stderr, "Failed to initialize logger\n");
+        return EXIT_FAILURE;
     }
 
-    printf("%lld\n", ret);
-    return 0;
+    // 创建实例
+    if (wr_create_instance(SERVER_ADDR, &g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error creating instance: %d : %s\n", errorcode, errormsg);
+        return EXIT_FAILURE;
+    }
+
+    // 创建VFS
+    if (wr_vfs_create(TEST_DIR, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error creating VFS: %d : %s\n", errorcode, errormsg);
+        return EXIT_FAILURE;
+    }
+
+    // 创建文件
+    if (wr_file_create(TEST_FILE1, 0, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error creating file: %d : %s\n", errorcode, errormsg);
+        return EXIT_FAILURE;
+    }
+
+    // 打开文件
+    if (wr_file_open(TEST_FILE1, 0, &handle1, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error opening file: %d : %s\n", errorcode, errormsg);
+        return EXIT_FAILURE;
+    }
+
+    // 创建一个大于8KB的数据块
+    const int large_data_size = 10 * 1024; // 10KB
+    char *large_data = (char *)malloc(large_data_size);
+    if (!large_data) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return EXIT_FAILURE;
+    }
+    memset(large_data, 'A', large_data_size);
+
+    // 写入大数据块到文件
+    if (wr_file_pwrite(handle1, large_data, large_data_size, 0, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error writing to file: %d : %s\n", errorcode, errormsg);
+        free(large_data);
+        return EXIT_FAILURE;
+    }
+
+    // 读取大数据块
+    char *read_buffer = (char *)malloc(large_data_size);
+    if (!read_buffer) {
+        fprintf(stderr, "Memory allocation failed\n");
+        free(large_data);
+        return EXIT_FAILURE;
+    }
+    if (wr_file_pread(handle1, read_buffer, large_data_size, 0, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error reading from file: %d : %s\n", errorcode, errormsg);
+        free(large_data);
+        free(read_buffer);
+        return EXIT_FAILURE;
+    }
+
+    // 验证读取的数据是否与写入的数据一致
+    if (memcmp(large_data, read_buffer, large_data_size) != 0) {
+        fprintf(stderr, "Data mismatch\n");
+        free(large_data);
+        free(read_buffer);
+        return EXIT_FAILURE;
+    }
+
+    printf("Large data write and read test passed.\n");
+
+    // 清理动态分配的内存
+    free(large_data);
+    free(read_buffer);
+
+    // 关闭文件
+    if (wr_file_close(handle1, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error closing file: %d : %s\n", errorcode, errormsg);
+        return EXIT_FAILURE;
+    }
+
+    // 删除文件
+    if (wr_file_delete(TEST_FILE1, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error deleting file: %d : %s\n", errorcode, errormsg);
+        return EXIT_FAILURE;
+    }
+
+    // 删除VFS
+    if (wr_vfs_delete(TEST_DIR, g_inst_handle) != WR_SUCCESS) {
+        wr_get_error(&errorcode, &errormsg);
+        fprintf(stderr, "Error deleting VFS: %d : %s\n", errorcode, errormsg);
+        return EXIT_FAILURE;
+    }
+
+    printf("All operations completed successfully.\n");
+    return EXIT_SUCCESS;
 }

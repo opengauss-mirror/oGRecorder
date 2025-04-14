@@ -1339,15 +1339,6 @@ static status_t wr_load_buffer_cache_from_file(int32 file_fd, wr_vg_info_item_t 
     return CM_SUCCESS;
 }
 
-static status_t wr_get_group_num(int32 file_fd, int64 *offset, uint32 *group_num)
-{
-    int32 read_size = 0;
-    status_t status = cm_read_file(file_fd, group_num, sizeof(uint32), &read_size);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to read group num."));
-    *offset += (int64)sizeof(uint32);
-    return CM_SUCCESS;
-}
-
 bool32 wr_check_software_version(int32 file_fd, int64 *offset)
 {
     int32 read_size = 0;

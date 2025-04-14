@@ -184,7 +184,7 @@ extern "C" {
 #define CM_MAX_UDS_FILE_PERMISSIONS (uint16)777
 #define CM_DEF_UDS_FILE_PERMISSIONS (uint16)600
 
-#define WR_MAX_PACKET_SIZE (uint32)2136 /* sizeof(wr_packet_head_t) + CM_ALIGN4(WR_FILE_PATH_MAX_LENGTH + 1) */
+#define WR_MAX_PACKET_SIZE (uint32)(10240) /* 10KB */
 #define WR_MAX_PACKET_DATA_SIZE (((WR_MAX_PACKET_SIZE) - sizeof(wr_packet_head_t)) - sizeof(uint32))
 
 #define WR_PARAM_BUFFER_SIZE (uint32)1024

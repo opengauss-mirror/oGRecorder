@@ -235,7 +235,7 @@ status_t wr_get_fname_impl(int handle, char *fname, int fname_size);
 status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32 *file_num);
 
 status_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset);
-status_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset);
+status_t wr_pread_file_impl(wr_conn_t *conn, int handle, void *buf, int size, long long offset);
 status_t wr_get_addr_impl(wr_conn_t *conn, int32 handle, long long offset, char *pool_name, char *image_name,
     char *obj_addr, unsigned int *obj_id, unsigned long int *obj_offset);
 gft_node_t *wr_get_node_by_path_impl(wr_conn_t *conn, const char *path);
@@ -279,6 +279,8 @@ status_t wr_set_main_inst_on_server(wr_conn_t *conn);
 
 #define WR_UNLOCK_VG_META_S(vg_item, session) \
     (void)wr_unlock_shm_meta_s_with_stack((session), (vg_item)->vg_latch, CM_FALSE)
+
+#define WR_RW_STEP_SIZE (8192)
 
 #ifdef __cplusplus
 }

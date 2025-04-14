@@ -464,17 +464,30 @@ static status_t wr_process_read_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &size));
-    char *buf = (char *)malloc(size);
+
+    // Allocate one extra byte for the null terminator
+    char *buf = (char *)malloc(size + 1);
     if (buf == NULL) {
         LOG_DEBUG_ERR("Failed to malloc buffer for read file.");
         return CM_ERROR;
     }
-    memset(buf, 0, size);
+
+    // Initialize the buffer and ensure it is null-terminated
+    memset(buf, 0, size + 1);
+
+    // Read the file content into the buffer
     WR_RETURN_IF_ERROR(wr_filesystem_pread(handle, offset, size, buf));
+
+    // Convert the buffer to a text_t structure
     text_t data;
     cm_str2text(buf, &data);
+
+    // Send the data
     WR_RETURN_IF_ERROR(wr_put_text(&session->send_pack, &data));
+
+    // Free the allocated buffer
     free(buf);
+
     return CM_SUCCESS;
 }
 

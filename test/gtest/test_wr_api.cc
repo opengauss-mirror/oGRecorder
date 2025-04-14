@@ -68,6 +68,27 @@ TEST_F(WrApiTest, TestWrfileOpen) {
     EXPECT_EQ(result3, WR_SUCCESS);
 }
 
+TEST_F(WrApiTest, TestWrfileWriteReadLargeData) {
+    // 创建一个大于8KB的数据块
+    const int large_data_size = 100 * 1024; // 10KB
+    char *large_data = new char[large_data_size];
+    memset(large_data, 'A', large_data_size); // 用'A'填充数据
+
+    // 写入大数据块到文件
+    EXPECT_EQ(wr_file_pwrite(handle1, large_data, large_data_size, 0, g_inst_handle), WR_SUCCESS);
+
+    // 读取大数据块
+    char *read_buffer = new char[large_data_size];
+    EXPECT_EQ(wr_file_pread(handle1, read_buffer, large_data_size, 0, g_inst_handle), WR_SUCCESS);
+
+    // 验证读取的数据是否与写入的数据一致
+    EXPECT_EQ(memcmp(large_data, read_buffer, large_data_size), 0);
+
+    // 清理动态分配的内存
+    delete[] large_data;
+    delete[] read_buffer;
+}
+
 TEST_F(WrApiTest, TestWrfileWriteRead) {
     const char *data1 = "hello world 1";
     const char *data2 = "hello world 2";

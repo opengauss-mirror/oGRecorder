@@ -118,6 +118,20 @@ status_t wr_filesystem_query_file_num(const char *vfs_name, uint32_t *file_num) 
     return CM_SUCCESS;
 }
 
+status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_position) {
+    if (!file_path || !end_position) {
+        LOG_AND_RETURN_ERROR("[FS] Invalid parameters: file_path or end_position is NULL");
+    }
+
+    struct stat file_stat;
+    if (stat(WR_FS_GET_PATH(file_path), &file_stat) != 0) {
+        LOG_AND_RETURN_ERROR("[FS] Failed to stat file: %s", file_path);
+    }
+
+    *end_position = file_stat.st_size;
+    return CM_SUCCESS;
+}
+
 status_t wr_filesystem_open(const char *file_path, int *fd) {
     *fd = open(WR_FS_GET_PATH(file_path), O_RDWR | O_SYNC, 0);
     if (*fd == -1) {
