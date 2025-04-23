@@ -136,6 +136,11 @@ status_t wr_check_name(const char *name)
     return wr_check_name_is_valid(name, WR_MAX_NAME_LEN);
 }
 
+status_t wr_check_attr_flag(uint64_t attrFlag)
+{
+    return CM_SUCCESS;
+}
+
 status_t wr_check_path(const char *path)
 {
     if (path == NULL || strlen(path) == 0) {

@@ -341,7 +341,7 @@ void wr_disconnect_ex(wr_conn_t *conn)
     return;
 }
 
-status_t wr_vfs_create_impl(wr_conn_t *conn, const char *dir_name)
+status_t wr_vfs_create_impl(wr_conn_t *conn, const char *dir_name, unsigned long long attrFlag)
 {
     text_t text;
     cm_str2text((char *)dir_name, &text);
@@ -354,12 +354,13 @@ status_t wr_vfs_create_impl(wr_conn_t *conn, const char *dir_name)
     LOG_DEBUG_INF("wr make dir entry, dir_name:%s", dir_name);
     wr_make_dir_info_t send_info;
     send_info.name = dir_name;
+    send_info.attrFlag = attrFlag;
     status_t status = wr_msg_interact(conn, WR_CMD_MKDIR, (void *)&send_info, NULL);
     LOG_DEBUG_INF("wr make dir leave");
     return status;
 }
 
-status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir)
+status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir, unsigned long long attrFlag)
 {
     WR_RETURN_IF_ERROR(wr_check_device_path(dir));
     LOG_DEBUG_INF("wr remove dir entry, dir:%s", dir);
@@ -857,7 +858,50 @@ int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin)
     return new_offset;
 }
 
-status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset)
+status_t wr_read_write_file_core(wr_conn_t *conn, int64 offset, void *buf, int32 size, int64_t handle) 
+{
+    LOG_DEBUG_INF("wr write file entry, handle:%lld, size:%d", handle, size);   
+    wr_write_file_info_t send_info;
+    send_info.offset = offset;
+    send_info.handle = handle;
+    send_info.size = size;
+    send_info.buf = buf;
+
+    status_t status = wr_msg_interact(conn, WR_CMD_WRITE_FILE, (void *)&send_info, NULL);
+    LOG_DEBUG_INF("wr write file leave");
+    return status;
+}
+
+status_t wr_read_write_file(wr_conn_t *conn, int32 handle, void *buf, int32 size, int64 offset, bool32 is_read)
+{
+    status_t status;
+    wr_file_context_t *context = NULL;
+    wr_rw_param_t param;
+
+    if (size < 0) {
+        LOG_DEBUG_ERR("File size is invalid: %d.", size);
+        return CM_ERROR;
+    }
+    LOG_DEBUG_INF("wr read write file entry, handle:%d, is_read:%u", handle, is_read);
+
+    /* WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_EXCLUSIVE));
+    bool mode_match = is_read ? (context->mode & WR_FILE_MODE_READ) : (context->mode & WR_FILE_MODE_WRITE);
+    if (!mode_match) {
+        wr_unlatch(&context->latch);
+        WR_THROW_ERROR(ERR_WR_FILE_RDWR_INSUFF_PER, is_read ? "read" : "write", context->mode);
+        return CM_ERROR;
+    }
+    */
+    // wr_init_rw_param(&param, conn, handle, context, context->offset, WR_FALSE);
+    // param.is_read = is_read;
+    status = wr_read_write_file_core(conn, offset, buf, size, handle);
+    // wr_unlatch(&context->latch);
+    LOG_DEBUG_INF("wr read write file leave");
+
+    return status;
+}
+
+status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
         LOG_DEBUG_ERR("File size is invalid: %d.", size);
@@ -894,7 +938,7 @@ status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, int si
     return CM_SUCCESS;
 }
 
-status_t wr_pread_file_impl(wr_conn_t *conn, int handle, void *buf, int size, long long offset)
+status_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
         LOG_DEBUG_ERR("File size is invalid: %d.", size);
@@ -988,7 +1032,7 @@ status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst)
     return CM_SUCCESS;
 }
 
-status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long int length)
+status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType)
 {
     if (length < 0) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "length must be a positive integer");
@@ -1012,6 +1056,7 @@ status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long int length)
     send_info.fid = context->fid;
     send_info.ftid = *(uint64 *)&(context->node->id);
     send_info.length = (uint64)length;
+    send_info.truncateType = truncateType;
     // send_info.vg_name = context->vg_name;
     send_info.vg_id = context->vgid;
     status_t status = wr_msg_interact(conn, WR_CMD_TRUNCATE_FILE, (void *)&send_info, NULL);

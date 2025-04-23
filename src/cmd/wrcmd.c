@@ -360,6 +360,7 @@ static wr_args_t cmd_mkdir_args[] = {
     {'d', "dir_name", CM_TRUE, CM_TRUE, wr_check_name, NULL, NULL, 0, NULL, NULL, 0},
     {'U', "UDS", CM_FALSE, CM_TRUE, cmd_check_uds, cmd_check_convert_uds_home, cmd_clean_check_convert, 0, NULL, NULL,
         0},
+    {'a', "attr_flag", CM_FALSE, CM_TRUE, wr_check_attr_flag, NULL, NULL, 0, NULL, NULL, 0},
 };
 static wr_args_set_t cmd_mkdir_args_set = {
     cmd_mkdir_args,
@@ -407,7 +408,8 @@ static status_t mkdir_proc(void)
     if (conn == NULL) {
         return CM_ERROR;
     }
-    status_t status = wr_vfs_create_impl(conn, dir_name);
+    unsigned long long attrFlag = 0;
+    status_t status = wr_vfs_create_impl(conn, dir_name, attrFlag);
     if (status != CM_SUCCESS) {
         WR_PRINT_ERROR("Failed to make dir, path is %s, dir name is %s.\n", path, dir_name);
     } else {
@@ -774,6 +776,7 @@ static wr_args_t cmd_rmdir_args[] = {
     {'r', "recursive", CM_FALSE, CM_FALSE, NULL, NULL, NULL, 0, NULL, NULL, 0},
     {'U', "UDS", CM_FALSE, CM_TRUE, cmd_check_uds, cmd_check_convert_uds_home, cmd_clean_check_convert, 0, NULL, NULL,
         0},
+    {'a', "attr_flag", CM_FALSE, CM_TRUE, wr_check_attr_flag, NULL, NULL, 0, NULL, NULL, 0},
 };
 static wr_args_set_t cmd_rmdir_args_set = {
     cmd_rmdir_args,
@@ -806,8 +809,14 @@ static status_t rmdir_proc(void)
     if (conn == NULL) {
         return CM_ERROR;
     }
-
-    status = wr_vfs_delete_impl(conn, path);
+    uint64 attr;
+    const char *attrFlag = cmd_rmdir_args[WR_ARG_IDX_3].input_args;
+    status_t ret = cm_str2uint64(attrFlag, &attr);
+    if (ret != CM_SUCCESS) {
+        WR_PRINT_ERROR("The value of attrFlag is invalid.\n");
+        return CM_ERROR;
+    }
+    status = wr_vfs_delete_impl(conn, path, attr);
     if (status != CM_SUCCESS) {
         WR_PRINT_ERROR("Failed to rm dir, path is %s.\n", path);
     } else {
@@ -1735,8 +1744,8 @@ static status_t truncate_proc(void)
         WR_PRINT_ERROR("Failed to truncate file, name is %s.\n", path);
         return status;
     }
-
-    status = (status_t)wr_truncate_impl(conn, handle, length);
+    int truncateType = 0;
+    status = (status_t)wr_truncate_impl(conn, handle, length, truncateType);
     if (status != CM_SUCCESS) {
         WR_PRINT_ERROR("Failed to truncate file, name is %s.\n", path);
         (void)wr_close_file_impl(conn, handle);
