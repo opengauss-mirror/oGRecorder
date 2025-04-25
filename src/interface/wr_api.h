@@ -46,10 +46,6 @@ extern "C" {
 #define WR_DECLARE __attribute__((visibility("default")))
 #endif
 
-/* handle */
-struct __wr_dir;
-typedef struct __wr_dir *wr_vfs_handle;
-
 struct __wr_instance_handle;
 typedef struct __wr_instance_handle *wr_instance_handle;
 
@@ -96,10 +92,10 @@ typedef struct st_wr_dirent {
     char d_name[WR_MAX_NAME_LEN];
 } wr_dirent_t;
 
-typedef struct VfsHandlePtr {
+typedef struct wr_vfs_handle {
     wr_instance_handle handle;
     char vfs_name[WR_MAX_NAME_LEN];
-} VfsHandlePtr;
+} wr_vfs_handle;
 
 typedef struct FileParameter {
     unsigned long long attrFlag;
@@ -165,8 +161,8 @@ typedef void (*wr_exit_callback_t)(int exit_code);
 // vfs
 WR_DECLARE int wr_vfs_create(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
 WR_DECLARE int wr_vfs_delete(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
-WR_DECLARE int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, VfsHandlePtr *vfs_handle);
-WR_DECLARE int wr_vfs_unmount(wr_instance_handle inst_handle, VfsHandlePtr vfs_handle);
+WR_DECLARE int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_handle *vfs_handle);
+WR_DECLARE int wr_vfs_unmount(wr_instance_handle inst_handle, wr_vfs_handle vfs_handle);
 WR_DECLARE int wr_vfs_control(void);
 
 WR_DECLARE int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result, wr_instance_handle inst_handle);
@@ -175,17 +171,17 @@ WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle dir, wr_dir_item_t item, wr_
 WR_DECLARE int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, int *file_num);
 
 // file
-WR_DECLARE int wr_file_create(VfsHandlePtr vfs_handle, const char *name, const FileParameter *param, int *fd);
-WR_DECLARE int wr_file_delete(VfsHandlePtr vfs_handle, const char *file);
-WR_DECLARE int wr_file_open(VfsHandlePtr vfs_handle, const char *file, int flag, int *fd);
-WR_DECLARE int wr_file_close(VfsHandlePtr vfs_handle, int fd);
+WR_DECLARE int wr_file_create(wr_vfs_handle vfs_handle, const char *name, const FileParameter *param);
+WR_DECLARE int wr_file_delete(wr_vfs_handle vfs_handle, const char *file);
+WR_DECLARE int wr_file_open(wr_vfs_handle vfs_handle, const char *file, int flag, int *fd);
+WR_DECLARE int wr_file_close(wr_vfs_handle vfs_handle, int fd);
 WR_DECLARE long long wr_fseek(int handle, long long offset, int origin, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_rename(const char *src, const char *dst);
-WR_DECLARE int wr_file_truncate(int fd, int truncateType, long long offset, VfsHandlePtr vfs_handle);
+WR_DECLARE int wr_file_truncate(int fd, int truncateType, long long offset, wr_vfs_handle vfs_handle);
 WR_DECLARE int wr_file_size_physical(int handle, long long *fsize);
 WR_DECLARE void wr_file_size_maxwr(const char *fname, long long *fsize);
-WR_DECLARE int wr_file_pwrite(int fd, const void *buf, unsigned long long count, long long offset, VfsHandlePtr vfs_handle);
-WR_DECLARE int wr_file_pread(int fd, void *buf, unsigned long long count, long long offset, VfsHandlePtr vfs_handle);
+WR_DECLARE int wr_file_pwrite(int fd, const void *buf, unsigned long long count, long long offset, wr_vfs_handle vfs_handle);
+WR_DECLARE int wr_file_pread(int fd, void *buf, unsigned long long count, long long offset, wr_vfs_handle vfs_handle);
 WR_DECLARE int wr_file_fallocate(int handle, int mode, long long offset, long long length);
 WR_DECLARE int wr_file_stat(const char *fileName, long long offset, unsigned long long count);
 WR_DECLARE int wr_file_pwrite_async();
