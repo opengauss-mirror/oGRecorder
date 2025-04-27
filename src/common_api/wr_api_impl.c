@@ -227,13 +227,6 @@ status_t wr_set_session_id(wr_conn_t *conn, uint32 objectid)
             wr_get_max_total_session_cnt());
         return ERR_WR_SESSION_INVALID_ID;
     }
-    conn->session = (wr_session_t *)ga_object_addr(GA_SESSION_POOL, objectid);
-    if (conn->session == NULL) {
-        LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "Failed to get session, object id is %u.", objectid);
-        return ERR_WR_SESSION_INVALID_ID;
-    }
-    LOG_DEBUG_INF("wr set session id is %u, objectid is %u.", ((wr_session_t *)conn->session)->id, objectid);
-    wr_set_thv_run_ctx_item(WR_THV_RUN_CTX_ITEM_SESSION, conn->session);
     return CM_SUCCESS;
 }
 
@@ -275,6 +268,10 @@ status_t wr_cli_handshake(wr_conn_t *conn, uint32 max_open_file)
             WR_THROW_ERROR(ERR_WR_SERVER_REBOOT);
             return ERR_WR_SERVER_REBOOT;
         }
+    }
+
+    if (getenv(WR_ENV_HOME) != NULL) {
+        output_info.home = getenv(WR_ENV_HOME);
     }
     return wr_set_server_info(conn, output_info.home, output_info.objectid, max_open_file);
 }

@@ -274,13 +274,16 @@ status_t ga_attach_area(uint32 attach_perm)
 {
     uint32 i = 0;
 
-    if (cm_get_shm_ctrl_flag() != CM_SHM_CTRL_FLAG_TRUE) {
-        WR_RETURN_IFERR2(CM_ERROR, LOG_RUN_ERR("Can not attach the global area because the server is not ready yet."));
-    }
-
     g_app_area_addr = (char *)cm_attach_shm(SHM_TYPE_FIXED, (uint32)SHM_ID_APP_GA, 0, attach_perm);
     if (g_app_area_addr == NULL) {
-        WR_RETURN_IFERR2(CM_ERROR, LOG_RUN_ERR("can't attach the application area."));
+        uint64 app_area_size = CM_ALIGN_512(GA_APP_POOL_COUNT * (uint32)sizeof(ulong));
+        g_app_area_addr = (char *)cm_get_shm(SHM_TYPE_FIXED, (uint32)SHM_ID_APP_GA, app_area_size, CM_SHM_ATTACH_RW);
+
+        if (g_app_area_addr == NULL) {
+            LOG_RUN_ERR("can't attach the application are, area size = %llu.", app_area_size);
+            return ERR_WR_GA_INIT;
+        }
+
     }
 
     for (i = 0; i < GA_APP_POOL_COUNT; i++) {

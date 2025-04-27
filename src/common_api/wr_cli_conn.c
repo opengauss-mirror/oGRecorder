@@ -195,15 +195,6 @@ status_t wr_enter_api(wr_conn_t **conn, const char *addr)
     if (status != CM_SUCCESS) {
         return status;
     }
-    while (wr_cli_session_lock((*conn), (*conn)->session) != CM_SUCCESS) {
-        wr_destroy_thv(GLOBAL_THV_OBJ0);
-        LOG_RUN_INF("Begin to reconnect wr server.");
-        status = wr_get_conn(conn, addr);
-        if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to reconnect wr server.");
-            return status;
-        }
-    }
     return CM_SUCCESS;
 }
 
