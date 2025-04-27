@@ -17,13 +17,18 @@ wr_instance_handle g_inst_handle = NULL;
 wr_vfs_handle g_vfs_handle;
 int handle1 = 0, handle2 = 0, handle3 = 0;
 
+wr_param_t g_wr_param;
 
 
 class WrApiTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        strcpy(g_wr_param.log_home, "./testlog");
+        g_wr_param.log_level = 255;
+        g_wr_param.log_backup_file_count = 100;
+        g_wr_param.log_max_file_size = ONE_GB;
         // 初始化日志
-        int result = wr_init_logger(TEST_LOG_DIR, 255, 100, ONE_GB);
+        int result = wr_init(g_wr_param);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to initialize logger";
     }
 

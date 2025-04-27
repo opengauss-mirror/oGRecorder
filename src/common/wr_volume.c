@@ -62,7 +62,7 @@ static inline void wr_open_fail(const char *name)
         LOG_RUN_ERR("[WR] ABORT OPEN VOLUME RAW, because Linux OS error: errno:%d, errmsg:%s.", cm_get_os_error(),
             strerror(cm_get_os_error()));
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     } else {
         WR_THROW_ERROR(ERR_WR_VOLUME_OPEN, name, cm_get_os_error());
     }
@@ -142,7 +142,7 @@ uint64 wr_get_volume_size_raw(wr_volume_t *volume)
             LOG_RUN_ERR("[WR] ABORT GET VOLUME SIZE, because Linux OS error: errno:%d, errmsg:%s.", cm_get_os_error(),
                 strerror(cm_get_os_error()));
             cm_fync_logfile();
-            wr_exit(1);
+            wr_exit_error();
         } else {
             WR_THROW_ERROR(ERR_WR_VOLUME_SEEK, volume->name_p, volume->id, cm_get_os_error());
         }
@@ -160,7 +160,7 @@ static status_t wr_try_pread_volume_raw(wr_volume_t *volume, int64 offset, char 
             LOG_RUN_ERR("[WR] ABORT PREAD VOLUME, because Linux OS error: errno:%d, errmsg:%s.", cm_get_os_error(),
                 strerror(cm_get_os_error()));
             cm_fync_logfile();
-            wr_exit(1);
+            wr_exit_error();
         } else {
             WR_THROW_ERROR(ERR_WR_VOLUME_READ, volume->name_p, volume->id, cm_get_os_error());
         }
@@ -183,7 +183,7 @@ static int32 wr_try_pwrite_volume_raw(
                 LOG_RUN_ERR("[WR] ABORT ALIGNED PWRITE VOLUME, because Linux OS error: errno:%d, errmsg:%s.", cm_get_os_error(),
                     strerror(cm_get_os_error()));
                 cm_fync_logfile();
-                wr_exit(1);
+                wr_exit_error();
             } else {
                 WR_THROW_ERROR(ERR_WR_VOLUME_WRITE, volume->name_p, volume->id, cm_get_os_error());
             }
@@ -197,7 +197,7 @@ static int32 wr_try_pwrite_volume_raw(
                 LOG_RUN_ERR("[WR] ABORT UNALIGNED PWRITE VOLUME, because Linux OS error: errno:%d, errmsg:%s.", cm_get_os_error(),
                     strerror(cm_get_os_error()));
                 cm_fync_logfile();
-                wr_exit(1);
+                wr_exit_error();
             } else {
                 WR_THROW_ERROR(ERR_WR_VOLUME_WRITE, volume->name_p, volume->id, cm_get_os_error());
             }

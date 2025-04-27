@@ -416,7 +416,7 @@ static status_t wr_open_file_core(
         LOG_RUN_ERR("[WR] ABORT INFO : redo log process failed, errcode:%d, OS errno:%d, OS errmsg:%s.",
             cm_get_error_code(), errno, strerror(errno));
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
     wr_unlock_vg_mem_and_shm(session, vg_item);
     return CM_SUCCESS;
@@ -1000,7 +1000,7 @@ status_t wr_truncate_inner(wr_session_t *session, uint64 fid, ftid_t ftid, int64
         LOG_RUN_ERR("[WR] ABORT INFO:truncate small init tail failed, errcode:%d, OS errno:%d, OS errmsg:%s.",
             cm_get_error_code(), errno, strerror(errno));
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
 
     /* Truncating file space block completed. */
@@ -1009,7 +1009,7 @@ status_t wr_truncate_inner(wr_session_t *session, uint64 fid, ftid_t ftid, int64
         LOG_RUN_ERR("[WR] ABORT INFO: redo log process failed, errcode:%d, OS errno:%d, OS errmsg:%s.",
             cm_get_error_code(), errno, strerror(errno));
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
 
     // update the file ver for entry block

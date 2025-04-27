@@ -165,7 +165,7 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
     if (cm_get_thv(GLOBAL_THV_OBJ0, CM_TRUE, (pointer_t *)conn, addr) != CM_SUCCESS) {
         LOG_RUN_ERR("[WR API] ABORT INFO : wr server stoped, application need restart.");
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
 
 #ifdef ENABLE_WRTEST
@@ -175,7 +175,7 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
         if (wr_conn_sync(NULL, *conn, addr) != CM_SUCCESS) {
             LOG_RUN_ERR("[WR API] ABORT INFO: wr server stoped, application need restart.");
             cm_fync_logfile();
-            wr_exit(1);
+            wr_exit_error();
         }
         (*conn)->conn_pid = getpid();
     }
@@ -184,7 +184,7 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
     if ((*conn)->pipe.link.uds.closed) {
         LOG_RUN_ERR("[WR API] ABORT INFO : wr server stoped, application need restart.");
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
     return CM_SUCCESS;
 }

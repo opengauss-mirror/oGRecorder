@@ -38,7 +38,7 @@ void wr_cli_get_err(wr_packet_t *pack, int32 *errcode, char **errmsg)
     if (*errcode == ERR_WR_MES_ILL) {
         LOG_RUN_ERR("[WR API] ABORT INFO : server broadcast failed, errcode:%d, errmsg:%s.", *errcode, *errmsg);
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
 }
 

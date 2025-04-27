@@ -35,118 +35,27 @@
 extern "C" {
 #endif
 
-static status_t wr_check_two_path_in_same_vg(const char *path1, const char *path2, char *vg_name)
-{
-    uint32 beg_pos1 = 0;
-    uint32 beg_pos2 = 0;
-    char vg_name1[WR_MAX_NAME_LEN] = {0};
-
-    status_t ret = wr_get_name_from_path(path1, &beg_pos1, vg_name1);
-    WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("Failed to get name from path %s,%d.", path1, ret));
-
-    ret = wr_get_name_from_path(path2, &beg_pos2, vg_name);
-    WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("Failed to get name from path %s,%d.", path2, ret));
-
-    if ((beg_pos1 != beg_pos2) || (cm_strcmpni(vg_name1, vg_name, strlen(vg_name1)) != 0)) {
-        WR_THROW_ERROR(ERR_WR_FILE_RENAME_DIFF_VG, vg_name1, vg_name);
-        return CM_ERROR;
-    }
-
-    return CM_SUCCESS;
-}
-
 static status_t wr_rename_file_check(
     wr_session_t *session, const char *src, const char *dst, wr_vg_info_item_t **vg_item, gft_node_t **out_node)
 {
-    status_t status = wr_check_file(*vg_item);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to check file,errcode:%d.", cm_get_error_code()));
-
-    wr_check_dir_output_t output_info = {out_node, NULL, NULL, CM_TRUE};
-    wr_vg_info_item_t *file_vg_item = *vg_item;
-    output_info.item = &file_vg_item;
-    status = wr_check_dir(session, src, GFT_FILE, &output_info, CM_TRUE);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to check dir,errcode:%d.", cm_get_error_code()));
-
-    gft_node_t *out_node_tmp = NULL;
-    wr_check_dir_output_t output_info_tmp = {&out_node_tmp, NULL, NULL, CM_TRUE};
-    if (wr_check_dir(session, dst, GFT_FILE, &output_info_tmp, CM_TRUE) != CM_SUCCESS) {
-        int32 errcode = cm_get_error_code();
-        if (errcode != ERR_WR_FILE_NOT_EXIST) {
-            return CM_ERROR;
-        }
-        cm_reset_error();
-    } else {
-        WR_THROW_ERROR(ERR_WR_FILE_RENAME_EXIST, "cannot rename a existed file.");
-        return CM_ERROR;
-    }
-
-    if (file_vg_item->id != (*vg_item)->id) {
-        wr_unlock_vg_mem_and_shm(session, *vg_item);
-        *vg_item = file_vg_item;
-        wr_lock_vg_mem_and_shm_x(session, *vg_item);
-    }
     return CM_SUCCESS;
 }
 
 status_t wr_rename_file_put_redo_log(wr_session_t *session, gft_node_t *out_node, const char *dst_name,
     wr_vg_info_item_t *vg_item, wr_config_t *inst_cfg)
 {
-    wr_redo_rename_t redo;
-    redo.node = *out_node;
-    errno_t err = snprintf_s(redo.name, WR_MAX_NAME_LEN, strlen(dst_name), "%s", dst_name);
-    bool32 result = (bool32)(err != -1);
-    WR_RETURN_IF_FALSE2(result, WR_THROW_ERROR(ERR_SYSTEM_CALL, err));
-
-    err = snprintf_s(redo.old_name, WR_MAX_NAME_LEN, strlen(out_node->name), "%s", out_node->name);
-    result = (bool32)(err != -1);
-    WR_RETURN_IF_FALSE2(result, WR_THROW_ERROR(ERR_SYSTEM_CALL, err));
-
-    err = snprintf_s(out_node->name, WR_MAX_NAME_LEN, strlen(dst_name), "%s", dst_name);
-    result = (bool32)(err != -1);
-    WR_RETURN_IF_FALSE2(result, WR_THROW_ERROR(ERR_SYSTEM_CALL, err));
-
-    wr_put_log(session, vg_item, WR_RT_RENAME_FILE, &redo, sizeof(redo));
-
-    if (wr_process_redo_log(session, vg_item) != CM_SUCCESS) {
-        wr_unlock_vg_mem_and_shm(session, vg_item);
-        LOG_RUN_ERR("[WR] ABORT INFO: redo log process failed, errcode:%d, OS errno:%d, OS errmsg:%s.",
-            cm_get_error_code(), errno, strerror(errno));
-        cm_fync_logfile();
-        wr_exit(1);
-    }
     return CM_SUCCESS;
 }
 
 status_t wr_rename_file_check_path_and_name(
     wr_session_t *session, const char *src_path, const char *dst_path, char *vg_name, char *dst_name)
 {
-    CM_RETURN_IFERR(wr_check_two_path_in_same_vg(src_path, dst_path, vg_name));
-    text_t dst_name_text;
-    CM_RETURN_IFERR(wr_check_rename_path(session, src_path, dst_path, &dst_name_text));
-    CM_RETURN_IFERR(cm_text2str(&dst_name_text, dst_name, WR_MAX_NAME_LEN));
-    status_t status = wr_check_name(dst_name);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("The name %s is invalid.", dst_path));
-
     return CM_SUCCESS;
 }
 
 status_t wr_check_vg_ft_dir(wr_session_t *session, wr_vg_info_item_t **vg_item, const char *path,
     gft_item_type_t type, gft_node_t **node, gft_node_t **parent_node)
 {
-    CM_RETURN_IFERR(wr_check_file(*vg_item));
-
-    wr_vg_info_item_t *tmp_vg_item = *vg_item;
-    wr_check_dir_output_t output_info = {node, &tmp_vg_item, parent_node, CM_TRUE};
-    status_t status = wr_check_dir(session, path, type, &output_info, CM_TRUE);
-    if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to check dir, errcode: %d.", status);
-        return status;
-    }
-    if (tmp_vg_item->id != (*vg_item)->id) {
-        wr_unlock_vg_mem_and_shm(session, *vg_item);
-        *vg_item = tmp_vg_item;
-        wr_lock_vg_mem_and_shm_x(session, *vg_item);
-    }
     return CM_SUCCESS;
 }
 
@@ -264,7 +173,7 @@ static status_t wr_rm_dir_file(wr_session_t *session, const char *dir_name, gft_
         LOG_RUN_ERR("[WR] ABORT INFO: redo log process failed, errcode:%d, OS errno:%d, OS errmsg:%s.",
             cm_get_error_code(), errno, strerror(errno));
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
 
     LOG_RUN_INF("Succeed to rm dir or file:%s in vg:%s.", dir_name, vg_item->vg_name);

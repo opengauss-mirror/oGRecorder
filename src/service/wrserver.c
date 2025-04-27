@@ -253,7 +253,7 @@ int main(int argc, char **argv)
     securec_check_ret(errcode);
     if (wr_srv_parse_agrs(argc, argv, &wr_args) != CM_SUCCESS) {
         (void)fflush(stdout);
-        wr_exit(CM_ERROR);
+        wr_exit_error();
     }
 #ifndef WIN32
     sigset_t sign_old_mask;
@@ -265,7 +265,7 @@ int main(int argc, char **argv)
         fflush(stdout);
         wr_clean_server();
         LOG_RUN_ERR("wr failed to startup.");
-        wr_exit(CM_ERROR);
+        wr_exit_error();
     }
     if (wr_init_background_tasks() != CM_SUCCESS) {
         (void)printf("WR SERVER END.\n");
@@ -273,7 +273,7 @@ int main(int argc, char **argv)
         wr_clean_server();
         LOG_RUN_ERR("wr failed to startup.");
         LOG_RUN_INF("WR SERVER STARTED.\n");
-        wr_exit(CM_ERROR);
+        wr_exit_error();
     }
     (void)printf("WR SERVER STARTED.\n");
     LOG_RUN_INF("WR SERVER STARTED.\n");

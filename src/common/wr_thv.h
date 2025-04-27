@@ -99,7 +99,7 @@ uint32 wr_get_current_thread_id();
 void wr_set_thv_run_ctx_item(wr_thv_run_ctx_item_e item, void *item_addr);
 void *wr_get_thv_run_ctx_item(wr_thv_run_ctx_item_e item);
 
-void wr_exit(int32 exit_code);
+void wr_exit_error();
 void wr_destroy_thv(thv_type_e type);
 #ifdef __cplusplus
 }

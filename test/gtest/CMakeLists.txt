@@ -27,3 +27,9 @@ enable_testing()
 
 # 添加测试
 add_test(NAME WrApiTest COMMAND test_wr_api)
+
+add_executable(test_performance test_performance.cc)
+target_link_libraries(test_performance ${GTEST_LIBRARIES} pthread wrapi)
+
+add_test(NAME WrApiPerformanceTest COMMAND test_performance)
+
