@@ -105,9 +105,6 @@ int wr_delete_inst(wr_instance_handle inst_handle)
 {
     if (inst_handle != NULL) {
         st_wr_instance_handle *hdl = (st_wr_instance_handle *)inst_handle;
-        if (hdl->conn != NULL) {
-            wr_leave_api(hdl->conn, WR_TRUE);
-        }
         free(hdl);
     }
 }
