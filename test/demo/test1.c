@@ -24,7 +24,7 @@ int main() {
     }
 
     // 创建实例
-    if (wr_create_instance(SERVER_ADDR, &g_inst_handle) != WR_SUCCESS) {
+    if (wr_create_inst(SERVER_ADDR, &g_inst_handle) != WR_SUCCESS) {
         wr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error creating instance: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;

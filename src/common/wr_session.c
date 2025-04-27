@@ -420,7 +420,7 @@ status_t wr_cli_lock_shm_meta_s(
             WR_THROW_ERROR(ERR_WR_SHM_LOCK, "uds connection is closed.");
             LOG_RUN_ERR("[WR] ABORT INFO: Failed to lock vg share memery because uds connection is closed.");
             cm_fync_logfile();
-            wr_exit(1);
+            wr_exit_error();
         }
         if (wr_lock_shm_meta_s_with_stack(session, offset, shared_latch, SPIN_WAIT_FOREVER) == CM_SUCCESS) {
             return CM_SUCCESS;

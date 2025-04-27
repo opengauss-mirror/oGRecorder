@@ -1269,7 +1269,7 @@ void wr_get_api_volume_error(void)
     if (code == ERR_WR_VOLUME_SYSTEM_IO) {
         LOG_RUN_ERR("[WR API] ABORT INFO : volume operate failed for I/O ERROR, errcode:%d.", code);
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
     return;
 }

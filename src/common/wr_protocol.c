@@ -276,7 +276,7 @@ status_t wr_call_ex(cs_pipe_t *pipe, wr_packet_t *req, wr_packet_t *ack)
         LOG_RUN_ERR("[WR] ABORT INFO: wr call server failed, ack command type:%d, application exit.", ack->head->cmd);
         cs_disconnect(pipe);
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
     return ret;
 }

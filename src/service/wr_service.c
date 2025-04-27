@@ -207,7 +207,7 @@ static void wr_return_error(wr_session_t *session)
     if (code == ERR_WR_VOLUME_SYSTEM_IO) {
         LOG_RUN_ERR("[WR] ABORT INFO: volume operate failed for I/O ERROR, errcode:%d.", code);
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
     (void)wr_put_int32(send_pack, (uint32)code);
     (void)wr_put_str_with_cutoff(send_pack, message);
@@ -947,7 +947,7 @@ static status_t wr_process_set_main_inst(wr_session_t *session)
         cm_unlatch(&g_wr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
         LOG_RUN_ERR("[WR][SWITCH] ABORT INFO: wr instance %u refresh meta failed, result(%d).", curr_id, status);
         cm_fync_logfile();
-        wr_exit(1);
+        wr_exit_error();
     }
     wr_set_server_status_flag(WR_STATUS_READWRITE);
     LOG_RUN_INF("[SWITCH] inst %u set status flag %u when set main inst.", curr_id, WR_STATUS_READWRITE);

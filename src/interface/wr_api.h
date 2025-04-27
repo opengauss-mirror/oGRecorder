@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <limits.h>
 #include "wr_errno.h"
 #include "time.h"
 
@@ -62,8 +63,8 @@ typedef enum en_wr_log_id {
     WR_LOG_ID_COUNT,
 } wr_log_id_t;
 
-typedef struct wr_param_t {
-    char *log_home;
+typedef struct st_wr_param {
+    char log_home[PATH_MAX];
     unsigned int log_level;
     unsigned int log_backup_file_count;
     unsigned long long log_max_file_size;
@@ -157,17 +158,14 @@ typedef struct st_wr_dirent *wr_dir_item_t;
 typedef struct st_wr_stat *wr_stat_info_t;
 typedef void (*wr_log_output)(wr_log_id_t log_type, wr_log_level_t log_level, const char *code_file_name,
     unsigned int code_line_num, const char *module_name, const char *format, ...);
-typedef void (*wr_exit_callback_t)(int exit_code);
+typedef void (*wr_exit_error_callback_t)(int exit_code);
 // vfs
 WR_DECLARE int wr_vfs_create(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
 WR_DECLARE int wr_vfs_delete(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
 WR_DECLARE int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_handle *vfs_handle);
 WR_DECLARE int wr_vfs_unmount(wr_instance_handle inst_handle, wr_vfs_handle vfs_handle);
 WR_DECLARE int wr_vfs_control(void);
-
-WR_DECLARE int wr_dread(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result, wr_instance_handle inst_handle);
 WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
-
 WR_DECLARE int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, int *file_num);
 
 // file
@@ -186,18 +184,14 @@ WR_DECLARE int wr_file_fallocate(int handle, int mode, long long offset, long lo
 WR_DECLARE int wr_file_stat(const char *fileName, long long offset, unsigned long long count);
 WR_DECLARE int wr_file_pwrite_async();
 WR_DECLARE int wr_file_performance();
-
 // aio
 WR_DECLARE int wr_aio_prep_pread(void *iocb, int handle, void *buf, size_t count, long long offset);
 WR_DECLARE int wr_aio_prep_pwrite(void *iocb, int handle, void *buf, size_t count, long long offset);
 WR_DECLARE int wr_aio_post_pwrite(void *iocb, int handle, size_t count, long long offset);
-
 // log
 WR_DECLARE void wr_get_error(int *errcode, const char **errmsg);
 WR_DECLARE void wr_register_log_callback(wr_log_output cb_log_output, unsigned int log_level);
 WR_DECLARE void wr_set_log_level(unsigned int log_level);
-WR_DECLARE int wr_init_logger(
-    char *log_home, unsigned int log_level, unsigned int log_backup_file_count, unsigned long long log_max_file_size);
 WR_DECLARE void wr_refresh_logger(char *log_field, unsigned long long *value);
 // connection
 WR_DECLARE int wr_set_conn_timeout(int timeout);
@@ -209,11 +203,6 @@ WR_DECLARE int wr_delete_inst(wr_instance_handle inst_handle);
 WR_DECLARE int wr_set_main_inst(wr_instance_handle inst_handle);
 WR_DECLARE int wr_get_inst_status(wr_server_status_t *wr_status, wr_instance_handle inst_handle);
 WR_DECLARE int wr_is_maintain(unsigned int *is_maintain, wr_instance_handle inst_handle);
-
-WR_DECLARE int wr_stat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle);
-WR_DECLARE int wr_lstat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle);
-WR_DECLARE int wr_fstat(int handle, wr_stat_info_t item, wr_instance_handle inst_handle);
-
 // config
 WR_DECLARE int wr_set_conf(const char *name, const char *value, wr_instance_handle inst_handle);
 WR_DECLARE int wr_get_conf(const char *name, char *value, wr_instance_handle inst_handle);
@@ -223,8 +212,8 @@ WR_DECLARE void wr_show_version(char *version);
 WR_DECLARE void wr_show_version(char *version);
 
 // SDK
-WR_DECLARE int wr_init(const wr_param_t *param);
-// WR_DECLARE int wr_exit(void);
+WR_DECLARE int wr_init(const wr_param_t param);
+WR_DECLARE int wr_exit(void);
 
 #ifdef __cplusplus
 }

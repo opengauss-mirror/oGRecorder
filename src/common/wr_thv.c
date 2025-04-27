@@ -53,7 +53,7 @@ static __thread pointer_t g_thv_addr[MAX_THV_TYPE] = {0};
 static __thread bool32 g_thv_spec = CM_FALSE;
 static pthread_key_t g_thv_key;
 
-void wr_exit(int32 exit_code)
+void wr_exit_error()
 {
     LOG_RUN_INF("Try to exit.");
     _exit(1);

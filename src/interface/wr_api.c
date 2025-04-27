@@ -224,25 +224,6 @@ int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, 
     return WR_SUCCESS;
 }
 
-int wr_fstat(int handle, wr_stat_info_t item, wr_instance_handle inst_handle)
-{
-    if (item == NULL) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "wr_stat_info_t");
-        return WR_ERROR;
-    }
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("fstat get conn error.");
-        return WR_ERROR;
-    }
-    status_t ret = wr_fstat_impl(hdl->conn, HANDLE_VALUE(handle), item);
-    return (int)ret;
-}
-
 int wr_file_create(wr_vfs_handle vfs_handle, const char *name, const FileParameter *param)
 {
     if (vfs_handle.handle == NULL) {
@@ -358,22 +339,6 @@ int wr_file_close(wr_vfs_handle vfs_handle, int fd)
 
     status_t ret = wr_close_file_impl(hdl->conn, HANDLE_VALUE(fd));
     return (int)ret;
-}
-
-long long wr_fseek(int handle, long long offset, int origin, wr_instance_handle inst_handle)
-{
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("fseek get conn error.");
-        return WR_ERROR;
-    }
-
-    long long status = wr_seek_file_impl(hdl->conn, HANDLE_VALUE(handle), offset, origin);
-    return status;
 }
 
 int wr_file_pwrite(int fd, const void *buf, unsigned long long count, long long offset, wr_vfs_handle vfs_handle)
@@ -638,54 +603,6 @@ void wr_refresh_logger(char *log_field, unsigned long long *value)
     }
 }
 
-int wr_init_logger(
-    char *log_home, unsigned int log_level, unsigned int log_backup_file_count, unsigned long long log_max_file_size)
-{
-    errno_t ret;
-    log_param_t *log_param = cm_log_param_instance();
-    ret = memset_s(log_param, sizeof(log_param_t), 0, sizeof(log_param_t));
-    if (ret != EOK) {
-        return ERR_WR_INIT_LOGGER_FAILED;
-    }
-
-    log_param->log_level = log_level;
-    log_param->log_backup_file_count = log_backup_file_count;
-    log_param->audit_backup_file_count = log_backup_file_count;
-    log_param->max_log_file_size = log_max_file_size;
-    log_param->max_audit_file_size = log_max_file_size;
-    log_param->log_compressed = WR_TRUE;
-    if (log_param->log_compress_buf == NULL) {
-        log_param->log_compress_buf = malloc(CM_LOG_COMPRESS_BUFSIZE);
-        if (log_param->log_compress_buf == NULL) {
-            return ERR_WR_INIT_LOGGER_FAILED;
-        }
-    }
-    cm_log_set_file_permissions(600);
-    cm_log_set_path_permissions(700);
-    (void)cm_set_log_module_name("WR", sizeof("WR"));
-    ret = strcpy_sp(log_param->instance_name, CM_MAX_NAME_LEN, "WR");
-    if (ret != EOK) {
-        return ERR_WR_INIT_LOGGER_FAILED;
-    }
-
-    ret = strcpy_sp(log_param->log_home, CM_MAX_LOG_HOME_LEN, log_home);
-    if (ret != EOK) {
-        return ERR_WR_INIT_LOGGER_FAILED;
-    }
-
-    CM_RETURN_IFERR(init_single_logger(log_param, LOG_RUN));
-    CM_RETURN_IFERR(init_single_logger(log_param, LOG_DEBUG));
-    CM_RETURN_IFERR(init_single_logger(log_param, LOG_ALARM));
-    CM_RETURN_IFERR(init_single_logger(log_param, LOG_AUDIT));
-    CM_RETURN_IFERR(init_single_logger(log_param, LOG_BLACKBOX));
-    if (cm_start_timer(g_timer()) != CM_SUCCESS) {
-        return ERR_WR_INIT_LOGGER_FAILED;
-    }
-    log_param->log_instance_startup = (bool32)CM_TRUE;
-
-    return WR_SUCCESS;
-}
-
 int wr_set_conn_timeout(int32 timeout)
 {
     if (timeout < 0 && timeout != WR_CONN_NEVER_TIMEOUT) {
@@ -800,19 +717,57 @@ void wr_show_version(char *version)
     }
 }
 
-int wr_init(const wr_param_t *param)
+int wr_init(const wr_param_t param)
 {
-    return wr_init_logger(param->log_home,
-                          param->log_level,
-                          param->log_backup_file_count,
-                          param->log_max_file_size);
+    log_param_t *log_param = cm_log_param_instance();
+    errno_t ret = memset_s(log_param, sizeof(log_param_t), 0, sizeof(log_param_t));
+    if (ret != EOK) {
+        return ERR_WR_INIT_LOGGER_FAILED;
+    }
+
+    log_param->log_level = param.log_level;
+    log_param->log_backup_file_count = param.log_backup_file_count;
+    log_param->audit_backup_file_count = param.log_backup_file_count;
+    log_param->max_log_file_size = param.log_max_file_size;
+    log_param->max_audit_file_size = param.log_max_file_size;
+    log_param->log_compressed = WR_TRUE;
+    if (log_param->log_compress_buf == NULL) {
+        log_param->log_compress_buf = malloc(CM_LOG_COMPRESS_BUFSIZE);
+        if (log_param->log_compress_buf == NULL) {
+            return ERR_WR_INIT_LOGGER_FAILED;
+        }
+    }
+    cm_log_set_file_permissions(600);
+    cm_log_set_path_permissions(700);
+    (void)cm_set_log_module_name("WR", sizeof("WR"));
+    ret = strcpy_sp(log_param->instance_name, CM_MAX_NAME_LEN, "WR");
+    if (ret != EOK) {
+        return ERR_WR_INIT_LOGGER_FAILED;
+    }
+
+    ret = strcpy_sp(log_param->log_home, CM_MAX_LOG_HOME_LEN, param.log_home);
+    if (ret != EOK) {
+        return ERR_WR_INIT_LOGGER_FAILED;
+    }
+
+    CM_RETURN_IFERR(init_single_logger(log_param, LOG_RUN));
+    CM_RETURN_IFERR(init_single_logger(log_param, LOG_DEBUG));
+    CM_RETURN_IFERR(init_single_logger(log_param, LOG_ALARM));
+    CM_RETURN_IFERR(init_single_logger(log_param, LOG_AUDIT));
+    CM_RETURN_IFERR(init_single_logger(log_param, LOG_BLACKBOX));
+    if (cm_start_timer(g_timer()) != CM_SUCCESS) {
+        return ERR_WR_INIT_LOGGER_FAILED;
+    }
+    log_param->log_instance_startup = (bool32)CM_TRUE;
+
+    return WR_SUCCESS;
 }
-/*
+
 int wr_exit(void)
 {
     return WR_SUCCESS;
 }
-*/
+
 
 #ifdef __cplusplus
 }
