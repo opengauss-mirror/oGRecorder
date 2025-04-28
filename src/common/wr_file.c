@@ -379,49 +379,6 @@ static status_t wr_open_file_find_block_and_insert_index(
     return CM_SUCCESS;
 }
 
-static status_t wr_open_file_core(
-    wr_session_t *session, const char *path, uint32 type, gft_node_t **out_node, wr_find_node_t *find_info)
-{
-    CM_ASSERT(path != NULL);
-    wr_vg_info_item_t *vg_item = NULL;
-    errno_t errno;
-    char name[WR_MAX_NAME_LEN];
-    CM_RETURN_IFERR(wr_find_vg_by_dir(path, name, &vg_item));
-    wr_lock_vg_mem_and_shm_s(session, vg_item);
-
-    status_t status = wr_open_file_check_s(session, path, &vg_item, type, out_node);
-    WR_RETURN_IFERR2(status, wr_unlock_vg_mem_and_shm(session, vg_item));
-    if (*out_node == NULL) {
-        wr_unlock_vg_mem_and_shm(session, vg_item);
-        cm_panic(0);
-    }
-
-    if (((*out_node)->flags & WR_FT_NODE_FLAG_DEL) && ((*out_node)->type == GFT_FILE)) {
-        WR_RETURN_IFERR3(CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_NOT_EXIST, path, "wr"),
-            wr_unlock_vg_mem_and_shm(session, vg_item));
-    }
-
-    status = wr_open_file_find_block_and_insert_index(session, vg_item, *out_node);
-    WR_RETURN_IFERR3(status, wr_rollback_mem_update(session, vg_item), wr_unlock_vg_mem_and_shm(session, vg_item));
-
-    find_info->ftid = (*out_node)->id;
-    errno = strncpy_sp(find_info->vg_name, WR_MAX_NAME_LEN, vg_item->vg_name, WR_MAX_NAME_LEN - 1);
-    bool32 result = (bool32)(errno == EOK);
-    WR_RETURN_IF_FALSE3(
-        result, wr_rollback_mem_update(session, vg_item), wr_unlock_vg_mem_and_shm(session, vg_item));
-    status = wr_process_redo_log(session, vg_item);
-
-    if (status != CM_SUCCESS) {
-        wr_unlock_vg_mem_and_shm(session, vg_item);
-        LOG_RUN_ERR("[WR] ABORT INFO : redo log process failed, errcode:%d, OS errno:%d, OS errmsg:%s.",
-            cm_get_error_code(), errno, strerror(errno));
-        cm_fync_logfile();
-        wr_exit_error();
-    }
-    wr_unlock_vg_mem_and_shm(session, vg_item);
-    return CM_SUCCESS;
-}
-
 status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64_t *fd)
 {
     status_t status;

@@ -45,22 +45,20 @@ errno_t iret_snprintf = 0;
     path; \
 })
 
-#define LOG_AND_RETURN_ERROR(msg, ...) \
-    do { \
-        LOG_RUN_ERR(msg, ##__VA_ARGS__); \
-        return CM_ERROR; \
-    } while (0)
-
 status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
     if (mkdir(WR_FS_GET_PATH(name), mode) != 0) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to create directory: %s", name);
+        LOG_RUN_ERR("[FS] Failed to create directory: %s", name);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_rmdir(const char *name) {
     if (rmdir(WR_FS_GET_PATH(name)) != 0) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to remove directory: %s", name);
+        LOG_RUN_ERR("[FS] Failed to remove directory: %s", name);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
@@ -68,41 +66,51 @@ status_t wr_filesystem_rmdir(const char *name) {
 status_t wr_filesystem_touch(const char *name) {
     FILE *file = fopen(WR_FS_GET_PATH(name), "w");
     if (!file) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to create file: %s", name);
+        LOG_RUN_ERR("[FS] Failed to create file: %s", name);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
-    fclose(file);
+    (void)fclose(file);
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_rm(const char *name) {
     if (unlink(WR_FS_GET_PATH(name)) != 0) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to remove file: %s", name);
+        LOG_RUN_ERR("[FS] Failed to remove file: %s", name);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_write(int64_t handle, int64_t offset, int64_t size, const char *buf) {
     if (pwrite(handle, buf, size, offset) == -1) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to write to handle: %lld, offset: %lld, size: %lld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to write to handle: %ld, offset: %ld, size: %ld", handle, offset, size);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char *buf) {
     if (pread(handle, buf, size, offset) == -1) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to read from handle: %lld, offset: %lld, size: %lld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to read from handle: %ld, offset: %ld, size: %ld", handle, offset, size);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_query_file_num(const char *vfs_name, uint32_t *file_num) {
     if (!vfs_name || !file_num) {
-        LOG_AND_RETURN_ERROR("[FS] Invalid parameters: vfs_name or file_num is NULL");
+        LOG_RUN_ERR("[FS] Invalid parameters: vfs_name or file_num is NULL");
     }
 
     DIR *dir = opendir(WR_FS_GET_PATH(vfs_name));
     if (!dir) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to open directory: %s", vfs_name);
+        LOG_RUN_ERR("[FS] Failed to open directory: %s", vfs_name);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
 
     struct dirent *entry;
@@ -114,18 +122,20 @@ status_t wr_filesystem_query_file_num(const char *vfs_name, uint32_t *file_num) 
         }
     }
 
-    closedir(dir);
+    (void)closedir(dir);
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_position) {
     if (!file_path || !end_position) {
-        LOG_AND_RETURN_ERROR("[FS] Invalid parameters: file_path or end_position is NULL");
+        LOG_RUN_ERR("[FS] Invalid parameters: file_path or end_position is NULL");
     }
 
     struct stat file_stat;
     if (stat(WR_FS_GET_PATH(file_path), &file_stat) != 0) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to stat file: %s", file_path);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        LOG_RUN_ERR("[FS] Failed to stat file: %s", file_path);
+        return CM_ERROR;
     }
 
     *end_position = file_stat.st_size;
@@ -135,14 +145,18 @@ status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
 status_t wr_filesystem_open(const char *file_path, int *fd) {
     *fd = open(WR_FS_GET_PATH(file_path), O_RDWR | O_SYNC, 0);
     if (*fd == -1) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to open file: %s", file_path);
+        LOG_RUN_ERR("[FS] Failed to open file: %s", file_path);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_close(int fd) {
     if (close(fd) == -1) {
-        LOG_AND_RETURN_ERROR("[FS] Failed to close file descriptor: %d", fd);
+        LOG_RUN_ERR("[FS] Failed to close file descriptor: %d", fd);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }

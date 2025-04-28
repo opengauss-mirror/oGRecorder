@@ -121,6 +121,8 @@ const char *g_wr_error_desc[WR_ERROR_COUNT] = {
     [ERR_WR_VOLUME_FENCE_CHECK_COND] = "Fail to check fence cond:%s.",
     [ERR_WR_MASTER_CHANGE] = "Master id has changed.",
     [ERR_WR_RECOVER_CAUSE_BREAK] = "Req break by recovery.",
+    [ERR_WR_FILE_SYSTEM_ERROR] = "File system error, reason %m.",
+    [ERR_WR_CONNECTION_CLOSED] = "WR connection is closed",
 };
 
 wr_log_def_t g_wr_cmd_log[] = {

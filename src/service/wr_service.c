@@ -390,11 +390,11 @@ static status_t wr_process_close_file(wr_session_t *session)
     int64_t fd;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fd));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%lld", fd));
+    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%ld", fd));
 
-    WR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
+    WR_LOG_DEBUG_OP("Begin to close file, fd:%ld", fd);
     WR_RETURN_IF_ERROR(wr_filesystem_close(fd));
-    LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
+    LOG_DEBUG_INF("Succeed to close file, fd:%ld", fd);
     return CM_SUCCESS;
 }
 
@@ -420,9 +420,9 @@ static status_t wr_process_open_dir(wr_session_t *session)
 
 static status_t wr_process_close_dir(wr_session_t *session)
 {
-    uint64 ftid;
+    uint64_t ftid;
     char *vg_name = NULL;
-    uint32 vgid;
+    uint32_t vgid;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
@@ -437,19 +437,19 @@ static status_t wr_process_close_dir(wr_session_t *session)
 
 static status_t wr_process_write_file(wr_session_t *session)
 {
-    int64 offset;
-    int64 file_size;
-    int64 handle;
-    char *buf;
+    int64_t offset = 0;
+    int64_t file_size = 0;
+    int64_t handle = 0;
+    char *buf = NULL;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &file_size));
-    WR_RETURN_IF_ERROR(wr_get_data(&session->recv_pack, file_size, &buf));
+    WR_RETURN_IF_ERROR(wr_get_data(&session->recv_pack, file_size, (void**)&buf));
 
     WR_RETURN_IF_ERROR(wr_set_audit_resource(
-        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%lld, offset:%lld, size:%lld", handle, offset, file_size));
+        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%ld, offset:%ld, size:%ld", handle, offset, file_size));
 
     return wr_filesystem_write(handle, offset, file_size, buf);
 }

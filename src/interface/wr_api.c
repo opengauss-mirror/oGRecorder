@@ -145,11 +145,16 @@ int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_ha
         LOG_RUN_ERR("instance handle or vfs_handle is NULL.");
         return WR_ERROR;
     }
+    errno_t err = memset_s(vfs_handle, sizeof(wr_vfs_handle), 0, sizeof(wr_vfs_handle));
+    if (SECUREC_UNLIKELY(err != EOK)) {
+        WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return WR_ERROR;
+    }
 
     vfs_handle->handle = inst_handle;
-    int32 errcode = memcpy_s(vfs_handle->vfs_name, WR_MAX_NAME_LEN, vfs_name, WR_MAX_NAME_LEN);
-    if (SECUREC_UNLIKELY(errcode != EOK)) {
-        WR_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
+    err = memcpy_s(vfs_handle->vfs_name, WR_MAX_NAME_LEN, vfs_name, strlen(vfs_name));
+    if (SECUREC_UNLIKELY(err != EOK)) {
+        WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
         return WR_ERROR;
     }
     return WR_SUCCESS;
@@ -232,14 +237,19 @@ int wr_file_create(wr_vfs_handle vfs_handle, const char *name, const FileParamet
         LOG_RUN_ERR("fcreate get conn error.");
         return WR_ERROR;
     }
-    // status_t ret = wr_create_file_impl(hdl->conn, name, param);
-    // *fd = ret;
+    char full_name[WR_MAX_NAME_LEN];
+    errno_t err = sprintf_s(full_name, WR_MAX_NAME_LEN, "%s/%s", vfs_handle.vfs_name, name);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return WR_ERROR;
+    }
+
     int flag = 0;
-    status_t ret = wr_create_file_impl(hdl->conn, name, flag);
+    status_t ret = wr_create_file_impl(hdl->conn, full_name, flag);
     return (int)ret;
 }
 
-int wr_file_delete(wr_vfs_handle vfs_handle, const char *file)
+int wr_file_delete(wr_vfs_handle vfs_handle, const char *name)
 {
     if (vfs_handle.handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
@@ -250,11 +260,18 @@ int wr_file_delete(wr_vfs_handle vfs_handle, const char *file)
         LOG_RUN_ERR("fremove get conn error.");
         return WR_ERROR;
     }
-    status_t ret = wr_remove_file_impl(hdl->conn, file);
+
+    char full_name[WR_MAX_NAME_LEN];
+    errno_t err = sprintf_s(full_name, WR_MAX_NAME_LEN, "%s/%s", vfs_handle.vfs_name, name);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return WR_ERROR;
+    }
+    status_t ret = wr_remove_file_impl(hdl->conn, full_name);
     return (int)ret;
 }
 
-int wr_file_open(wr_vfs_handle vfs_handle, const char *file, int flag, int *fd)
+int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, int *fd)
 {
     timeval_t begin_tv;
     *fd = -1;
@@ -270,7 +287,13 @@ int wr_file_open(wr_vfs_handle vfs_handle, const char *file, int flag, int *fd)
         return WR_ERROR;
     }
 
-    status_t ret = wr_open_file_impl(hdl->conn, file, flag, fd);
+    char full_name[WR_MAX_NAME_LEN];
+    errno_t err = sprintf_s(full_name, WR_MAX_NAME_LEN, "%s/%s", vfs_handle.vfs_name, name);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return WR_ERROR;
+    }
+    status_t ret = wr_open_file_impl(hdl->conn, full_name, flag, fd);
     // if open fails, -1 is returned. DB determines based on -1
     if (ret == WR_SUCCESS) {
         *fd += WR_HANDLE_BASE;
@@ -651,7 +674,7 @@ int wr_aio_post_pwrite(void *iocb, int handle, size_t count, long long offset)
     return CM_SUCCESS;
 }
 
-int wr_set_conf(const char *name, const char *value, wr_instance_handle inst_handle)
+int wr_set_conf(wr_instance_handle inst_handle, const char *name, const char *value)
 {
     if (name == NULL || value == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid name or value when set cfg");
@@ -664,8 +687,6 @@ int wr_set_conf(const char *name, const char *value, wr_instance_handle inst_han
         return WR_ERROR;
     }
 
-    char *scope = (char *)scope;
-
     if (inst_handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
         return WR_ERROR;
@@ -676,11 +697,12 @@ int wr_set_conf(const char *name, const char *value, wr_instance_handle inst_han
         return WR_ERROR;
     }
 
-    status_t ret = wr_setcfg_impl(hdl->conn, name, value, scope);
+    /* both = memory + file */
+    status_t ret = wr_setcfg_impl(hdl->conn, name, value, "both");
     return (int)ret;
 }
 
-int wr_get_conf(const char *name, char *value, wr_instance_handle inst_handle)
+int wr_get_conf(wr_instance_handle inst_handle, const char *name, char *value)
 {
     if (name == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid name when get cfg");

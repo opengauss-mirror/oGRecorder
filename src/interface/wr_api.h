@@ -170,8 +170,8 @@ WR_DECLARE int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char 
 
 // file
 WR_DECLARE int wr_file_create(wr_vfs_handle vfs_handle, const char *name, const FileParameter *param);
-WR_DECLARE int wr_file_delete(wr_vfs_handle vfs_handle, const char *file);
-WR_DECLARE int wr_file_open(wr_vfs_handle vfs_handle, const char *file, int flag, int *fd);
+WR_DECLARE int wr_file_delete(wr_vfs_handle vfs_handle, const char *name);
+WR_DECLARE int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, int *fd);
 WR_DECLARE int wr_file_close(wr_vfs_handle vfs_handle, int fd);
 WR_DECLARE long long wr_fseek(int handle, long long offset, int origin, wr_instance_handle inst_handle);
 WR_DECLARE int wr_file_rename(const char *src, const char *dst);
@@ -204,8 +204,8 @@ WR_DECLARE int wr_set_main_inst(wr_instance_handle inst_handle);
 WR_DECLARE int wr_get_inst_status(wr_server_status_t *wr_status, wr_instance_handle inst_handle);
 WR_DECLARE int wr_is_maintain(unsigned int *is_maintain, wr_instance_handle inst_handle);
 // config
-WR_DECLARE int wr_set_conf(const char *name, const char *value, wr_instance_handle inst_handle);
-WR_DECLARE int wr_get_conf(const char *name, char *value, wr_instance_handle inst_handle);
+WR_DECLARE int wr_set_conf(wr_instance_handle inst_handle, const char *name, const char *value);
+WR_DECLARE int wr_get_conf(wr_instance_handle inst_handle, const char *name, char *value);
 // version
 WR_DECLARE int wr_get_lib_version(void);
 WR_DECLARE void wr_show_version(char *version);

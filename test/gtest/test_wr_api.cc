@@ -5,9 +5,9 @@ extern "C" {
 }
 #define TEST_LOG_DIR "./test_log"
 #define TEST_DIR "testdir1"
-#define TEST_FILE1 "testdir1/testfile1"
-#define TEST_FILE2 "testdir1/testfile2"
-#define TEST_FILE3 "testdir1/testfile3"
+#define TEST_FILE1 "testfile1"
+#define TEST_FILE2 "testfile2"
+#define TEST_FILE3 "testfile3"
 #define ONE_GB 1024 * 1024 * 1024
 #define SERVER_ADDR "127.0.0.1:19225"
 
@@ -20,6 +20,17 @@ int handle1 = 0, handle2 = 0, handle3 = 0;
 wr_param_t g_wr_param;
 
 
+class FailureListener : public ::testing::EmptyTestEventListener {
+public:
+    void OnTestEnd(const ::testing::TestInfo& test_info) override {
+        if (test_info.result()->Failed()) {
+            std::cout << "Test " << test_info.test_case_name() << "." << test_info.name() << " failed." << std::endl;
+            wr_get_error(&errorcode, &errormsg);
+            printf("errorcode: %d, errormsg: %s\n", errorcode, errormsg);
+        }
+    }
+};
+
 class WrApiTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -31,58 +42,40 @@ protected:
         int result = wr_init(g_wr_param);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to initialize logger";
     }
-
-    void TearDown() override {
-        wr_get_error(&errorcode, &errormsg);
-        if (errorcode != 0) {
-            printf("Error code: %d, Error message: %s\n", errorcode, errormsg);
-        }
-    }
 };
 
 TEST_F(WrApiTest, TestWrCreateInstance) {
-    int result = wr_create_inst(SERVER_ADDR, &g_inst_handle);
-    if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
-        printf("%d : %s\n", errorcode, errormsg);
-    }
-    EXPECT_EQ(result, WR_SUCCESS);
+    EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle), WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrSetGetConf) {
+    char buf[100];
+    EXPECT_EQ(wr_set_conf(g_inst_handle, "_LOG_LEVEL", "7"), WR_SUCCESS);
+    EXPECT_EQ(wr_get_conf(g_inst_handle, "_LOG_LEVEL", buf), WR_SUCCESS);
+    EXPECT_EQ(strcmp(buf, "7"), 0);
+    EXPECT_EQ(wr_set_conf(g_inst_handle, "_LOG_LEVEL", "255"), WR_SUCCESS);
+    EXPECT_EQ(wr_get_conf(g_inst_handle, "_LOG_LEVEL", buf), WR_SUCCESS);
+    EXPECT_EQ(strcmp(buf, "255"), 0);
 }
 
 TEST_F(WrApiTest, TestWrVfsCreate) {
-    int result = wr_vfs_create(g_inst_handle, TEST_DIR, 0);
-    if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
-        printf("%d : %s\n", errorcode, errormsg);
-    }
-    EXPECT_EQ(result, WR_SUCCESS);
+    EXPECT_EQ(wr_vfs_create(g_inst_handle, TEST_DIR, 0), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsMount) {
-    int result = wr_vfs_mount(g_inst_handle, TEST_DIR, &g_vfs_handle);
-    if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
-        printf("%d : %s\n", errorcode, errormsg);
-    }
-    EXPECT_EQ(result, WR_SUCCESS);
+    EXPECT_EQ(wr_vfs_mount(g_inst_handle, TEST_DIR, &g_vfs_handle), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsCreateFiles) {
-    int result1 = wr_file_create(g_vfs_handle, TEST_FILE1, NULL);
-    int result2 = wr_file_create(g_vfs_handle, TEST_FILE2, NULL);
-    int result3 = wr_file_create(g_vfs_handle, TEST_FILE3, NULL);
-    EXPECT_EQ(result1, WR_SUCCESS);
-    EXPECT_EQ(result2, WR_SUCCESS);
-    EXPECT_EQ(result3, WR_SUCCESS);
+    EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE1, NULL), WR_SUCCESS);
+    EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE2, NULL), WR_SUCCESS);
+    EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE3, NULL), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileOpen) {
-    int result1 = wr_file_open(g_vfs_handle, TEST_FILE1, 0, &handle1);
-    int result2 = wr_file_open(g_vfs_handle, TEST_FILE2, 0, &handle2);
-    int result3 = wr_file_open(g_vfs_handle, TEST_FILE3, 0, &handle3);
-    EXPECT_EQ(result1, WR_SUCCESS);
-    EXPECT_EQ(result2, WR_SUCCESS);
-    EXPECT_EQ(result3, WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE1, 0, &handle1), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, 0, &handle2), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE3, 0, &handle3), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileWriteReadLargeData) {
@@ -121,10 +114,6 @@ TEST_F(WrApiTest, TestWrfileWriteRead) {
     EXPECT_EQ(wr_file_pread(handle1, buf1, strlen(data1), 0, g_vfs_handle), WR_SUCCESS);
     EXPECT_EQ(wr_file_pread(handle2, buf2, strlen(data2), 0, g_vfs_handle), WR_SUCCESS);
     EXPECT_EQ(wr_file_pread(handle3, buf3, strlen(data3), 0, g_vfs_handle), WR_SUCCESS);
-
-    printf("buf1: %s\n", buf1);
-    printf("buf2: %s\n", buf2);
-    printf("buf3: %s\n", buf3);
 }
 
 TEST_F(WrApiTest, TestWrfileClose) {
@@ -146,12 +135,7 @@ TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
 }
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {
-    int result = wr_vfs_unmount(g_inst_handle, g_vfs_handle);
-    if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
-        printf("%d : %s\n", errorcode, errormsg);
-    }
-    EXPECT_EQ(result, WR_SUCCESS);
+    EXPECT_EQ(wr_vfs_unmount(g_inst_handle, g_vfs_handle), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsDelete) {
@@ -160,5 +144,7 @@ TEST_F(WrApiTest, TestWrVfsDelete) {
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
+    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(new FailureListener);
     return RUN_ALL_TESTS();
 }
