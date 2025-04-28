@@ -623,37 +623,6 @@ status_t wr_extend_files_context(wr_file_run_ctx_t *file_run_ctx)
     return CM_SUCCESS;
 }
 
-status_t wr_open_file_inner(wr_vg_info_item_t *vg_item, gft_node_t *ft_node, wr_file_mode_e mode, int *handle)
-{
-    wr_env_t *wr_env = wr_get_env();
-    wr_latch_x(&wr_env->latch);
-    wr_file_run_ctx_t *file_run_ctx = &wr_env->file_run_ctx;
-    if (file_run_ctx->has_opened_files >= file_run_ctx->max_open_file) {
-        wr_unlatch(&wr_env->latch);
-        LOG_RUN_ERR("The opened files %u has exceeded the max open file number %u.", file_run_ctx->has_opened_files,
-            file_run_ctx->max_open_file);
-        return CM_ERROR;
-    }
-
-    if (file_run_ctx->file_free_first == WR_INVALID_ID32) {
-        status_t status = wr_extend_files_context(file_run_ctx);
-        if (status != CM_SUCCESS) {
-            wr_unlatch(&wr_env->latch);
-            LOG_RUN_ERR("Failed to extend files context.");
-            return CM_ERROR;
-        }
-    }
-    *handle = (int)file_run_ctx->file_free_first;
-    wr_file_context_t *context = wr_get_file_context_by_handle(file_run_ctx, *handle);
-    uint32 next = context->next;
-    status_t ret = wr_init_file_context(context, ft_node, vg_item, mode);
-    WR_RETURN_IFERR2(ret, wr_unlatch(&wr_env->latch));
-    file_run_ctx->file_free_first = next;
-    file_run_ctx->has_opened_files++;
-    wr_unlatch(&wr_env->latch);
-    return CM_SUCCESS;
-}
-
 status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag, int64_t *fd)
 {
     wr_open_file_info_t send_info;
@@ -664,9 +633,6 @@ status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag
 
 status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int *handle)
 {
-    status_t status = CM_ERROR;
-    gft_node_t *ft_node = NULL;
-    wr_find_node_t *find_node = NULL;
     LOG_DEBUG_INF("wr begin to open file, file path:%s, flag:%d", file_path, flag);
     WR_RETURN_IF_ERROR(wr_check_device_path(file_path));
     WR_RETURN_IF_ERROR(wr_open_file_on_server(conn, file_path, flag, handle));

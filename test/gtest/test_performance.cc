@@ -10,7 +10,7 @@ extern "C" {
 #define SERVER_ADDR "127.0.0.1:19225"
 
 #define TEST_DIR "performancedir"
-#define TEST_FILE "performancedir/performance_test_file1"
+#define TEST_FILE "performance_test_file1"
 #define ONE_MB 1024 * 1024
 
 wr_param_t g_wr_param;
@@ -28,6 +28,9 @@ protected:
 
         result = wr_vfs_create(g_inst_handle, TEST_DIR, 0);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to create VFS";
+
+        result = wr_vfs_mount(g_inst_handle, TEST_DIR, &g_vfs_handle);
+        ASSERT_EQ(result, WR_SUCCESS) << "Failed to mount VFS";
 
         result = wr_file_create(g_vfs_handle, TEST_FILE, NULL);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to create test file";

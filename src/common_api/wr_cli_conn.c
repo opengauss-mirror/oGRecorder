@@ -163,9 +163,9 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
     cm_reset_error();
     wr_clt_env_init();
     if (cm_get_thv(GLOBAL_THV_OBJ0, CM_TRUE, (pointer_t *)conn, addr) != CM_SUCCESS) {
-        LOG_RUN_ERR("[WR API] ABORT INFO : wr server stoped, application need restart.");
-        cm_fync_logfile();
-        wr_exit_error();
+        LOG_RUN_ERR("[WR API] connection failed, reason: %s", strerror(cm_get_os_error()));
+        WR_THROW_ERROR(ERR_WR_CONNECT_FAILED, cm_get_os_error(), strerror(cm_get_os_error()));
+        return CM_ERROR;
     }
 
 #ifdef ENABLE_WRTEST
@@ -182,9 +182,9 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
 #endif
 
     if ((*conn)->pipe.link.uds.closed) {
-        LOG_RUN_ERR("[WR API] ABORT INFO : wr server stoped, application need restart.");
-        cm_fync_logfile();
-        wr_exit_error();
+        LOG_RUN_ERR("[WR API] connection is closed");
+        WR_THROW_ERROR(ERR_WR_CONNECTION_CLOSED);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
