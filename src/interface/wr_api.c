@@ -72,9 +72,8 @@ int wr_create_inst(const char *storageServerAddr, wr_instance_handle *inst_handl
         return WR_ERROR;
     }
 
-    size_t addr_len = strlen(storageServerAddr);
-    if (addr_len == 0 || addr_len >= CM_MAX_IP_LEN) {
-        LOG_RUN_ERR("invalid address length: %u", addr_len);
+    if (check_server_addr_format(storageServerAddr) != WR_SUCCESS) {
+        LOG_RUN_ERR("invalid address: %s.", storageServerAddr);
         return WR_ERROR;
     }
 
@@ -84,7 +83,8 @@ int wr_create_inst(const char *storageServerAddr, wr_instance_handle *inst_handl
         return WR_ERROR;
     }
     hdl->conn = NULL;
-    errno_t err = memcpy_s(hdl->addr, addr_len + 1, storageServerAddr, addr_len + 1);
+    errno_t err = memcpy_s(hdl->addr, strlen(storageServerAddr) + 1, 
+                            storageServerAddr, strlen(storageServerAddr) + 1);
     if (err != EOK) {
         LOG_RUN_ERR("Error occured when copying addr, errno code is %d.\n", err);
         free(hdl);
@@ -103,10 +103,19 @@ int wr_create_inst(const char *storageServerAddr, wr_instance_handle *inst_handl
 
 int wr_delete_inst(wr_instance_handle inst_handle)
 {
-    if (inst_handle != NULL) {
-        st_wr_instance_handle *hdl = (st_wr_instance_handle *)inst_handle;
-        free(hdl);
+    if (inst_handle == NULL) {
+        LOG_RUN_WAR("inst handle is null.");
+        return WR_SUCCESS;   
     }
+
+    st_wr_instance_handle *hdl = (st_wr_instance_handle *)inst_handle;
+    if (hdl->conn != NULL) {
+        free(hdl->conn);
+        hdl->conn = NULL;
+    }
+    free(hdl);
+    hdl = NULL;
+    return WR_SUCCESS;
 }
 
 int wr_vfs_create(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag)

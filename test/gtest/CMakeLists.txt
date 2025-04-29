@@ -33,3 +33,7 @@ target_link_libraries(test_performance ${GTEST_LIBRARIES} pthread wrapi)
 
 add_test(NAME WrApiPerformanceTest COMMAND test_performance)
 
+add_executable(test_insthandle test_insthandle.cc)
+target_link_libraries(test_insthandle ${GTEST_LIBRARIES} pthread wrapi)
+
+add_test(NAME WrCreateInstHandle COMMAND test_insthandle)

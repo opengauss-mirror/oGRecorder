@@ -198,6 +198,60 @@ status_t wr_enter_api(wr_conn_t **conn, const char *addr)
     return CM_SUCCESS;
 }
 
+status_t check_server_addr_format(const char *server_addr)
+{
+    if (server_addr == NULL) {
+        LOG_RUN_ERR("[WR API] ERROR INFO : server address is NULL.");
+        return WR_ERROR;
+    }
+
+    size_t addr_len = strlen(server_addr);
+    if (addr_len == 0 || addr_len >= CM_MAX_IP_LEN) {
+        LOG_RUN_ERR("[WR API] ERROR INFO : invalid server address length: %zu.", addr_len);
+        return WR_ERROR;
+    }
+
+    const char *port_sep = strrchr(server_addr, ':');
+    if (port_sep == NULL) {
+        LOG_RUN_ERR("[WR API] ERROR INFO : server address(%s) format error: missing port", server_addr);
+        return WR_ERROR;
+    }
+
+    size_t ip_len = port_sep - server_addr;
+    if (ip_len == 0 || ip_len >= CM_MAX_IP_LEN) {
+        LOG_RUN_ERR("[WR API] ERROR INFO : invalid IP length in server address(%s)", server_addr);
+        return WR_ERROR;
+    }
+
+    const char *port_str = port_sep + 1;
+    if (*port_str == '\0') {
+        LOG_RUN_ERR("[WR API] ERROR INFO : server address(%s) format error: empty port", server_addr);
+        return WR_ERROR;
+    }
+
+    char *end_ptr = NULL;
+    long port = strtol(port_str, &end_ptr, 10);
+    if (*end_ptr != '\0' || port <= 0 || port > 65535) {
+        LOG_RUN_ERR("[WR API] ERROR INFO : invalid port number in server address(%s)", server_addr);
+        return WR_ERROR;
+    }
+
+    char ip_buf[CM_MAX_IP_LEN] = {0};
+    errno_t rc = strncpy_s(ip_buf, CM_MAX_IP_LEN, server_addr, ip_len);
+    if (rc != EOK) {
+        LOG_RUN_ERR("[WR API] ERROR INFO : failed to copy IP address");
+        return WR_ERROR;
+    }
+
+    struct in_addr addr;
+    if (inet_pton(AF_INET, ip_buf, &addr) != 1) {
+        LOG_RUN_ERR("[WR API] ERROR INFO : invalid IP format in server address(%s)", server_addr);
+        return WR_ERROR;
+    }
+
+    return WR_SUCCESS;
+}
+
 void wr_leave_api(wr_conn_t *conn, bool32 get_api_volume_error)
 {
     cm_spin_unlock(&((wr_session_t *)(conn->session))->shm_lock);
