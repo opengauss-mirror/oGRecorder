@@ -163,7 +163,7 @@ typedef void (*wr_exit_error_callback_t)(int exit_code);
 WR_DECLARE int wr_vfs_create(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
 WR_DECLARE int wr_vfs_delete(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
 WR_DECLARE int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_handle *vfs_handle);
-WR_DECLARE int wr_vfs_unmount(wr_instance_handle inst_handle, wr_vfs_handle vfs_handle);
+WR_DECLARE int wr_vfs_unmount(wr_vfs_handle vfs_handle);
 WR_DECLARE int wr_vfs_control(void);
 WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
 WR_DECLARE int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, int *file_num);

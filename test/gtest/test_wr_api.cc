@@ -135,7 +135,7 @@ TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
 }
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {
-    EXPECT_EQ(wr_vfs_unmount(g_inst_handle, g_vfs_handle), WR_SUCCESS);
+    EXPECT_EQ(wr_vfs_unmount(g_vfs_handle), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsDelete) {

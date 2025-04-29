@@ -161,6 +161,15 @@ status_t wr_filesystem_close(int fd) {
     return CM_SUCCESS;
 }
 
+status_t wr_filesystem_truncate(int64_t fd, int64_t length) {
+    if (ftruncate(fd, length) == -1) {
+        LOG_RUN_ERR("[FS] Failed to truncate file: %ld, length: %ld", fd, length);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
 #ifdef __cplusplus
 }
 #endif

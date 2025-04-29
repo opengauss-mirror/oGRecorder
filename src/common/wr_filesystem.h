@@ -18,6 +18,7 @@ status_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char 
 status_t wr_filesystem_query_file_num(const char *vfs_name, uint32 *file_num);
 status_t wr_filesystem_open(const char *file_path, int *fd);
 status_t wr_filesystem_close(int fd);
+status_t wr_filesystem_truncate(int64_t fd, int64_t length);
 
 
 #ifdef __cplusplus

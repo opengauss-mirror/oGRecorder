@@ -1012,21 +1012,14 @@ status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int tru
         return CM_ERROR;
     }
 
-    wr_file_context_t *context = NULL;
-    WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_EXCLUSIVE));
-
-    LOG_DEBUG_INF("Truncating file via handle(%d), file name: %s, node size: %lld, length: %lld.", handle,
-        context->node->name, context->node->size, length);
+    LOG_DEBUG_INF("Truncating file via handle(%d), length: %lld.", handle, length);
 
     wr_truncate_file_info_t send_info;
-    send_info.fid = context->fid;
-    send_info.ftid = *(uint64 *)&(context->node->id);
-    send_info.length = (uint64)length;
+    send_info.handle = handle;
+    send_info.length = length;
     send_info.truncateType = truncateType;
-    // send_info.vg_name = context->vg_name;
-    send_info.vg_id = context->vgid;
+
     status_t status = wr_msg_interact(conn, WR_CMD_TRUNCATE_FILE, (void *)&send_info, NULL);
-    wr_unlatch(&context->latch);
     return status;
 }
 
@@ -1459,11 +1452,9 @@ static status_t wr_decode_get_time_stat(wr_packet_t *ack_pack, void *ack)
 static status_t wr_encode_truncate_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     wr_truncate_file_info_t *info = (wr_truncate_file_info_t *)send_info;
-    CM_RETURN_IFERR(wr_put_int64(pack, info->fid));
-    CM_RETURN_IFERR(wr_put_int64(pack, info->ftid));
     CM_RETURN_IFERR(wr_put_int64(pack, info->length));
-    CM_RETURN_IFERR(wr_put_str(pack, info->vg_name));
-    CM_RETURN_IFERR(wr_put_int32(pack, info->vg_id));
+    CM_RETURN_IFERR(wr_put_int64(pack, info->handle));
+    CM_RETURN_IFERR(wr_put_int64(pack, info->truncateType));
     return CM_SUCCESS;
 }
 

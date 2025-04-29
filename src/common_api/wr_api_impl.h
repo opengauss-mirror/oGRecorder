@@ -119,12 +119,9 @@ typedef struct st_wr_refresh_volume_info {
 } wr_refresh_volume_info_t;
 
 typedef struct st_wr_truncate_file_info {
-    uint64 fid;
-    uint64 ftid;
-    uint64 length;
-    const char *vg_name;
-    uint32 vg_id;
-    int32_t truncateType;
+    int64 length;
+    int64 handle;
+    int64 truncateType;
 } wr_truncate_file_info_t;
 
 typedef struct st_wr_write_file_info {

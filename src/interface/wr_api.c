@@ -163,7 +163,7 @@ int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_ha
     return WR_SUCCESS;
 }
 
-int wr_vfs_unmount(wr_instance_handle inst_handle, wr_vfs_handle vfs_handle)
+int wr_vfs_unmount(wr_vfs_handle vfs_handle)
 {
     vfs_handle.handle = NULL;
     vfs_handle.vfs_name[0] = '\0';
@@ -460,7 +460,6 @@ int wr_file_truncate(int fd, int truncateType, long long offset, wr_vfs_handle v
 
 int wr_file_stat(const char *fileName, long long offset, unsigned long long count)
 {
-    // wr_fstat  ?
     return WR_SUCCESS;
 }
 
@@ -473,7 +472,6 @@ int wr_file_performance()
 {
     return WR_SUCCESS;
 }
-
 
 static void wr_fsize_with_options(const char *fname, long long *fsize, int origin, wr_instance_handle inst_handle)
 {

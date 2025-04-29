@@ -532,42 +532,18 @@ static status_t wr_process_fallocate_file(wr_session_t *session)
 
 static status_t wr_process_truncate_file(wr_session_t *session)
 {
-    uint64 fid;
-    ftid_t ftid;
     int64 length;
-    uint32 vgid;
-    char *vg_name = NULL;
+    int64 handle;
+    int64 truncateType;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&length));
-    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vg_name));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&vgid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &length));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &truncateType));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "vg_name:%s, fid:%llu, ftid:%llu, length:%lld", vg_name, fid, *(uint64 *)&ftid, length));
-    LOG_DEBUG_INF("Truncate file ft id:%llu, length:%lld", *(uint64 *)&ftid, length);
-    return wr_truncate(session, fid, ftid, length, vg_name);
-}
-
-static status_t wr_process_refresh_file(wr_session_t *session)
-{
-    uint64 fid;
-    ftid_t ftid;
-    uint32 vgid;
-    int64 offset;
-
-    wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
-    char *name_str = NULL;
-    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name_str));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&vgid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&offset));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "vg_name:%s, offset:%lld, fid:%llu, ftid:%llu", name_str, offset, fid, *(uint64 *)&ftid));
-
-    return wr_refresh_file(session, fid, ftid, name_str, offset);
+        "handle:%ld, length:%lld", handle, length));
+    LOG_DEBUG_INF("Truncate file handle:%ld, length:%lld", handle, length);
+    return wr_filesystem_truncate(handle, length);
 }
 
 static status_t wr_process_handshake(wr_session_t *session)
@@ -974,7 +950,6 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_READ_FILE)] = {WR_CMD_READ_FILE, wr_process_read_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXTEND_FILE)] = {WR_CMD_EXTEND_FILE, wr_process_extending_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RENAME_FILE)] = {WR_CMD_RENAME_FILE, wr_process_rename, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_REFRESH_FILE)] = {WR_CMD_REFRESH_FILE, wr_process_refresh_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_TRUNCATE_FILE)] = {WR_CMD_TRUNCATE_FILE, wr_process_truncate_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_FALLOCATE_FILE)] = {WR_CMD_FALLOCATE_FILE, wr_process_fallocate_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_STOP_SERVER)] = {WR_CMD_STOP_SERVER, wr_process_stop_server, NULL, CM_FALSE},
