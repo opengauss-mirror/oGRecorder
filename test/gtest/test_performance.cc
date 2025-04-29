@@ -37,6 +37,9 @@ protected:
 
         result = wr_file_open(g_vfs_handle, TEST_FILE, 0, &handle);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to open test file";
+
+        result = wr_file_truncate(g_vfs_handle, handle, 0, ONE_GB);
+        ASSERT_EQ(result, WR_SUCCESS) << "Failed to truncate test file";
     }
 
     void TearDown() override {
@@ -56,7 +59,7 @@ TEST_F(WrApiPerformanceTest, TestWritePerformance) {
     memset(data, 'A', data_size);
 
     auto start = std::chrono::high_resolution_clock::now();
-    int result = wr_file_pwrite(handle, data, data_size, 0, g_vfs_handle);
+    int result = wr_file_pwrite(g_vfs_handle, handle, data, data_size, 0);
     auto end = std::chrono::high_resolution_clock::now();
 
     ASSERT_EQ(result, WR_SUCCESS) << "Failed to write data";
@@ -84,7 +87,7 @@ TEST_F(WrApiPerformanceTest, TestWritePerformanceWith8KSteps) {
 
     for (int offset = 0; offset < total_size; offset += step_size) {
         auto start = std::chrono::high_resolution_clock::now();
-        result = wr_file_pwrite(handle, data, step_size, offset, g_vfs_handle);
+        result = wr_file_pwrite(g_vfs_handle, handle, data, step_size, offset);
         auto end = std::chrono::high_resolution_clock::now();
 
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to write data at offset " << offset;

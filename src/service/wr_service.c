@@ -546,6 +546,20 @@ static status_t wr_process_truncate_file(wr_session_t *session)
     return wr_filesystem_truncate(handle, length);
 }
 
+static status_t wr_process_stat_file(wr_session_t *session)
+{
+    char *name = NULL;
+    int64 offset;
+    int64 size;
+    wr_init_get(&session->recv_pack);
+    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
+    WR_RETURN_IF_ERROR(wr_filesystem_stat(name, &offset, &size));
+    wr_put_int64(&session->send_pack, offset);
+    wr_put_int64(&session->send_pack, size);
+    LOG_DEBUG_INF("Stat file name:%s, offset:%ld, size:%ld", name, offset, size);
+    return CM_SUCCESS;
+}
+
 static status_t wr_process_handshake(wr_session_t *session)
 {
     wr_init_get(&session->recv_pack);
@@ -951,6 +965,7 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXTEND_FILE)] = {WR_CMD_EXTEND_FILE, wr_process_extending_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RENAME_FILE)] = {WR_CMD_RENAME_FILE, wr_process_rename, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_TRUNCATE_FILE)] = {WR_CMD_TRUNCATE_FILE, wr_process_truncate_file, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_STAT_FILE)] = {WR_CMD_STAT_FILE, wr_process_stat_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_FALLOCATE_FILE)] = {WR_CMD_FALLOCATE_FILE, wr_process_fallocate_file, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_STOP_SERVER)] = {WR_CMD_STOP_SERVER, wr_process_stop_server, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SETCFG)] = {WR_CMD_SETCFG, wr_process_setcfg, NULL, CM_FALSE},

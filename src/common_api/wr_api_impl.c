@@ -1023,6 +1023,18 @@ status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int tru
     return status;
 }
 
+status_t wr_stat_file_impl(wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *size)
+{
+    wr_stat_file_info_t send_info;
+    send_info.name = fileName;
+    send_info.offset = 0;
+    send_info.size = 0;
+    status_t status = wr_msg_interact(conn, WR_CMD_STAT_FILE, (void *)&send_info, (void *)&send_info);
+    *offset = send_info.offset;
+    *size = send_info.size;
+    return status;
+}
+
 void wr_heartbeat_entry(thread_t *thread)
 {
     return;
@@ -1287,15 +1299,6 @@ status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node)
     return WR_SUCCESS;
 }
 
-status_t wr_fstat_impl(wr_conn_t *conn, int handle, wr_stat_info_t item)
-{
-    wr_file_context_t *context = NULL;
-    WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_SHARE));
-    status_t ret = wr_set_stat_info(item, context->node);
-    wr_unlatch(&context->latch);
-    return ret;
-}
-
 static status_t wr_get_phy_size_prepare(wr_conn_t *conn, wr_file_context_t *context, long long *size)
 {
     *size = 0;
@@ -1344,6 +1347,14 @@ static status_t wr_encode_query_file_num(wr_conn_t *conn, wr_packet_t *pack, voi
 {
     wr_query_file_num_info_t *info = (wr_query_file_num_info_t *)send_info;
     CM_RETURN_IFERR(wr_put_str(pack, info->vfs_name));
+    return CM_SUCCESS;
+}
+
+static status_t wr_decode_stat_file(wr_packet_t *ack_pack, void *ack)
+{
+    wr_stat_file_info_t *info = (wr_stat_file_info_t *)ack;
+    CM_RETURN_IFERR(wr_get_int64(ack_pack, &(info->offset)));
+    CM_RETURN_IFERR(wr_get_int64(ack_pack, &(info->size)));
     return CM_SUCCESS;
 }
 
@@ -1458,6 +1469,13 @@ static status_t wr_encode_truncate_file(wr_conn_t *conn, wr_packet_t *pack, void
     return CM_SUCCESS;
 }
 
+static status_t wr_encode_stat_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_stat_file_info_t *info = (wr_stat_file_info_t *)send_info;
+    CM_RETURN_IFERR(wr_put_str(pack, info->name));
+    return CM_SUCCESS;
+} 
+
 static status_t wr_encode_write_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     wr_write_file_info_t *info = (wr_write_file_info_t *)send_info;
@@ -1571,6 +1589,7 @@ static status_t wr_encode_create_file(wr_conn_t *conn, wr_packet_t *pack, void *
     return CM_SUCCESS;
 }
 
+
 static status_t wr_encode_delete_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     return wr_put_str(pack, (const char *)send_info);
@@ -1624,6 +1643,7 @@ wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] =
     [WR_CMD_EXTEND_FILE] = {wr_encode_extend_file, NULL, "extend file"},
     [WR_CMD_RENAME_FILE] = {wr_encode_rename_file, NULL, "rename file"},
     [WR_CMD_TRUNCATE_FILE] = {wr_encode_truncate_file, NULL, "truncate file"},
+    [WR_CMD_STAT_FILE] = {wr_encode_stat_file, wr_decode_stat_file, "stat file"},
     [WR_CMD_KICKH] = {wr_encode_kickh, NULL, "kickh"},
     [WR_CMD_STOP_SERVER] = {NULL, NULL, "stop server"},
     [WR_CMD_SETCFG] = {wr_encode_setcfg, NULL, "setcfg"},

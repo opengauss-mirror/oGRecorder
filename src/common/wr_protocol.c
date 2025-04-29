@@ -43,6 +43,7 @@ static char *g_wr_cmd_desc[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXTEND_FILE)] = "extend file",
     [WR_CMD_TYPE_OFFSET(WR_CMD_RENAME_FILE)] = "rename file",
     [WR_CMD_TYPE_OFFSET(WR_CMD_TRUNCATE_FILE)] = "truncate file",
+    [WR_CMD_TYPE_OFFSET(WR_CMD_STAT_FILE)] = "stat file",
     [WR_CMD_TYPE_OFFSET(WR_CMD_FALLOCATE_FILE)] = "fallocate file",
     [WR_CMD_TYPE_OFFSET(WR_CMD_KICKH)] = "kick off host",
     [WR_CMD_TYPE_OFFSET(WR_CMD_LOAD_CTRL)] = "load ctrl",

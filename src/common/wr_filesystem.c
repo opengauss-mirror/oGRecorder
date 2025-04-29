@@ -170,6 +170,18 @@ status_t wr_filesystem_truncate(int64_t fd, int64_t length) {
     return CM_SUCCESS;
 }
 
+status_t wr_filesystem_stat(const char *name, int64_t *offset, int64_t *size) {
+    struct stat file_stat;
+    if (stat(WR_FS_GET_PATH(name), &file_stat) != 0) {
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        LOG_RUN_ERR("[FS] Failed to stat file: %s", name);
+        return CM_ERROR;
+    }
+    *offset = file_stat.st_size;
+    *size = file_stat.st_size;
+    return CM_SUCCESS;
+}
+
 #ifdef __cplusplus
 }
 #endif
