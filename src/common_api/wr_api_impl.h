@@ -119,14 +119,16 @@ typedef struct st_wr_refresh_volume_info {
 } wr_refresh_volume_info_t;
 
 typedef struct st_wr_truncate_file_info {
-    uint64 fid;
-    uint64 ftid;
-    uint64 length;
-    const char *vg_name;
-    uint32 vg_id;
-    int32_t truncateType;
+    int64 length;
+    int64 handle;
+    int64 truncateType;
 } wr_truncate_file_info_t;
 
+typedef struct st_wr_stat_file_info {
+    const char *name;
+    int64 offset;
+    int64 size;
+} wr_stat_file_info_t;
 typedef struct st_wr_write_file_info {
     int64 offset;
     int64 handle;
@@ -227,7 +229,7 @@ int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin);
 status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long int offset);
 status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst);
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType);
-status_t wr_fstat_impl(wr_conn_t *conn, int handle, wr_stat_info_t item);
+status_t wr_stat_file_impl(wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *count);
 status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node);
 
 status_t wr_cli_handshake(wr_conn_t *conn, uint32 max_open_file);

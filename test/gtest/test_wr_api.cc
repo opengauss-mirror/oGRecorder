@@ -85,11 +85,11 @@ TEST_F(WrApiTest, TestWrfileWriteReadLargeData) {
     memset(large_data, 'A', large_data_size); // 用'A'填充数据
 
     // 写入大数据块到文件
-    EXPECT_EQ(wr_file_pwrite(handle1, large_data, large_data_size, 0, g_vfs_handle), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle1, large_data, large_data_size, 0), WR_SUCCESS);
 
     // 读取大数据块
     char *read_buffer = new char[large_data_size];
-    EXPECT_EQ(wr_file_pread(handle1, read_buffer, large_data_size, 0, g_vfs_handle), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle1, read_buffer, large_data_size, 0), WR_SUCCESS);
 
     // 验证读取的数据是否与写入的数据一致
     EXPECT_EQ(memcmp(large_data, read_buffer, large_data_size), 0);
@@ -105,15 +105,27 @@ TEST_F(WrApiTest, TestWrfileWriteRead) {
     const char *data3 = "hello world 3";
 
     // Write to files
-    EXPECT_EQ(wr_file_pwrite(handle1, data1, strlen(data1), 0, g_vfs_handle), WR_SUCCESS);
-    EXPECT_EQ(wr_file_pwrite(handle2, data2, strlen(data2), 0, g_vfs_handle), WR_SUCCESS);
-    EXPECT_EQ(wr_file_pwrite(handle3, data3, strlen(data3), 0, g_vfs_handle), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle1, data1, strlen(data1), 0), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle2, data2, strlen(data2), 0), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle3, data3, strlen(data3), 0), WR_SUCCESS);
 
     // Read from files
     char buf1[100] = {0}, buf2[100] = {0}, buf3[100] = {0};
-    EXPECT_EQ(wr_file_pread(handle1, buf1, strlen(data1), 0, g_vfs_handle), WR_SUCCESS);
-    EXPECT_EQ(wr_file_pread(handle2, buf2, strlen(data2), 0, g_vfs_handle), WR_SUCCESS);
-    EXPECT_EQ(wr_file_pread(handle3, buf3, strlen(data3), 0, g_vfs_handle), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle1, buf1, strlen(data1), 0), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle2, buf2, strlen(data2), 0), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle3, buf3, strlen(data3), 0), WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrfileTruncate) {
+    EXPECT_EQ(wr_file_truncate(g_vfs_handle, handle1, 0, ONE_GB), WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrfileStat) {
+    long long offset = 0;
+    unsigned long long size = 0;
+    EXPECT_EQ(wr_file_stat(g_vfs_handle, TEST_FILE1, &offset, &size), WR_SUCCESS);
+    EXPECT_EQ(offset, ONE_GB);
+    EXPECT_EQ(size, ONE_GB);
 }
 
 TEST_F(WrApiTest, TestWrfileClose) {
@@ -135,7 +147,7 @@ TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
 }
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {
-    EXPECT_EQ(wr_vfs_unmount(g_inst_handle, g_vfs_handle), WR_SUCCESS);
+    EXPECT_EQ(wr_vfs_unmount(g_vfs_handle), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsDelete) {

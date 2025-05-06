@@ -169,7 +169,7 @@ int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_ha
     return WR_SUCCESS;
 }
 
-int wr_vfs_unmount(wr_instance_handle inst_handle, wr_vfs_handle vfs_handle)
+int wr_vfs_unmount(wr_vfs_handle vfs_handle)
 {
     vfs_handle.handle = NULL;
     vfs_handle.vfs_name[0] = '\0';
@@ -370,7 +370,7 @@ int wr_file_close(wr_vfs_handle vfs_handle, int fd)
     return (int)ret;
 }
 
-int wr_file_pwrite(int fd, const void *buf, unsigned long long count, long long offset, wr_vfs_handle vfs_handle)
+int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -401,7 +401,7 @@ int wr_file_pwrite(int fd, const void *buf, unsigned long long count, long long 
     return (int)ret;
 }
 
-int wr_file_pread(int fd, void *buf, unsigned long long count, long long offset, wr_vfs_handle vfs_handle)
+int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -433,23 +433,7 @@ int wr_file_pread(int fd, void *buf, unsigned long long count, long long offset,
     return (int)ret;
 }
 
-int wr_frename(const char *src, const char *dst, wr_instance_handle inst_handle)
-{
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("frename get conn error.");
-        return WR_ERROR;
-    }
-
-    status_t ret = wr_rename_file_impl(hdl->conn, src, dst);
-    return (int)ret;
-}
-
-int wr_file_truncate(int fd, int truncateType, long long offset, wr_vfs_handle vfs_handle)
+int wr_file_truncate(wr_vfs_handle vfs_handle, int fd, int truncateType, long long offset)
 {
     if (vfs_handle.handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
@@ -464,13 +448,34 @@ int wr_file_truncate(int fd, int truncateType, long long offset, wr_vfs_handle v
     return (int)ret;
 }
 
-int wr_file_stat(const char *fileName, long long offset, unsigned long long count)
+int wr_file_stat(wr_vfs_handle vfs_handle, const char *fileName, long long *offset, unsigned long long *count)
 {
-    // wr_fstat  ?
-    return WR_SUCCESS;
+    if (vfs_handle.handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)(vfs_handle.handle);
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("fcreate get conn error.");
+        return WR_ERROR;
+    }
+    char full_name[WR_MAX_NAME_LEN];
+    errno_t err = sprintf_s(full_name, WR_MAX_NAME_LEN, "%s/%s", vfs_handle.vfs_name, fileName);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return WR_ERROR;
+    }
+
+    status_t ret = wr_stat_file_impl(hdl->conn, full_name, offset, count);
+    return (int)ret;
 }
 
 int wr_file_pwrite_async()
+{
+    return WR_SUCCESS;
+}
+
+int wr_file_pread_async()
 {
     return WR_SUCCESS;
 }
@@ -479,7 +484,6 @@ int wr_file_performance()
 {
     return WR_SUCCESS;
 }
-
 
 static void wr_fsize_with_options(const char *fname, long long *fsize, int origin, wr_instance_handle inst_handle)
 {
@@ -530,14 +534,10 @@ int wr_fsize_physical(int handle, long long *fsize, wr_instance_handle inst_hand
     return (int)ret;
 }
 
-void wr_fsize_maxwr(const char *fname, long long *fsize, wr_instance_handle inst_handle)
-{
-    wr_fsize_with_options(fname, fsize, WR_SEEK_MAXWR, inst_handle);
-}
-
-void wr_get_error(int *errcode, const char **errmsg)
+int wr_get_error(int *errcode, const char **errmsg)
 {
     cm_get_error(errcode, errmsg);
+    return CM_SUCCESS;
 }
 
 int wr_get_fname(int handle, char *fname, int fname_size)
