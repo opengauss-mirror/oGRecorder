@@ -74,6 +74,7 @@ void wr_conn_release(pointer_t thv_addr);
 status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn, const char *addr);
 void wr_clt_env_init(void);
 status_t wr_enter_api(wr_conn_t **conn, const char *addr);
+status_t check_server_addr_format(const char *server_addr);
 void wr_leave_api(wr_conn_t *conn, bool32 get_api_volume_error);
 
 #ifdef __cplusplus

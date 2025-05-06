@@ -124,24 +124,13 @@ void cm_init_thv(void)
 
 status_t cm_get_thv(thv_type_e var_type, bool32 is_create, pointer_t *result, const char* addr)
 {
-    if (g_thv_addr[var_type] == NULL && is_create) {
-        int32 ret = g_thv_ctrl_func[var_type].create(&g_thv_addr[var_type], addr);
+    if (is_create) {
+        int32 ret = g_thv_ctrl_func[var_type].create(result, addr);
         if (ret != EOK) {
             LOG_RUN_ERR("create thread variable failed, var_type %u", (uint32)var_type);
             return CM_ERROR;
         }
-        if (!g_thv_spec) {
-            ret = pthread_setspecific(g_thv_key, g_thv_addr);
-            if (ret != EOK) {
-                WR_THROW_ERROR(ERR_SYSTEM_CALL, ret);
-                LOG_RUN_ERR("call pthread_setspecific failed");
-                return CM_ERROR;
-            }
-            g_thv_spec = CM_TRUE;
-        }
     }
-
-    *result = g_thv_addr[var_type];
     return CM_SUCCESS;
 }
 
