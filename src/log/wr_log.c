@@ -124,19 +124,19 @@ const char *g_wr_error_desc[WR_ERROR_COUNT] = {
 };
 
 wr_log_def_t g_wr_cmd_log[] = {
-    {LOG_DEBUG, "debug/wrcmd.dlog"},
-    {LOG_OPER, "oper/wrcmd.olog"},
-    {LOG_RUN, "run/wrcmd.rlog"},
-    {LOG_ALARM, "wrcmd_alarm.log"},
+    {CM_LOG_DEBUG, "debug/wrcmd.dlog"},
+    {CM_LOG_OPER, "oper/wrcmd.olog"},
+    {CM_LOG_RUN, "run/wrcmd.rlog"},
+    {CM_LOG_ALARM, "wrcmd_alarm.log"},
 };
 
 wr_log_def_t g_wr_instance_log[] = {
-    {LOG_DEBUG, "debug/wrinstance.dlog"},
-    {LOG_OPER, "oper/wrinstance.olog"},
-    {LOG_RUN, "run/wrinstance.rlog"},
-    {LOG_ALARM, "wrinstance_alarm.log"},
-    {LOG_AUDIT, "audit/wrinstance.aud"},
-    {LOG_BLACKBOX, "blackbox/wrinstance.blog"},
+    {CM_LOG_DEBUG, "debug/wrinstance.dlog"},
+    {CM_LOG_OPER, "oper/wrinstance.olog"},
+    {CM_LOG_RUN, "run/wrinstance.rlog"},
+    {CM_LOG_ALARM, "wrinstance_alarm.log"},
+    {CM_LOG_AUDIT, "audit/wrinstance.aud"},
+    {CM_LOG_BLACKBOX, "blackbox/wrinstance.blog"},
 };
 
 uint32 g_wr_warn_id[] = {
@@ -362,7 +362,7 @@ status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32 lo
 
     int32 ret;
     for (size_t i = 0; i < log_def_count; i++) {
-        if (log_def[i].log_id == LOG_ALARM) {
+        if (log_def[i].log_id == CM_LOG_ALARM) {
             ret = snprintf_s(file_name, buffer_len, (buffer_len - 1), "%s/%s", alarm_dir, log_def[i].log_filename);
         } else {
             ret = snprintf_s(
