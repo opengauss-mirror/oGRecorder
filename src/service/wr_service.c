@@ -270,13 +270,13 @@ static status_t wr_process_mkdir(wr_session_t *session)
 static status_t wr_process_rmdir(wr_session_t *session)
 {
     char *dir = NULL;
-    int32 recursive = 0;
+    uint64_t flag = 0;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &dir));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &recursive));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", dir));
     WR_LOG_DEBUG_OP("Begin to rmdir:%s.", dir);
-    status_t status = wr_filesystem_rmdir(dir);
+    status_t status = wr_filesystem_rmdir(dir, flag);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to rmdir:%s", dir);
         return status;

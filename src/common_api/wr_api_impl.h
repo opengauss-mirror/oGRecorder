@@ -175,7 +175,7 @@ typedef struct st_wr_symlink_info {
 
 typedef struct st_wr_remove_dir_info {
     const char *name;
-    bool recursive;
+    uint64 attrFlag;
 } wr_remove_dir_info_t;
 
 typedef struct st_wr_get_server_info {

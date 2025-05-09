@@ -22,6 +22,7 @@
  * -------------------------------------------------------------------------
  */
 #include "wr_filesystem.h"
+#include <stdint.h>
 #ifndef WIN32
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -46,6 +47,12 @@ errno_t iret_snprintf = 0;
 })
 
 status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
+    if (access(WR_FS_GET_PATH(name), F_OK) == 0) {
+        LOG_RUN_ERR("[FS] Directory already exists: %s", name);
+        WR_THROW_ERROR(ERR_WR_DIR_CREATE_DUPLICATED, name);
+        return CM_ERROR;
+    }
+
     if (mkdir(WR_FS_GET_PATH(name), mode) != 0) {
         LOG_RUN_ERR("[FS] Failed to create directory: %s", name);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
@@ -54,16 +61,51 @@ status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_rmdir(const char *name) {
+status_t wr_filesystem_rmdir(const char *name, uint64_t flag) {
+    if (flag != 0) {
+        DIR *dir = opendir(WR_FS_GET_PATH(name));
+        if (!dir) {
+            LOG_RUN_ERR("[FS] Failed to open directory: %s", name);
+            WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+            return CM_ERROR;
+        }
+
+        struct dirent *entry;
+        char path[WR_FILE_PATH_MAX_LENGTH];
+
+        while ((entry = readdir(dir)) != NULL) {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+                continue;
+            }
+
+            snprintf(path, sizeof(path), "%s/%s", WR_FS_GET_PATH(name), entry->d_name);
+            if (unlink(path) != 0) {
+                LOG_RUN_ERR("[FS] Failed to remove file: %s", path);
+                WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+                closedir(dir);
+                return CM_ERROR;
+            }
+        }
+
+        closedir(dir);
+    }
+
     if (rmdir(WR_FS_GET_PATH(name)) != 0) {
         LOG_RUN_ERR("[FS] Failed to remove directory: %s", name);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
+
     return CM_SUCCESS;
 }
 
 status_t wr_filesystem_touch(const char *name) {
+    if (access(WR_FS_GET_PATH(name), F_OK) == 0) {
+        LOG_RUN_ERR("[FS] File already exists: %s", name);
+        WR_THROW_ERROR(ERR_WR_DIR_CREATE_DUPLICATED, name);
+        return CM_ERROR;
+    }
+
     FILE *file = fopen(WR_FS_GET_PATH(name), "w");
     if (!file) {
         LOG_RUN_ERR("[FS] Failed to create file: %s", name);
@@ -142,8 +184,8 @@ status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_open(const char *file_path, int *fd) {
-    *fd = open(WR_FS_GET_PATH(file_path), O_RDWR | O_SYNC, 0);
+status_t wr_filesystem_open(const char *file_path, int flag, int *fd) {
+    *fd = open(WR_FS_GET_PATH(file_path), flag, 0);
     if (*fd == -1) {
         LOG_RUN_ERR("[FS] Failed to open file: %s", file_path);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);

@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <fcntl.h>
 #include <chrono>
 #include <iostream>
 extern "C" {
@@ -35,7 +36,7 @@ protected:
         result = wr_file_create(g_vfs_handle, TEST_FILE, NULL);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to create test file";
 
-        result = wr_file_open(g_vfs_handle, TEST_FILE, 0, &handle);
+        result = wr_file_open(g_vfs_handle, TEST_FILE, O_RDWR | O_SYNC, &handle);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to open test file";
 
         result = wr_file_truncate(g_vfs_handle, handle, 0, ONE_GB);
