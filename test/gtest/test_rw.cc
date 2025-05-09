@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <thread>
 #include <vector>
+#include <fcntl.h>
 extern "C" {
 #include "wr_api.h"
 #include "wr_errno.h"
@@ -15,8 +16,10 @@ extern "C" {
 
 int errorcode = 0;
 const char *errormsg = NULL;
-wr_instance_handle g_inst_handle = NULL;
-wr_vfs_handle g_vfs_handle;
+wr_instance_handle g_inst_handle1 = NULL;
+wr_instance_handle g_inst_handle2 = NULL;
+wr_vfs_handle g_vfs_handle1;
+wr_vfs_handle g_vfs_handle2;
 int handle1 = 0, handle2 = 0;
 
 wr_param_t g_wr_param;
@@ -31,22 +34,27 @@ protected:
         int result = wr_init(g_wr_param);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to initialize logger";
 
-        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_create(g_inst_handle, TEST_DIR, 0), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_mount(g_inst_handle, TEST_DIR, &g_vfs_handle), WR_SUCCESS);
-        EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE1, NULL), WR_SUCCESS);
-        EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE2, NULL), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE1, 0, &handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, 0, &handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle1), WR_SUCCESS);
+        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_create(g_inst_handle1, TEST_DIR, 0), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), WR_SUCCESS);
+        
+
+        EXPECT_EQ(wr_file_create(g_vfs_handle1, TEST_FILE1, NULL), WR_SUCCESS);
+        EXPECT_EQ(wr_file_create(g_vfs_handle1, TEST_FILE2, NULL), WR_SUCCESS);
+        EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE1, O_RDWR | O_SYNC, &handle1), WR_SUCCESS);
+        EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE2, O_RDWR | O_SYNC, &handle2), WR_SUCCESS);
     }
 
     void TearDown() override {
-        EXPECT_EQ(wr_file_close(g_vfs_handle, handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_close(g_vfs_handle, handle2), WR_SUCCESS);
-        EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE2), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_unmount(g_vfs_handle), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_delete(g_inst_handle, TEST_DIR, 0), WR_SUCCESS);
+        EXPECT_EQ(wr_file_close(g_vfs_handle1, handle1), WR_SUCCESS);
+        EXPECT_EQ(wr_file_close(g_vfs_handle1, handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE1), WR_SUCCESS);
+        EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE2), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_unmount(g_vfs_handle1), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_unmount(g_vfs_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_delete(g_inst_handle1, TEST_DIR, 0), WR_SUCCESS);
     }
 };
 
@@ -72,12 +80,11 @@ TEST_F(ComplexWrApiTest, TestConcurrentReadWrite) {
     std::vector<std::thread> threads;
 
     // 启动并发写线程
-    threads.emplace_back(writeData, handle1, g_vfs_handle, data1, data_size1, 0);
-    threads.emplace_back(writeData, handle2, g_vfs_handle, data2, data_size2, 0);
-
+    threads.emplace_back(writeData, handle1, g_vfs_handle1, data1, data_size1, 0);
+    threads.emplace_back(writeData, handle2, g_vfs_handle2, data2, data_size2, 0);
     // 启动并发读线程
-    threads.emplace_back(readData, handle1, g_vfs_handle, read_buffer1, data_size1, 0);
-    threads.emplace_back(readData, handle2, g_vfs_handle, read_buffer2, data_size2, 0);
+    threads.emplace_back(readData, handle1, g_vfs_handle1, read_buffer1, data_size1, 0);
+    threads.emplace_back(readData, handle2, g_vfs_handle2, read_buffer2, data_size2, 0);
 
     // 等待所有线程完成
     for (auto& t : threads) {

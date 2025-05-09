@@ -198,7 +198,7 @@ status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_
     status_t ret = cs_connect(
         server_locator, &conn->pipe, NULL);
     if (ret != CM_SUCCESS) {
-        LOG_DEBUG_ERR("connect server failed, uds path:%s", server_locator);
+        LOG_DEBUG_ERR("connect server failed, ip port:%s", server_locator);
         return ret;
     }
     wr_init_packet(&conn->pack, conn->pipe.options);
@@ -363,7 +363,7 @@ status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir, unsigned long long
     LOG_DEBUG_INF("wr remove dir entry, dir:%s", dir);
     wr_remove_dir_info_t send_info;
     send_info.name = dir;
-    send_info.recursive = CM_TRUE;
+    send_info.attrFlag = attrFlag;
     status_t status = wr_msg_interact(conn, WR_CMD_RMDIR, (void *)&send_info, NULL);
     LOG_DEBUG_INF("wr remove dir leave");
     return status;
@@ -1531,8 +1531,8 @@ static status_t wr_encode_remove_dir(wr_conn_t *conn, wr_packet_t *pack, void *s
     wr_remove_dir_info_t *info = (wr_remove_dir_info_t *)send_info;
     // 1. dir_name
     CM_RETURN_IFERR(wr_put_str(pack, info->name));
-    // 2. recursive -r
-    CM_RETURN_IFERR(wr_put_int32(pack, info->recursive));
+    // 2. attrFlag
+    CM_RETURN_IFERR(wr_put_int64(pack, info->attrFlag));
     return CM_SUCCESS;
 }
 

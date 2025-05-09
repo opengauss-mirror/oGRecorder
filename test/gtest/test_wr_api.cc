@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <fcntl.h>
 extern "C" {
 #include "wr_api.h"
 #include "wr_errno.h"
@@ -60,6 +61,7 @@ TEST_F(WrApiTest, TestWrSetGetConf) {
 
 TEST_F(WrApiTest, TestWrVfsCreate) {
     EXPECT_EQ(wr_vfs_create(g_inst_handle, TEST_DIR, 0), WR_SUCCESS);
+    EXPECT_NE(wr_vfs_create(g_inst_handle, TEST_DIR, 0), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsMount) {
@@ -70,12 +72,13 @@ TEST_F(WrApiTest, TestWrVfsCreateFiles) {
     EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE1, NULL), WR_SUCCESS);
     EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE2, NULL), WR_SUCCESS);
     EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE3, NULL), WR_SUCCESS);
+    EXPECT_NE(wr_file_create(g_vfs_handle, TEST_FILE1, NULL), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileOpen) {
-    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE1, 0, &handle1), WR_SUCCESS);
-    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, 0, &handle2), WR_SUCCESS);
-    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE3, 0, &handle3), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE1, O_RDWR | O_SYNC, &handle1), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, O_RDWR | O_SYNC, &handle2), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE3, O_RDWR | O_SYNC, &handle3), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileWriteReadLargeData) {
@@ -143,15 +146,14 @@ TEST_F(WrApiTest, TestWrVfsQueryFileNum) {
 TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
     EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE1), WR_SUCCESS);
     EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE2), WR_SUCCESS);
-    EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE3), WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrVfsForceDelete) {
+    EXPECT_EQ(wr_vfs_delete(g_inst_handle, TEST_DIR, 1), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {
     EXPECT_EQ(wr_vfs_unmount(g_vfs_handle), WR_SUCCESS);
-}
-
-TEST_F(WrApiTest, TestWrVfsDelete) {
-    EXPECT_EQ(wr_vfs_delete(g_inst_handle, TEST_DIR, 0), WR_SUCCESS);
 }
 
 int main(int argc, char **argv) {

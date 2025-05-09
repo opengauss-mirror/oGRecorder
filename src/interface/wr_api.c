@@ -173,7 +173,7 @@ int wr_vfs_unmount(wr_vfs_handle vfs_handle)
 {
     vfs_handle.handle = NULL;
     vfs_handle.vfs_name[0] = '\0';
-    return CM_SUCCESS; 
+    return WR_SUCCESS; 
 }
 
 int wr_vfs_control(void)
