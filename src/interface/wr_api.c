@@ -370,7 +370,7 @@ int wr_file_close(wr_vfs_handle vfs_handle, int fd)
     return (int)ret;
 }
 
-int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned long long count, long long offset)
+long long int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -379,7 +379,7 @@ int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned l
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "size must be a positive integer");
         return CM_ERROR;
     }
-    if (offset > (int64)WR_MAX_FILE_SIZE) {
+    if (offset > (int64_t)WR_MAX_FILE_SIZE) {
         LOG_DEBUG_ERR("Invalid parameter offset:%lld.", offset);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
@@ -394,14 +394,14 @@ int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned l
         return WR_ERROR;
     }
 
-    status_t ret = wr_write_file_impl(hdl->conn, HANDLE_VALUE(fd), buf, count, offset);
-    if (ret == CM_SUCCESS) {
+    long long int ret = wr_pwrite_file_impl(hdl->conn, HANDLE_VALUE(fd), buf, count, offset);
+    if (ret == count) {
         wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PWRITE);
     }
-    return (int)ret;
+    return ret;
 }
 
-int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long long count, long long offset)
+long long int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -411,7 +411,7 @@ int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long lon
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "size must be a positive integer");
         return CM_ERROR;
     }
-    if (offset > (int64)WR_MAX_FILE_SIZE) {
+    if (offset > (int64_t)WR_MAX_FILE_SIZE) {
         LOG_DEBUG_ERR("Invalid parameter offset:%lld.", offset);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
@@ -426,11 +426,11 @@ int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long lon
         return WR_ERROR;
     }
 
-    status_t ret = wr_pread_file_impl(hdl->conn, HANDLE_VALUE(fd), buf, count, offset);
-    if (ret == CM_SUCCESS) {
+    long long int ret = wr_pread_file_impl(hdl->conn, HANDLE_VALUE(fd), buf, count, offset);
+    if (ret == count) {
         wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PREAD);
     }
-    return (int)ret;
+    return ret;
 }
 
 int wr_file_truncate(wr_vfs_handle vfs_handle, int fd, int truncateType, long long offset)
@@ -487,7 +487,7 @@ int wr_file_performance()
 
 static void wr_fsize_with_options(const char *fname, long long *fsize, int origin, wr_instance_handle inst_handle)
 {
-    int32 handle;
+    int32_t handle;
     status_t status;
     *fsize = CM_INVALID_INT64;
 
@@ -574,9 +574,9 @@ void wr_set_log_level(unsigned int log_level)
     cm_log_param_instance()->log_level = log_level;
 }
 
-static int32 init_single_logger_core(log_param_t *log_param, log_type_t log_id, char *file_name, uint32 file_name_len)
+static int32_t init_single_logger_core(log_param_t *log_param, log_type_t log_id, char *file_name, uint32_t file_name_len)
 {
-    int32 ret;
+    int32_t ret;
     switch (log_id) {
         case CM_LOG_RUN:
             ret = snprintf_s(
@@ -606,7 +606,7 @@ static int32 init_single_logger_core(log_param_t *log_param, log_type_t log_id, 
     return (ret != -1) ? WR_SUCCESS : ERR_WR_INIT_LOGGER_FAILED;
 }
 
-static int32 init_single_logger(log_param_t *log_param, log_type_t log_id)
+static int32_t init_single_logger(log_param_t *log_param, log_type_t log_id)
 {
     char file_name[CM_FILE_NAME_BUFFER_SIZE] = {'\0'};
     CM_RETURN_IFERR(init_single_logger_core(log_param, log_id, file_name, CM_FILE_NAME_BUFFER_SIZE));
@@ -622,17 +622,17 @@ void wr_refresh_logger(char *log_field, unsigned long long *value)
     }
 
     if (strcmp(log_field, "LOG_LEVEL") == 0) {
-        cm_log_param_instance()->log_level = (uint32)(*value);
+        cm_log_param_instance()->log_level = (uint32_t)(*value);
     } else if (strcmp(log_field, "LOG_MAX_FILE_SIZE") == 0) {
         cm_log_param_instance()->max_log_file_size = (uint64)(*value);
         cm_log_param_instance()->max_audit_file_size = (uint64)(*value);
     } else if (strcmp(log_field, "LOG_BACKUP_FILE_COUNT") == 0) {
-        cm_log_param_instance()->log_backup_file_count = (uint32)(*value);
-        cm_log_param_instance()->audit_backup_file_count = (uint32)(*value);
+        cm_log_param_instance()->log_backup_file_count = (uint32_t)(*value);
+        cm_log_param_instance()->audit_backup_file_count = (uint32_t)(*value);
     }
 }
 
-int wr_set_conn_timeout(int32 timeout)
+int wr_set_conn_timeout(int32_t timeout)
 {
     if (timeout < 0 && timeout != WR_CONN_NEVER_TIMEOUT) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid timeout when set connection timeout");
@@ -642,7 +642,7 @@ int wr_set_conn_timeout(int32 timeout)
     return CM_SUCCESS;
 }
 
-int wr_set_thread_conn_timeout(wr_conn_opt_t *thv_opts, int32 timeout)
+int wr_set_thread_conn_timeout(wr_conn_opt_t *thv_opts, int32_t timeout)
 {
     if (timeout < 0 && timeout != WR_CONN_NEVER_TIMEOUT) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid timeout when set connection timeout");
@@ -661,7 +661,7 @@ int wr_set_conn_opts(wr_conn_opt_key_e key, void *value, const char *addr)
     }
     switch (key) {
         case WR_CONN_OPT_TIME_OUT:
-            return wr_set_thread_conn_timeout(thv_opts, *(int32 *)value);
+            return wr_set_thread_conn_timeout(thv_opts, *(int32_t *)value);
         default:
             WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid key when set connection options");
             return CM_ERROR;

@@ -27,6 +27,6 @@
 
 #include "wr_param.h"
 
-status_t wr_catch_input_text(char *plain, uint32 plain_size);
-status_t wr_receive_info_from_terminal(char *buff, int32 buff_size, bool32 is_plain_text);
+status_t wr_catch_input_text(char *plain, uint32_t plain_size);
+status_t wr_receive_info_from_terminal(char *buff, int32_t buff_size, bool32 is_plain_text);
 #endif

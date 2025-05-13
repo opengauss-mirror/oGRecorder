@@ -34,7 +34,7 @@ extern "C" {
 #define WR_FALSE (uint8)0
 #define WR_TRUE (uint8)1
 
-#define WR_FILE_NAME_BUFFER_SIZE (uint32)256
+#define WR_FILE_NAME_BUFFER_SIZE (uint32_t)256
 #define WR_FILE_PATH_MAX_LENGTH (SIZE_K(1) + 1)
 #define WR_FKEY_FILENAME "server.key.rand"
 #define WR_MAX_AUDIT_PATH_LENGTH (SIZE_K(2) + 512)
@@ -48,14 +48,14 @@ extern "C" {
 #define WR_INVALID_ID8 (uint8)0xFF
 #define WR_INVALID_OFFSET16 (uint16)0xFFFF
 #define WR_INVALID_ID16 (uint16)0xFFFF
-#define WR_INVALID_ID24 (uint32)0xFFFFFF
-#define WR_INVALID_ID32 (uint32)0xFFFFFFFF
-#define WR_INVALID_OFFSET32 (uint32)0xFFFFFFFF
+#define WR_INVALID_ID24 (uint32_t)0xFFFFFF
+#define WR_INVALID_ID32 (uint32_t)0xFFFFFFFF
+#define WR_INVALID_OFFSET32 (uint32_t)0xFFFFFFFF
 #define WR_INVALID_ID64 (uint64)0xFFFFFFFFFFFFFFFF
-#define WR_INFINITE32 (uint32)0xFFFFFFFF
+#define WR_INFINITE32 (uint32_t)0xFFFFFFFF
 #define WR_NULL_VALUE_LEN (uint16)0xFFFF
-#define WR_INVALID_ASN (uint32)0
-#define WR_INVALID_INT32 (uint32)0x7FFFFFFF
+#define WR_INVALID_ASN (uint32_t)0
+#define WR_INVALID_INT32 (uint32_t)0x7FFFFFFF
 #define WR_INVALID_INT64 (int64)0x7FFFFFFFFFFFFFFF
 #define WR_INVALID_FILEID WR_INVALID_ID16
 #define WR_INVALID_CHECKSUM (uint16)0
@@ -109,7 +109,7 @@ extern "C" {
 #define WR_LOCK_SHARE_DISK_SIZE (SIZE_K(32) + 512)
 #define WR_INIT_DISK_LATCH_SIZE (SIZE_K(32))
 
-#define WR_NAME_BUFFER_SIZE (uint32)68
+#define WR_NAME_BUFFER_SIZE (uint32_t)68
 #define WR_NAME_USER_BUFFER_SIZE (WR_NAME_BUFFER_SIZE - 16)  // reserve 16 bytes for system
 #define WR_VOLUME_CODE_SIZE 64
 
@@ -129,7 +129,7 @@ extern "C" {
 #define WR_FILE_CONTEXT_PER_GROUP 1000
 #define WR_MAX_FILE_CONTEXT_GROUP_NUM 1000
 
-#define WR_STATIC_ASSERT(condition) ((void)sizeof(char[1 - 2 * (int32)(!(condition))]))
+#define WR_STATIC_ASSERT(condition) ((void)sizeof(char[1 - 2 * (int32_t)(!(condition))]))
 
 #define WR_MAX_BIT_NUM_VOLUME 10
 #define WR_MAX_BIT_NUM_AU 34
@@ -155,12 +155,12 @@ extern "C" {
 
 #define WR_CMS_RES_TYPE "wr"
 
-#define WR_FILE_HASH_SIZE (uint32)5000
+#define WR_FILE_HASH_SIZE (uint32_t)5000
 
-#define WR_MAX_PATH_BUFFER_SIZE (uint32)(WR_FILE_NAME_BUFFER_SIZE - WR_NAME_BUFFER_SIZE)
+#define WR_MAX_PATH_BUFFER_SIZE (uint32_t)(WR_FILE_NAME_BUFFER_SIZE - WR_NAME_BUFFER_SIZE)
 
-#define WR_PROTO_CODE *(uint32 *)"\xFE\xDC\xBA\x98"
-#define WR_UNIX_PATH_MAX (uint32)108
+#define WR_PROTO_CODE *(uint32_t *)"\xFE\xDC\xBA\x98"
+#define WR_UNIX_PATH_MAX (uint32_t)108
 #define WR_MAX_INSTANCES 64
 #define WR_VERSION_MAX_LEN 256
 #define WR_WAIT_TIMEOUT 5
@@ -175,7 +175,7 @@ extern "C" {
 #define WR_MIN_SYSTEM_DATAFILE_SIZE SIZE_M(128)
 #define WR_MIN_USER_DATAFILE_SIZE SIZE_M(1)
 #define WR_DFLT_CTRL_BLOCK_SIZE SIZE_K(16)
-#define WR_DFLT_LOG_BLOCK_SIZE (uint32)512
+#define WR_DFLT_LOG_BLOCK_SIZE (uint32_t)512
 #define WR_MAX_ARCH_FILES_SIZE SIZE_T(32)
 
 #define GSDB_UDS_EMERG_CLIENT "gsdb_uds_emerg.client"
@@ -184,16 +184,16 @@ extern "C" {
 #define CM_MAX_UDS_FILE_PERMISSIONS (uint16)777
 #define CM_DEF_UDS_FILE_PERMISSIONS (uint16)600
 
-#define WR_MAX_PACKET_SIZE (uint32)(10240) /* 10KB */
-#define WR_MAX_PACKET_DATA_SIZE (((WR_MAX_PACKET_SIZE) - sizeof(wr_packet_head_t)) - sizeof(uint32))
+#define WR_MAX_PACKET_SIZE (uint32_t)(10240) /* 10KB */
+#define WR_MAX_PACKET_DATA_SIZE (((WR_MAX_PACKET_SIZE) - sizeof(wr_packet_head_t)) - sizeof(uint32_t))
 
-#define WR_PARAM_BUFFER_SIZE (uint32)1024
-#define WR_ALIGN_SIZE (uint32)512
-#define WR_MIN_PORT (uint32)1024
+#define WR_PARAM_BUFFER_SIZE (uint32_t)1024
+#define WR_ALIGN_SIZE (uint32_t)512
+#define WR_MIN_PORT (uint32_t)1024
 #define CM_ALIGN_512(size) (((size) + 0x000001FF) & 0xFFFFFE00)
-#define WR_DEFAULT_NULL_VALUE (uint32)0xFFFFFFFF
-#define WR_TCP_CONNECT_TIMEOUT (int32)(30000) /* 30 seconds */
-#define WR_TCP_SOCKET_TIMEOUT (int32)0x4FFFFFFF
+#define WR_DEFAULT_NULL_VALUE (uint32_t)0xFFFFFFFF
+#define WR_TCP_CONNECT_TIMEOUT (int32_t)(30000) /* 30 seconds */
+#define WR_TCP_SOCKET_TIMEOUT (int32_t)0x4FFFFFFF
 #define WR_SEEK_MAXWR 3 /* Used for seek actual file size for openGauss */
 
 #define WR_MIN_IOTHREADS_CFG 1
@@ -356,7 +356,7 @@ extern "C" {
     do {                                                                               \
         if (SECUREC_UNLIKELY(!(condition))) {                                          \
             LOG_RUN_ERR(format, ##__VA_ARGS__);                                        \
-            LOG_RUN_ERR("Assertion throws an exception at line %u", (uint32)__LINE__); \
+            LOG_RUN_ERR("Assertion throws an exception at line %u", (uint32_t)__LINE__); \
             cm_fync_logfile();                                                         \
             CM_ASSERT(0);                                                              \
         }                                                                              \

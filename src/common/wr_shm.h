@@ -45,11 +45,11 @@ extern "C" {
 typedef HANDLE cm_shm_handle_t;
 #define CM_INVALID_SHM_HANDLE INVALID_HANDLE_VALUE
 #else
-typedef int32 cm_shm_handle_t;
+typedef int32_t cm_shm_handle_t;
 #define CM_INVALID_SHM_HANDLE (-1)
 #endif
 
-extern uint32 g_shm_key;
+extern uint32_t g_shm_key;
 extern bool32 g_shm_inited;
 
 #define CM_FIXED_SHM_MAX_ID CM_FIXED_SHM_ID_TAIL
@@ -68,7 +68,7 @@ extern bool32 g_shm_inited;
 /* pids stored in share memory block */
 #define CM_SHM_BLOCK_PID_CNT 128
 
-typedef uint32 cm_shm_key_t;
+typedef uint32_t cm_shm_key_t;
 
 #ifdef WIN32
 #define CM_SHM_ATTACH_RDONLY FILE_MAP_READ
@@ -82,16 +82,16 @@ typedef uint32 cm_shm_key_t;
 
 #define CM_SHM_CTRL_CURRENT_VERSION 6u
 #define CM_INVALID_SHM_IDX 0xFFFFFFFF
-#define CM_SHM_MAKE_KEY(shm_key, idx) ((uint32)(((uint32)(shm_key) & (0xFFFF)) << 16) | (uint32)((idx) & (0xFFFF)))
-#define CM_SHM_KEY2IDX(key) ((uint32)((key) & (0xFFFF)))
-#define CM_SHM_KEY2INSTANCE(key) (((uint32)((key) & (0xFFFF0000))) >> 16)
+#define CM_SHM_MAKE_KEY(shm_key, idx) ((uint32_t)(((uint32_t)(shm_key) & (0xFFFF)) << 16) | (uint32_t)((idx) & (0xFFFF)))
+#define CM_SHM_KEY2IDX(key) ((uint32_t)((key) & (0xFFFF)))
+#define CM_SHM_KEY2INSTANCE(key) (((uint32_t)((key) & (0xFFFF0000))) >> 16)
 #define CM_SHM_IDX_TO_KEY(idx) CM_SHM_MAKE_KEY(g_shm_key, idx)
 #define CM_SHM_SIZE_OF_CTRL (sizeof(cm_shm_ctrl_t))
 
 typedef struct tagcm_shm_ctrl {
     char magic[sizeof(CM_SHM_MAGIC)]; /* share memory control block magic string */
-    uint32 self_version;              /* share memory control block version */
-    uint32 instance_id;               /* mdb instance ID, to identify the share memory control block */
+    uint32_t self_version;              /* share memory control block version */
+    uint32_t instance_id;               /* mdb instance ID, to identify the share memory control block */
     spinlock_t lock_for_self;
     uint64 flag;                             /* flag for database instance initialization integrality */
     char reserved[CM_SHM_CTRL_RESERVED]; /* reserved */
@@ -105,7 +105,7 @@ typedef enum tagcm_fixed_shm_id {
     CM_FIXED_SHM_ID_TAIL
 } cm_fixed_shm_id_e;
 
-#define CM_SHM_CTRL_KEY CM_SHM_IDX_TO_KEY((uint32)SHM_ID_MNG_CTRL)
+#define CM_SHM_CTRL_KEY CM_SHM_IDX_TO_KEY((uint32_t)SHM_ID_MNG_CTRL)
 
 typedef struct sh_mem_struct {
     uint64_t offset : 32;
@@ -144,20 +144,20 @@ typedef uint64_t sh_mem_p;
 
 #define SHM_MAX_RETRY_ATTACH_NUM 10
 
-#define CM_SHM_CTRL_KEY CM_SHM_IDX_TO_KEY((uint32)SHM_ID_MNG_CTRL)
+#define CM_SHM_CTRL_KEY CM_SHM_IDX_TO_KEY((uint32_t)SHM_ID_MNG_CTRL)
 
-status_t cm_init_shm(uint32 shm_key);
+status_t cm_init_shm(uint32_t shm_key);
 void cm_destroy_shm(void);
 
-void *cm_get_shm(cm_shm_type_e type, uint32 id, uint64 size, uint32 flag);
-bool32 cm_del_shm(cm_shm_type_e type, uint32 id);
-void *cm_attach_shm(cm_shm_type_e type, uint32 id, uint64 size, uint32 flag);
+void *cm_get_shm(cm_shm_type_e type, uint32_t id, uint64 size, uint32_t flag);
+bool32 cm_del_shm(cm_shm_type_e type, uint32_t id);
+void *cm_attach_shm(cm_shm_type_e type, uint32_t id, uint64 size, uint32_t flag);
 uint64 cm_get_shm_ctrl_flag(void);
-bool32 cm_detach_shm(cm_shm_type_e type, uint32 id);
+bool32 cm_detach_shm(cm_shm_type_e type, uint32_t id);
 bool32 cm_native_del_shm(cm_shm_handle_t handle);
-cm_shm_key_t cm_shm_key_of(cm_shm_type_e type, uint32 id);
+cm_shm_key_t cm_shm_key_of(cm_shm_type_e type, uint32_t id);
 sh_mem_p cm_trans_shm_offset(uint32_t key, void *ptr);
-void *cm_do_attach_shm_without_register(cm_shm_key_t key, uint64 size, uint32 flag, bool32 logging_open_err);
+void *cm_do_attach_shm_without_register(cm_shm_key_t key, uint64 size, uint32_t flag, bool32 logging_open_err);
 void cm_set_shm_ctrl_flag(uint64 value);
 bool32 del_shm_by_key(cm_shm_key_t key);
 sh_mem_p cm_trans_shm_offset_from_malloc(uint32_t key, void *ptr);

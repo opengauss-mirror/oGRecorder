@@ -53,11 +53,11 @@ extern "C" {
 
 typedef struct st_wr_recycle_meta_args {
     wr_recycle_meta_pos_t *recyle_meta_pos;
-    uint32 time_clean_wait_time;     // ms
-    uint32 trigger_clean_wait_time;  // ms
+    uint32_t time_clean_wait_time;     // ms
+    uint32_t trigger_clean_wait_time;  // ms
     cm_thread_cond_t trigger_cond;   // for tigger recycle meta by other task
     bool32 trigger_enable;
-    uint32 last_bucket_id[WR_MAX_VOLUME_GROUP_NUM];  // for re-start from last recycle stop point
+    uint32_t last_bucket_id[WR_MAX_VOLUME_GROUP_NUM];  // for re-start from last recycle stop point
 } wr_recycle_meta_args_t;
 
 typedef struct st_wr_recycle_meta {
@@ -68,14 +68,14 @@ typedef struct st_wr_recycle_meta {
 #define WR_LOCK_SHM_META_TIMEOUT 200
 #define WR_BUFFER_CACHE_HASH(block_id) cm_hash_int64((int64)WR_BLOCK_ID_IGNORE_UNINITED((block_id)))
 void wr_enter_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item);
-bool32 wr_enter_shm_time_x(wr_session_t *session, wr_vg_info_item_t *vg_item, uint32 wait_ticks);
-void wr_enter_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item, bool32 is_force, int32 timeout);
+bool32 wr_enter_shm_time_x(wr_session_t *session, wr_vg_info_item_t *vg_item, uint32_t wait_ticks);
+void wr_enter_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item, bool32 is_force, int32_t timeout);
 void wr_leave_shm(wr_session_t *session, wr_vg_info_item_t *vg_item);
 
-wr_block_ctrl_t *wr_buffer_get_block_ctrl_addr(ga_pool_id_e pool_id, uint32 object_id);
-char *wr_buffer_get_meta_addr(ga_pool_id_e pool_id, uint32 object_id);
+wr_block_ctrl_t *wr_buffer_get_block_ctrl_addr(ga_pool_id_e pool_id, uint32_t object_id);
+char *wr_buffer_get_meta_addr(ga_pool_id_e pool_id, uint32_t object_id);
 
-uint32 wr_buffer_cache_get_block_size(uint32_t block_type);
+uint32_t wr_buffer_cache_get_block_size(uint32_t block_type);
 bool32 wr_buffer_cache_key_compare(void *key, void *key2);
 
 status_t wr_register_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, const wr_block_id_t block_id,
@@ -95,7 +95,7 @@ char *wr_find_block_in_shm_no_refresh_ex(
 
 status_t wr_refresh_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, shm_hashmap_t *map);
 status_t wr_get_block_from_disk(
-    wr_vg_info_item_t *vg_item, wr_block_id_t block_id, char *buf, int64_t offset, int32 size, bool32 calc_checksum);
+    wr_vg_info_item_t *vg_item, wr_block_id_t block_id, char *buf, int64_t offset, int32_t size, bool32 calc_checksum);
 status_t wr_check_block_version(wr_vg_info_item_t *vg_item, wr_block_id_t block_id, wr_block_type_t type,
     char *meta_addr, bool32 *is_changed, bool32 force_refresh);
 status_t wr_refresh_block_in_shm(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id,
@@ -109,7 +109,7 @@ void wr_init_wr_fs_block_cache_info(wr_fs_block_cache_info_t *fs_block_cache_inf
 void wr_init_vg_cache_node_info(wr_vg_info_item_t *vg_item);
 status_t wr_hashmap_extend_and_redistribute(wr_session_t *session, shm_hash_ctrl_t *hash_ctrl);
 status_t wr_hashmap_extend_and_redistribute_batch(
-    wr_session_t *session, shm_hash_ctrl_t *hash_ctrl, uint32 extend_num);
+    wr_session_t *session, shm_hash_ctrl_t *hash_ctrl, uint32_t extend_num);
 void wr_hashmap_dynamic_extend_and_redistribute_per_vg(wr_vg_info_item_t *vg_item, wr_session_t *session);
 
 // do not need control concurrence

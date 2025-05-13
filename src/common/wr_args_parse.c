@@ -226,9 +226,9 @@ void cmd_parse_clean(wr_args_t *cmd_args_set, int set_size)
 
 status_t cmd_check_au_size(const char *au_size_str)
 {
-    uint32 min_multiple = WR_MIN_AU_SIZE / SIZE_K(1);
-    uint32 max_multiple = WR_MAX_AU_SIZE / SIZE_K(1);
-    uint32 au_size;
+    uint32_t min_multiple = WR_MIN_AU_SIZE / SIZE_K(1);
+    uint32_t max_multiple = WR_MAX_AU_SIZE / SIZE_K(1);
+    uint32_t au_size;
     status_t ret = cm_str2uint32(au_size_str, &au_size);
     if (ret != CM_SUCCESS) {
         WR_PRINT_ERROR("au_size %s is error!\n", au_size_str);
@@ -249,7 +249,7 @@ status_t cmd_check_wr_home(const char *wr_home)
 
 status_t cmd_realpath_home(const char *input_args, char **convert_result, int *convert_size)
 {
-    uint32 len = (uint32)strlen(input_args);
+    uint32_t len = (uint32_t)strlen(input_args);
     if (len == 0 || len >= CM_FILE_NAME_BUFFER_SIZE) {
         WR_PRINT_ERROR("the len of path is invalid.\n");
         return CM_ERROR;
@@ -350,7 +350,7 @@ config_item_t g_wr_admin_parameters[] = {
 };
 
 static status_t wr_load_local_server_config_core(
-    wr_config_t *inst_cfg, config_item_t *client_parameters, uint32 item_count)
+    wr_config_t *inst_cfg, config_item_t *client_parameters, uint32_t item_count)
 {
     char file_name[CM_MAX_PATH_LEN];
     char *home = wr_get_cfg_dir(inst_cfg);

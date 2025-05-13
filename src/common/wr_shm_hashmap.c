@@ -28,9 +28,9 @@
 #include "wr_errno.h"
 #include "wr_defs.h"
 
-uint32 shm_hashmap_calc_bucket_idx(shm_hash_ctrl_t *hash_ctrl, uint32 hash)
+uint32_t shm_hashmap_calc_bucket_idx(shm_hash_ctrl_t *hash_ctrl, uint32_t hash)
 {
-    uint32 bucket_idx = hash & hash_ctrl->high_mask;
+    uint32_t bucket_idx = hash & hash_ctrl->high_mask;
     if (bucket_idx > hash_ctrl->max_bucket) {
         bucket_idx &= hash_ctrl->low_mask;
     }
@@ -42,9 +42,9 @@ bool32 shm_hashmap_need_extend_and_redistribute(shm_hash_ctrl_t *hash_ctrl)
     if (hash_ctrl->bucket_num == hash_ctrl->bucket_limits && hash_ctrl->max_bucket == hash_ctrl->high_mask) {
         return CM_FALSE;
     }
-    uint32 max_bucket = hash_ctrl->max_bucket;
+    uint32_t max_bucket = hash_ctrl->max_bucket;
     uint64 enums = 0;
-    for (uint32 i = 0; i <= max_bucket; i++) {
+    for (uint32_t i = 0; i <= max_bucket; i++) {
         shm_hashmap_bucket_t *bucket = shm_hashmap_get_bucket(hash_ctrl, i, NULL);
         if (bucket != NULL) {
             enums += bucket->entry_num;
@@ -56,8 +56,8 @@ bool32 shm_hashmap_need_extend_and_redistribute(shm_hash_ctrl_t *hash_ctrl)
 
 status_t shm_hashmap_extend_segment(shm_hash_ctrl_t *hash_ctrl)
 {
-    uint32 segment_num = hash_ctrl->nsegments;
-    uint32 objectid = ga_alloc_object(GA_SEGMENT_POOL, CM_INVALID_ID32);
+    uint32_t segment_num = hash_ctrl->nsegments;
+    uint32_t objectid = ga_alloc_object(GA_SEGMENT_POOL, CM_INVALID_ID32);
     if (objectid == CM_INVALID_ID32) {
         WR_THROW_ERROR(ERR_WR_GA_ALLOC_OBJECT, GA_SEGMENT_POOL);
         return CM_ERROR;
@@ -72,7 +72,7 @@ status_t shm_hashmap_extend_segment(shm_hash_ctrl_t *hash_ctrl)
         CM_THROW_ERROR(ERR_SYSTEM_CALL, rc);
         return CM_ERROR;
     }
-    uint32 *dirs = (uint32 *)OFFSET_TO_ADDR(hash_ctrl->dirs);
+    uint32_t *dirs = (uint32_t *)OFFSET_TO_ADDR(hash_ctrl->dirs);
     dirs[segment_num] = objectid;
     hash_ctrl->nsegments++;
     LOG_DEBUG_INF(
@@ -80,13 +80,13 @@ status_t shm_hashmap_extend_segment(shm_hash_ctrl_t *hash_ctrl)
     return CM_SUCCESS;
 }
 
-shm_hashmap_bucket_t *shm_hashmap_get_bucket(shm_hash_ctrl_t *hash_ctrl, uint32 bucket_idx, uint32 *segment_objid)
+shm_hashmap_bucket_t *shm_hashmap_get_bucket(shm_hash_ctrl_t *hash_ctrl, uint32_t bucket_idx, uint32_t *segment_objid)
 {
-    uint32 *dirs = (uint32 *)OFFSET_TO_ADDR(hash_ctrl->dirs);
-    uint32 segment_idx = bucket_idx / WR_BUCKETS_PER_SEGMENT;
+    uint32_t *dirs = (uint32_t *)OFFSET_TO_ADDR(hash_ctrl->dirs);
+    uint32_t segment_idx = bucket_idx / WR_BUCKETS_PER_SEGMENT;
     WR_ASSERT_LOG(segment_idx < hash_ctrl->nsegments, "segment idx %u exceeds nsegments %u, bucket_idx is %u.",
         segment_idx, hash_ctrl->nsegments, bucket_idx);
-    uint32 objectid = dirs[segment_idx];
+    uint32_t objectid = dirs[segment_idx];
     shm_hashmap_bucket_t *segment = (shm_hashmap_bucket_t *)ga_object_addr(GA_SEGMENT_POOL, objectid);
     if (segment == NULL) {
         WR_THROW_ERROR(ERR_WR_GA_GET_ADDR, GA_SEGMENT_POOL, objectid);
@@ -95,14 +95,14 @@ shm_hashmap_bucket_t *shm_hashmap_get_bucket(shm_hash_ctrl_t *hash_ctrl, uint32 
     if (segment_objid != NULL) {
         *segment_objid = objectid;
     }
-    uint32 sub_bucket_idx = bucket_idx % WR_BUCKETS_PER_SEGMENT;
+    uint32_t sub_bucket_idx = bucket_idx % WR_BUCKETS_PER_SEGMENT;
     return &segment[sub_bucket_idx];
 }
 
 static status_t shm_hashmap_init_segments(shm_hash_ctrl_t *hash_ctrl)
 {
-    uint32 expect_segments = CM_ALIGN_CEIL(hash_ctrl->bucket_num, WR_BUCKETS_PER_SEGMENT);
-    for (uint32 i = 0; i < expect_segments; i++) {
+    uint32_t expect_segments = CM_ALIGN_CEIL(hash_ctrl->bucket_num, WR_BUCKETS_PER_SEGMENT);
+    for (uint32_t i = 0; i < expect_segments; i++) {
         status_t status = shm_hashmap_extend_segment(hash_ctrl);
         if (status != CM_SUCCESS) {
             return status;
@@ -110,10 +110,10 @@ static status_t shm_hashmap_init_segments(shm_hash_ctrl_t *hash_ctrl)
     }
     return CM_SUCCESS;
 }
-int32 shm_hashmap_init(shm_hashmap_t *map, uint32 id, cm_oamap_compare_t compare_func)
+int32_t shm_hashmap_init(shm_hashmap_t *map, uint32_t id, cm_oamap_compare_t compare_func)
 {
     void *addr = NULL;
-    uint32 shm_key;
+    uint32_t shm_key;
     if (map == NULL) {
         LOG_DEBUG_ERR("Null pointer specified");
         return ERR_WR_INVALID_PARAM;
@@ -126,7 +126,7 @@ int32 shm_hashmap_init(shm_hashmap_t *map, uint32 id, cm_oamap_compare_t compare
     map->hash_ctrl.func = compare_func;
     map->shm_id = id;
     map->not_extend = 1;
-    uint64 size = WR_MAX_SEGMENT_NUM * (uint32)sizeof(uint32_t);
+    uint64 size = WR_MAX_SEGMENT_NUM * (uint32_t)sizeof(uint32_t);
     addr = cm_get_shm(SHM_TYPE_HASH, id, size, CM_SHM_ATTACH_RW);
     if (addr == NULL) {
         LOG_RUN_ERR("get hash map shm failed, id is %u.", id);
@@ -148,7 +148,7 @@ int32 shm_hashmap_init(shm_hashmap_t *map, uint32 id, cm_oamap_compare_t compare
     return CM_SUCCESS;
 }
 
-void shm_hashmap_destroy(shm_hashmap_t *map, uint32 id)
+void shm_hashmap_destroy(shm_hashmap_t *map, uint32_t id)
 {
     CM_ASSERT(map != NULL);
     if (map->hash_ctrl.dirs != SHM_INVALID_ADDR) {

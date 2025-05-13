@@ -51,11 +51,11 @@ wr_instance_t g_wr_instance;
 
 static const char *const g_wr_lock_file = "wr.lck";
 
-static void instance_set_pool_def(ga_pool_id_e pool_id, uint32 obj_count, uint32 obj_size, uint32 ex_max)
+static void instance_set_pool_def(ga_pool_id_e pool_id, uint32_t obj_count, uint32_t obj_size, uint32_t ex_max)
 {
     ga_pool_def_t pool_def;
 
-    CM_ASSERT(ex_max <= ((uint32)GA_MAX_EXTENDED_POOLS));
+    CM_ASSERT(ex_max <= ((uint32_t)GA_MAX_EXTENDED_POOLS));
     pool_def.object_count = obj_count;
     pool_def.object_size = obj_size;
     pool_def.ex_max = ex_max;
@@ -87,7 +87,7 @@ status_t wr_lock_instance(void)
 
 static status_t instance_init_ga(wr_instance_t *inst)
 {
-    int32 ret;
+    int32_t ret;
     ga_destroy_global_area();
     instance_set_pool_def(GA_INSTANCE_POOL, 1, sizeof(wr_share_vg_item_t), WR_MAX_VOLUME_GROUP_NUM - 1);
     instance_set_pool_def(
@@ -108,13 +108,13 @@ static status_t instance_init_ga(wr_instance_t *inst)
 
 static status_t wr_init_thread(wr_instance_t *inst)
 {
-    uint32 size = wr_get_uwression_startid();
-    inst->threads = (thread_t *)cm_malloc(size * (uint32)sizeof(thread_t));
+    uint32_t size = wr_get_uwression_startid();
+    inst->threads = (thread_t *)cm_malloc(size * (uint32_t)sizeof(thread_t));
     if (inst->threads == NULL) {
         return CM_ERROR;
     }
     errno_t errcode =
-        memset_s(inst->threads, (size * (uint32)sizeof(thread_t)), 0x00, (size * (uint32)sizeof(thread_t)));
+        memset_s(inst->threads, (size * (uint32_t)sizeof(thread_t)), 0x00, (size * (uint32_t)sizeof(thread_t)));
     securec_check_ret(errcode);
     return CM_SUCCESS;
 }
@@ -174,8 +174,8 @@ static status_t instance_init(wr_instance_t *inst)
 {
     status_t status = wr_lock_instance();
     WR_RETURN_IFERR2(status, LOG_RUN_ERR("Another wrinstance is running"));
-    uint32 shm_key =
-        (uint32)(inst->inst_cfg.params.shm_key << (uint8)WR_MAX_SHM_KEY_BITS) + (uint32)inst->inst_cfg.params.inst_id;
+    uint32_t shm_key =
+        (uint32_t)(inst->inst_cfg.params.shm_key << (uint8)WR_MAX_SHM_KEY_BITS) + (uint32_t)inst->inst_cfg.params.inst_id;
     status = cm_init_shm(shm_key);
     WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance failed to initialize shared memory!"));
     status = instance_init_ga(inst);
@@ -195,7 +195,7 @@ static status_t instance_init(wr_instance_t *inst)
 
 static void wr_init_cluster_proto_ver(wr_instance_t *inst)
 {
-    for (uint32 i = 0; i < WR_MAX_INSTANCES; i++) {
+    for (uint32_t i = 0; i < WR_MAX_INSTANCES; i++) {
         inst->cluster_proto_vers[i] = WR_INVALID_VERSION;
     }
 }
@@ -226,7 +226,7 @@ static status_t wr_save_process_pid(wr_config_t *inst_cfg)
     CM_RETURN_IFERR(cm_fopen(file_name, "w+", S_IRUSR | S_IWUSR, &fp));
     (void)cm_truncate_file(fp->_fileno, 0);
     (void)cm_seek_file(fp->_fileno, 0, SEEK_SET);
-    int32 size = fprintf(fp, "%d", pid);
+    int32_t size = fprintf(fp, "%d", pid);
     (void)fflush(stdout);
     if (size < 0) {
         LOG_RUN_ERR("write wrserver process failed, write size is %d.", size);
@@ -273,7 +273,7 @@ static status_t wr_handshake_core(wr_session_t *session)
 {
     wr_init_packet(&session->recv_pack, CM_FALSE);
     wr_init_packet(&session->send_pack, CM_FALSE);
-    session->pipe.socket_timeout = (int32)CM_NETWORK_IO_TIMEOUT;
+    session->pipe.socket_timeout = (int32_t)CM_NETWORK_IO_TIMEOUT;
     status_t status = wr_process_handshake_cmd(session, WR_CMD_HANDSHAKE);
     return status;
 }
@@ -373,7 +373,7 @@ void wr_free_log_ctrl()
     if (g_vgs_info == NULL) {
         return;
     }
-    for (uint32 i = 0; i < g_vgs_info->group_num; i++) {
+    for (uint32_t i = 0; i < g_vgs_info->group_num; i++) {
         wr_vg_info_item_t *vg_item = &g_vgs_info->volume_group[i];
         if (vg_item != NULL && vg_item->log_file_ctrl.log_buf != NULL) {
             WR_FREE_POINT(vg_item->log_file_ctrl.log_buf);
@@ -417,7 +417,7 @@ static void wr_check_peer_by_cm(wr_instance_t *inst)
     }
     wr_config_t *inst_cfg = wr_get_inst_cfg();
     uint64 cur_inst_map = 0;
-    uint32 instance_count = 0;
+    uint32_t instance_count = 0;
     if (cm_res_get_instance_count(&instance_count, &inst->cm_res.mgr, res) != CM_SUCCESS) {
         cm_res_free_stat(&inst->cm_res.mgr, res);
         cm_res_uninit_memctx(&res_mem_ctx);
@@ -493,7 +493,7 @@ void wr_init_cm_res(wr_instance_t *inst)
 }
 
 #ifdef ENABLE_WRTEST
-status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32 *master_id)
+status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32_t *master_id)
 {
     if (g_simulation_cm.simulation) {
         int ret = cm_res_get_lock_owner(&cm_res->mgr, WR_CM_LOCK, master_id);
@@ -514,7 +514,7 @@ status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32 *master_id)
     return CM_SUCCESS;
 }
 #else
-status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32 *master_id)
+status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32_t *master_id)
 {
     int ret = cm_res_get_lock_owner(&cm_res->mgr, WR_CM_LOCK, master_id);
     if (ret == CM_RES_TIMEOUT) {
@@ -530,7 +530,7 @@ status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32 *master_id)
 }
 #endif
 // get cm lock owner, if no owner, try to become.master_id can not be WR_INVALID_ID32.
-status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try_lock, uint32 *master_id)
+status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try_lock, uint32_t *master_id)
 {
     wr_config_t *inst_cfg = wr_get_inst_cfg();
     *master_id = WR_INVALID_ID32;
@@ -538,8 +538,8 @@ status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try
         *grab_lock = CM_TRUE;
         LOG_RUN_INF_INHIBIT(LOG_INHIBIT_LEVEL5,
             "[RECOVERY]Set curr_id %u to be primary when wrserver is maintain or just one inst.",
-            (uint32)inst_cfg->params.inst_id);
-        *master_id = (uint32)inst_cfg->params.inst_id;
+            (uint32_t)inst_cfg->params.inst_id);
+        *master_id = (uint32_t)inst_cfg->params.inst_id;
         return CM_SUCCESS;
     }
     wr_cm_res *cm_res = &inst->cm_res;
@@ -555,14 +555,14 @@ status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try
         }
         if (inst->no_grab_lock) {
             LOG_RUN_INF_INHIBIT(LOG_INHIBIT_LEVEL5, "[RECOVERY]No need to grab lock when inst %u is set no grab lock.",
-                (uint32)inst_cfg->params.inst_id);
+                (uint32_t)inst_cfg->params.inst_id);
             wr_set_master_id(WR_INVALID_ID32);
             return CM_ERROR;
         }
         ret = cm_res_lock(&cm_res->mgr, WR_CM_LOCK);
         *grab_lock = ((int)ret == CM_RES_SUCCESS);
         if (*grab_lock) {
-            *master_id = (uint32)inst->inst_cfg.params.inst_id;
+            *master_id = (uint32_t)inst->inst_cfg.params.inst_id;
             LOG_RUN_INF("[RECOVERY]inst id %u succeed to get lock owner.", *master_id);
             return CM_SUCCESS;
         }
@@ -571,7 +571,7 @@ status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try
     return CM_SUCCESS;
 }
 
-void wr_recovery_when_primary(wr_session_t *session, wr_instance_t *inst, uint32 curr_id, bool32 grab_lock)
+void wr_recovery_when_primary(wr_session_t *session, wr_instance_t *inst, uint32_t curr_id, bool32 grab_lock)
 {
     bool32 first_start = CM_FALSE;
     if (!grab_lock) {
@@ -606,10 +606,10 @@ void wr_recovery_when_primary(wr_session_t *session, wr_instance_t *inst, uint32
     inst->status = WR_STATUS_OPEN;
 }
 
-void wr_recovery_when_standby(wr_session_t *session, wr_instance_t *inst, uint32 curr_id, uint32 master_id)
+void wr_recovery_when_standby(wr_session_t *session, wr_instance_t *inst, uint32_t curr_id, uint32_t master_id)
 {
-    uint32 old_master_id = wr_get_master_id();
-    int32 old_status = wr_get_server_status_flag();
+    uint32_t old_master_id = wr_get_master_id();
+    int32_t old_status = wr_get_server_status_flag();
     if (old_master_id != master_id) {
         wr_set_master_id(master_id);
         wr_set_server_status_flag(WR_STATUS_READONLY);
@@ -631,9 +631,9 @@ void wr_recovery_when_standby(wr_session_t *session, wr_instance_t *inst, uint32
 void wr_get_cm_lock_and_recover_inner(wr_session_t *session, wr_instance_t *inst)
 {
     cm_latch_x(&g_wr_instance.switch_latch, WR_DEFAULT_SESSIONID, LATCH_STAT(LATCH_SWITCH));
-    uint32 old_master_id = wr_get_master_id();
+    uint32_t old_master_id = wr_get_master_id();
     bool32 grab_lock = CM_FALSE;
-    uint32 master_id = WR_INVALID_ID32;
+    uint32_t master_id = WR_INVALID_ID32;
     status_t status = wr_get_cm_lock_owner(inst, &grab_lock, CM_TRUE, &master_id);
     if (status != CM_SUCCESS) {
         cm_unlatch(&g_wr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
@@ -645,7 +645,7 @@ void wr_get_cm_lock_and_recover_inner(wr_session_t *session, wr_instance_t *inst
         return;
     }
     wr_config_t *inst_cfg = wr_get_inst_cfg();
-    uint32 curr_id = (uint32)inst_cfg->params.inst_id;
+    uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
     // master no change
     if (old_master_id == master_id) {
         // primary, no need check
@@ -676,7 +676,7 @@ void wr_get_cm_lock_and_recover_inner(wr_session_t *session, wr_instance_t *inst
 void wr_get_cm_lock_and_recover(thread_t *thread)
 {
     cm_set_thread_name("recovery");
-    uint32 work_idx = wr_get_recover_task_idx();
+    uint32_t work_idx = wr_get_recover_task_idx();
     wr_session_t *session = wr_get_reserv_session(work_idx);
     wr_instance_t *inst = (wr_instance_t *)thread->argument;
     while (!thread->closed) {
@@ -693,12 +693,12 @@ void wr_get_cm_lock_and_recover(thread_t *thread)
 void wr_delay_clean_proc(thread_t *thread)
 {
     cm_set_thread_name("delay_clean");
-    uint32 work_idx = wr_get_delay_clean_task_idx();
+    uint32_t work_idx = wr_get_delay_clean_task_idx();
     wr_session_ctrl_t *session_ctrl = wr_get_session_ctrl();
     wr_session_t *session = session_ctrl->sessions[work_idx];
     LOG_RUN_INF("Session[id=%u] is available for delay clean task.", session->id);
     wr_config_t *inst_cfg = wr_get_inst_cfg();
-    uint32 sleep_times = 0;
+    uint32_t sleep_times = 0;
     while (!thread->closed) {
         if (sleep_times < inst_cfg->params.delay_clean_interval) {
             cm_sleep(CM_SLEEP_1000_FIXED);
@@ -718,12 +718,12 @@ void wr_delay_clean_proc(thread_t *thread)
 void wr_alarm_check_proc(thread_t *thread)
 {
     cm_set_thread_name("alarm_check");
-    uint32 sleep_times = 0;
-    uint32 work_idx = wr_get_alarm_check_task_idx();
+    uint32_t sleep_times = 0;
+    uint32_t work_idx = wr_get_alarm_check_task_idx();
     wr_session_ctrl_t *session_ctrl = wr_get_session_ctrl();
     wr_session_t *session = session_ctrl->sessions[work_idx];
     // for check other alarms
-    uint32 alarm_counts = WR_VG_ALARM_CHECK_COUNT;
+    uint32_t alarm_counts = WR_VG_ALARM_CHECK_COUNT;
     while (!thread->closed) {
         // only master node need alarm
         if (sleep_times % WR_VG_ALARM_CHECK_COUNT == 0) {
@@ -808,7 +808,7 @@ bool32 wr_check_join_cluster()
             cm_reset_error();
             return CM_FALSE;
         }
-        LOG_DEBUG_INF("Join cluster result [%u].", (uint32)join_succ);
+        LOG_DEBUG_INF("Join cluster result [%u].", (uint32_t)join_succ);
         if (!join_succ) {
             return CM_FALSE;
         }
@@ -823,7 +823,7 @@ void wr_meta_syn_proc(thread_t *thread)
 {
     cm_set_thread_name("meta_syn");
     wr_bg_task_info_t *bg_task_info = (wr_bg_task_info_t *)(thread->argument);
-    uint32 work_idx = wr_get_meta_syn_task_idx(bg_task_info->my_task_id);
+    uint32_t work_idx = wr_get_meta_syn_task_idx(bg_task_info->my_task_id);
     wr_session_ctrl_t *session_ctrl = wr_get_session_ctrl();
     wr_session_t *session = session_ctrl->sessions[work_idx];
     while (!thread->closed) {
@@ -842,7 +842,7 @@ void wr_recycle_meta_proc(thread_t *thread)
     wr_bg_task_info_t *bg_task_info = (wr_bg_task_info_t *)(thread->argument);
     wr_set_recycle_meta_args_to_vg(bg_task_info);
 
-    uint32 work_idx = wr_get_recycle_meta_task_idx(bg_task_info->my_task_id);
+    uint32_t work_idx = wr_get_recycle_meta_task_idx(bg_task_info->my_task_id);
     wr_session_ctrl_t *session_ctrl = wr_get_session_ctrl();
     wr_session_t *session = session_ctrl->sessions[work_idx];
     date_t clean_time = cm_now();

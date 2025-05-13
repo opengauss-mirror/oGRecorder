@@ -37,9 +37,9 @@ extern "C" {
 
 wr_session_ctrl_t g_wr_session_ctrl = {0};
 
-status_t wr_extend_session(uint32 extend_num)
+status_t wr_extend_session(uint32_t extend_num)
 {
-    uint32 objectid;
+    uint32_t objectid;
     uint32_t old_alloc_sessions = g_wr_session_ctrl.alloc_sessions;
     uint32_t new_alloc_sessions = g_wr_session_ctrl.alloc_sessions + extend_num;
     if (new_alloc_sessions > g_wr_session_ctrl.total) {
@@ -70,9 +70,9 @@ status_t wr_extend_session(uint32 extend_num)
     return CM_SUCCESS;
 }
 
-status_t wr_init_session_pool(uint32 max_session_num)
+status_t wr_init_session_pool(uint32_t max_session_num)
 {
-    uint32 wr_session_size = (uint32)(max_session_num * sizeof(wr_session_t *));
+    uint32_t wr_session_size = (uint32_t)(max_session_num * sizeof(wr_session_t *));
     g_wr_session_ctrl.sessions = cm_malloc(wr_session_size);
     if (g_wr_session_ctrl.sessions == NULL) {
         return ERR_WR_GA_INIT;
@@ -80,7 +80,7 @@ status_t wr_init_session_pool(uint32 max_session_num)
     errno_t errcode = memset_s(g_wr_session_ctrl.sessions, wr_session_size, 0, wr_session_size);
     securec_check_ret(errcode);
     g_wr_session_ctrl.alloc_sessions = 0;
-    uint32 extend_num = max_session_num >= WR_SESSION_NUM_PER_GROUP ? WR_SESSION_NUM_PER_GROUP : max_session_num;
+    uint32_t extend_num = max_session_num >= WR_SESSION_NUM_PER_GROUP ? WR_SESSION_NUM_PER_GROUP : max_session_num;
     g_wr_session_ctrl.total = max_session_num;
     status_t status = wr_extend_session(extend_num);
     if (status != CM_SUCCESS) {
@@ -95,55 +95,55 @@ wr_session_ctrl_t *wr_get_session_ctrl(void)
     return &g_wr_session_ctrl;
 }
 
-uint32 wr_get_uwression_startid(void)
+uint32_t wr_get_uwression_startid(void)
 {
     wr_config_t *inst_cfg = wr_get_inst_cfg();
-    uint32 start_sid = (uint32)WR_BACKGROUND_TASK_NUM;
+    uint32_t start_sid = (uint32_t)WR_BACKGROUND_TASK_NUM;
     if (inst_cfg->params.nodes_list.inst_cnt > 1) {
         start_sid = start_sid + inst_cfg->params.channel_num + inst_cfg->params.work_thread_cnt;
     }
     return start_sid;
 }
 
-uint32 wr_get_max_total_session_cnt(void)
+uint32_t wr_get_max_total_session_cnt(void)
 {
     wr_config_t *inst_cfg = wr_get_inst_cfg();
     return wr_get_uwression_startid() + inst_cfg->params.cfg_session_num;
 }
 
-uint32 wr_get_recover_task_idx(void)
+uint32_t wr_get_recover_task_idx(void)
 {
-    return (wr_get_uwression_startid() - (uint32)WR_BACKGROUND_TASK_NUM);
+    return (wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM);
 }
 
-uint32 wr_get_delay_clean_task_idx(void)
+uint32_t wr_get_delay_clean_task_idx(void)
 {
-    return (wr_get_uwression_startid() - (uint32)WR_BACKGROUND_TASK_NUM) + WR_DELAY_CLEAN_BACKGROUND_TASK;
+    return (wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM) + WR_DELAY_CLEAN_BACKGROUND_TASK;
 }
 
-uint32 wr_get_hashmap_dynamic_extend_task_idx(void)
+uint32_t wr_get_hashmap_dynamic_extend_task_idx(void)
 {
-    return (wr_get_uwression_startid() - (uint32)WR_BACKGROUND_TASK_NUM) + WR_HASHMAP_DYNAMIC_EXTEND_TASK;
+    return (wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM) + WR_HASHMAP_DYNAMIC_EXTEND_TASK;
 }
 
-uint32 wr_get_bg_task_set_idx(uint32 task_id_base, uint32 idx)
+uint32_t wr_get_bg_task_set_idx(uint32_t task_id_base, uint32_t idx)
 {
-    return (wr_get_uwression_startid() - (uint32)WR_BACKGROUND_TASK_NUM) + task_id_base + idx;
+    return (wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM) + task_id_base + idx;
 }
 
-uint32 wr_get_meta_syn_task_idx(uint32 idx)
+uint32_t wr_get_meta_syn_task_idx(uint32_t idx)
 {
     return wr_get_bg_task_set_idx(WR_META_SYN_BG_TASK_BASE, idx);
 }
 
-uint32 wr_get_recycle_meta_task_idx(uint32 idx)
+uint32_t wr_get_recycle_meta_task_idx(uint32_t idx)
 {
     return wr_get_bg_task_set_idx(WR_RECYCLE_META_TASK_BASE, idx);
 }
 
-uint32 wr_get_alarm_check_task_idx(void)
+uint32_t wr_get_alarm_check_task_idx(void)
 {
-    return (wr_get_uwression_startid() - (uint32)WR_BACKGROUND_TASK_NUM) + WR_ALARM_CHECK_TASK;
+    return (wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM) + WR_ALARM_CHECK_TASK;
 }
 
 static status_t wr_init_session(wr_session_t *session, const cs_pipe_t *pipe)
@@ -169,7 +169,7 @@ static status_t wr_init_session(wr_session_t *session, const cs_pipe_t *pipe)
     return CM_SUCCESS;
 }
 
-wr_session_t *wr_get_reserv_session(uint32 idx)
+wr_session_t *wr_get_reserv_session(uint32_t idx)
 {
     wr_session_ctrl_t *session_ctrl = wr_get_session_ctrl();
     wr_session_t *session = session_ctrl->sessions[idx];
@@ -178,18 +178,18 @@ wr_session_t *wr_get_reserv_session(uint32 idx)
 
 status_t wr_create_session(const cs_pipe_t *pipe, wr_session_t **session)
 {
-    uint32 i, id;
+    uint32_t i, id;
 
     *session = NULL;
     id = WR_INVALID_ID32;
     cm_spin_lock(&g_wr_session_ctrl.lock, NULL);
 
-    uint32 start_sid = wr_get_uwression_startid();
-    uint32 end_sid = wr_get_max_total_session_cnt();
+    uint32_t start_sid = wr_get_uwression_startid();
+    uint32_t end_sid = wr_get_max_total_session_cnt();
     status_t status;
     for (i = start_sid; i < end_sid; i++) {
         if (i >= g_wr_session_ctrl.alloc_sessions) {
-            uint32 extend_num =
+            uint32_t extend_num =
                 g_wr_session_ctrl.total - g_wr_session_ctrl.alloc_sessions >= WR_SESSION_NUM_PER_GROUP ?
                     WR_SESSION_NUM_PER_GROUP :
                     g_wr_session_ctrl.total - g_wr_session_ctrl.alloc_sessions;
@@ -246,7 +246,7 @@ void wr_destroy_session(wr_session_t *session)
     cm_spin_unlock(&g_wr_session_ctrl.lock);
 }
 
-wr_session_t *wr_get_session(uint32 sid)
+wr_session_t *wr_get_session(uint32_t sid)
 {
     if (sid >= g_wr_session_ctrl.alloc_sessions || sid >= g_wr_session_ctrl.total) {
         return NULL;
@@ -254,7 +254,7 @@ wr_session_t *wr_get_session(uint32 sid)
     return g_wr_session_ctrl.sessions[sid];
 }
 
-static bool32 wr_is_timeout(int32 timeout, int32 sleep_times, int32 sleeps)
+static bool32 wr_is_timeout(int32_t timeout, int32_t sleep_times, int32_t sleeps)
 {
     if ((timeout == SPIN_WAIT_FOREVER) || (sleeps == 0)) {
         return CM_FALSE;
@@ -265,13 +265,13 @@ static bool32 wr_is_timeout(int32 timeout, int32 sleep_times, int32 sleeps)
 }
 
 status_t wr_lock_shm_meta_s_without_stack(
-    wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_force, int32 timeout)
+    wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_force, int32_t timeout)
 {
     cm_panic_log(wr_is_server(), "can not op shared latch without session latch stack in client");
-    int32 sleep_times = 0;
+    int32_t sleep_times = 0;
     latch_statis_t *stat = NULL;
-    uint32 count = 0;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t count = 0;
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
     do {
         cm_spin_lock_by_sid(sid, &shared_latch->latch.lock, (stat != NULL) ? &stat->s_spin : NULL);
         if (shared_latch->latch.stat == LATCH_STATUS_IDLE) {
@@ -316,7 +316,7 @@ status_t wr_lock_shm_meta_s_without_stack(
 
 // only used by api-client
 status_t wr_lock_shm_meta_s_with_stack(
-    wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch, int32 timeout)
+    wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch, int32_t timeout)
 {
     cm_panic_log(!(wr_is_server()), "can not op shared latch with session latch stack in server");
     WR_ASSERT_LOG(session != NULL, "session ptr is NULL");
@@ -326,10 +326,10 @@ status_t wr_lock_shm_meta_s_with_stack(
     session->latch_stack.op = LATCH_SHARED_OP_LATCH_S;
     session->latch_stack.latch_offset_stack[session->latch_stack.stack_top] = *offset;
 
-    int32 sleep_times = 0;
+    int32_t sleep_times = 0;
     latch_statis_t *stat = NULL;
-    uint32 count = 0;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t count = 0;
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
     bool32 is_force = CM_FALSE;
     do {
         cm_spin_lock_by_sid(sid, &shared_latch->latch.lock, (stat != NULL) ? &stat->s_spin : NULL);
@@ -399,7 +399,7 @@ status_t wr_lock_shm_meta_s_with_stack(
     return CM_SUCCESS;
 }
 
-status_t wr_lock_shm_meta_bucket_s(wr_session_t *session, uint32 id, wr_shared_latch_t *shared_latch)
+status_t wr_lock_shm_meta_bucket_s(wr_session_t *session, uint32_t id, wr_shared_latch_t *shared_latch)
 {
     CM_ASSERT(session != NULL);
     if (wr_is_server()) {
@@ -440,8 +440,8 @@ void wr_lock_shm_meta_x(const wr_session_t *session, wr_shared_latch_t *shared_l
     CM_ASSERT(session != NULL);
     cm_panic_log(wr_is_server(), "can not op x latch in client");
     latch_statis_t *stat = NULL;
-    uint32 count = 0;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t count = 0;
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
 
     do {
         cm_spin_lock_by_sid(sid, &shared_latch->latch.lock, (stat != NULL) ? &stat->x_spin : NULL);
@@ -473,14 +473,14 @@ void wr_lock_shm_meta_x(const wr_session_t *session, wr_shared_latch_t *shared_l
     } while (CM_TRUE);
 }
 
-bool32 wr_lock_shm_meta_timed_x(const wr_session_t *session, wr_shared_latch_t *shared_latch, uint32 wait_ticks)
+bool32 wr_lock_shm_meta_timed_x(const wr_session_t *session, wr_shared_latch_t *shared_latch, uint32_t wait_ticks)
 {
     CM_ASSERT(session != NULL);
     cm_panic_log(wr_is_server(), "can not op x latch in client");
     latch_statis_t *stat = NULL;
-    uint32 count = 0;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
-    uint32 actual_ticks = 0;
+    uint32_t count = 0;
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t actual_ticks = 0;
     do {
         cm_spin_lock_by_sid(sid, &shared_latch->latch.lock, (stat != NULL) ? &stat->x_spin : NULL);
         if (shared_latch->latch.stat == LATCH_STATUS_IDLE) {
@@ -527,7 +527,7 @@ void wr_lock_shm_meta_x2ix(wr_session_t *session, wr_shared_latch_t *shared_latc
     cm_panic_log(wr_is_server(), "can not op x latch in client");
     CM_ASSERT(shared_latch->latch.stat == LATCH_STATUS_X);
     latch_statis_t *stat = NULL;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
     wr_latch_x2ix(&shared_latch->latch, sid, stat);
 }
 
@@ -537,7 +537,7 @@ void wr_lock_shm_meta_ix2x(wr_session_t *session, wr_shared_latch_t *shared_latc
     cm_panic_log(wr_is_server(), "can not op x latch in client");
     CM_ASSERT(shared_latch->latch.stat == LATCH_STATUS_IX);
     latch_statis_t *stat = NULL;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
     wr_latch_ix2x(&shared_latch->latch, sid, stat);
 }
 
@@ -545,7 +545,7 @@ void wr_lock_shm_meta_degrade(wr_session_t *session, wr_shared_latch_t *shared_l
 {
     CM_ASSERT(session != NULL);
     cm_panic_log(wr_is_server(), "can not op x latch degradation in client.");
-    uint32 sid = (session == NULL) ? WR_DEFAULT_SESSIONID : WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t sid = (session == NULL) ? WR_DEFAULT_SESSIONID : WR_SESSIONID_IN_LOCK(session->id);
     cm_panic_log(sid == shared_latch->latch.sid && shared_latch->latch.stat == LATCH_STATUS_X,
         "Invalid degradation: sid:%u, sid on latch:%u, latch status:%u.", sid, shared_latch->latch.sid,
         shared_latch->latch.stat);
@@ -570,7 +570,7 @@ void wr_unlock_shm_meta_without_stack(wr_session_t *session, wr_shared_latch_t *
     CM_ASSERT(shared_latch->latch.stat != LATCH_STATUS_IDLE);
 
     spin_statis_t *stat_spin = NULL;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
     cm_spin_lock_by_sid(sid, &shared_latch->latch.lock, stat_spin);
 
     if (shared_latch->latch.stat == LATCH_STATUS_S || shared_latch->latch.stat == LATCH_STATUS_IX) {
@@ -601,7 +601,7 @@ bool32 wr_unlock_shm_meta_s_with_stack(wr_session_t *session, wr_shared_latch_t 
     session->latch_stack.op = LATCH_SHARED_OP_UNLATCH;
 
     spin_statis_t *stat_spin = NULL;
-    uint32 sid = WR_SESSIONID_IN_LOCK(session->id);
+    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
     if (!is_try_lock) {
         cm_spin_lock_by_sid(sid, &shared_latch->latch.lock, stat_spin);
     } else {
@@ -842,9 +842,9 @@ static bool32 wr_need_clean_session_latch(wr_session_t *session, uint64 cli_pid,
 
 void wr_clean_session_latch(wr_session_t *session, bool32 is_daemon)
 {
-    int32 i = 0;
+    int32_t i = 0;
     sh_mem_p offset;
-    int32 latch_place;
+    int32_t latch_place;
     wr_latch_offset_type_e offset_type;
     wr_shared_latch_t *shared_latch = NULL;
     if (!session->is_direct) {
@@ -862,7 +862,7 @@ void wr_clean_session_latch(wr_session_t *session, bool32 is_daemon)
         start_time, session->cli_info.process_name);
     LOG_DEBUG_INF("Clean sid:%u latch_stack op:%u, stack_top:%hu.", WR_SESSIONID_IN_LOCK(session->id),
         session->latch_stack.op, session->latch_stack.stack_top);
-    for (i = (int32)session->latch_stack.stack_top; i >= WR_MAX_LATCH_STACK_BOTTON; i--) {
+    for (i = (int32_t)session->latch_stack.stack_top; i >= WR_MAX_LATCH_STACK_BOTTON; i--) {
         // the stack_top may NOT be moveed to the right place
         if (i == WR_MAX_LATCH_STACK_DEPTH) {
             latch_place = i - 1;
@@ -876,7 +876,7 @@ void wr_clean_session_latch(wr_session_t *session, bool32 is_daemon)
             LOG_DEBUG_ERR("Clean sid:%u shared_latch offset type is invalid %u,latch_place:%d.",
                 WR_SESSIONID_IN_LOCK(session->id), session->latch_stack.latch_offset_stack[latch_place].type,
                 latch_place);
-            if (session->latch_stack.op == LATCH_SHARED_OP_UNLATCH_BEG && i != (int32)session->latch_stack.stack_top) {
+            if (session->latch_stack.op == LATCH_SHARED_OP_UNLATCH_BEG && i != (int32_t)session->latch_stack.stack_top) {
                 session->latch_stack.stack_top = latch_place;
                 session->latch_stack.op = LATCH_SHARED_OP_UNLATCH_END;
             }

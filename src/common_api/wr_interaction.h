@@ -38,7 +38,7 @@ extern "C" {
 
 typedef struct st_wr_conn wr_conn_t;
 int wr_get_pack_err(wr_conn_t *conn, wr_packet_t *pack);
-void wr_cli_get_err(wr_packet_t *pack, int32 *errcode, char **errmsg);
+void wr_cli_get_err(wr_packet_t *pack, int32_t *errcode, char **errmsg);
 
 #ifdef __cplusplus
 }

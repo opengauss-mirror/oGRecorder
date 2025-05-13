@@ -233,7 +233,7 @@ status_t wr_rename_file(wr_session_t *session, const char *src, const char *dst)
 
     // error_handle: rollback memory
     wr_rollback_mem_update(session, vg_item);
-    int32 err_code = cm_get_error_code();
+    int32_t err_code = cm_get_error_code();
     if (err_code != ERR_WR_FILE_RENAME_EXIST) {
         wr_unlock_vg_mem_and_shm(session, vg_item);
         return ret;
@@ -273,7 +273,7 @@ status_t wr_make_dir(wr_session_t *session, const char *dir_name)
     return wr_filesystem_mkdir(dir_name, 0777);
 }
 
-status_t wr_create_file(wr_session_t *session, const char *parent, const char *name, int32 flag)
+status_t wr_create_file(wr_session_t *session, const char *parent, const char *name, int32_t flag)
 {
     char path[WR_FILE_PATH_MAX_LENGTH];
     snprintf(path, WR_FILE_PATH_MAX_LENGTH, "%s/%s", parent, name);

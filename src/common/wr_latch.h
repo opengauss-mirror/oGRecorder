@@ -78,17 +78,17 @@ typedef bool32 (*latch_should_exit)(void);
 void wr_latch_s(latch_t *latch);
 void wr_latch_x(latch_t *latch);
 void wr_unlatch(latch_t *latch);
-void wr_latch_x2(latch_t *latch, uint32 sid);
-bool32 wr_latch_timed_x(latch_t *latch, uint32 wait_ticks);
-static inline void wr_latch(latch_t *latch, wr_latch_mode_e latch_mode, uint32 sid)
+void wr_latch_x2(latch_t *latch, uint32_t sid);
+bool32 wr_latch_timed_x(latch_t *latch, uint32_t wait_ticks);
+static inline void wr_latch(latch_t *latch, wr_latch_mode_e latch_mode, uint32_t sid)
 {
     latch_mode == LATCH_MODE_SHARE ? cm_latch_s(latch, sid, CM_FALSE, NULL) : cm_latch_x(latch, sid, NULL);
 }
 
-void wr_latch_s2(latch_t *latch, uint32 sid, bool32 is_force, latch_statis_t *stat);
-void wr_latch_x2ix(latch_t *latch, uint32 sid, latch_statis_t *stat);
-void wr_latch_ix2x(latch_t *latch, uint32 sid, latch_statis_t *stat);
-void wr_latch_degrade(latch_t *latch, uint32 sid, latch_statis_t *stat);
+void wr_latch_s2(latch_t *latch, uint32_t sid, bool32 is_force, latch_statis_t *stat);
+void wr_latch_x2ix(latch_t *latch, uint32_t sid, latch_statis_t *stat);
+void wr_latch_ix2x(latch_t *latch, uint32_t sid, latch_statis_t *stat);
+void wr_latch_degrade(latch_t *latch, uint32_t sid, latch_statis_t *stat);
 
 void wr_set_latch_extent(wr_latch_extent_t *latch_extent, uint16 stat, uint16 shared_count);
 

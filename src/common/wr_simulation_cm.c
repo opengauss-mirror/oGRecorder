@@ -172,7 +172,7 @@ void wr_simulation_cm_free_res_stat(char *res_stat)
 status_t wr_simulation_cm_res_lock(const char *lock_name)
 {
     wr_config_t *inst_cfg = wr_get_inst_cfg();
-    uint32 curr_id = (uint32)inst_cfg->params.inst_id;
+    uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
     LOG_RUN_INF("[WR][simulation_cm]Simulate to lock %s.", lock_name);
     if (g_simulation_cm.params.lock_owner_id == CM_INVALID_ID32) {
         return wr_refresh_cm_config_lock_owner_id(curr_id);
@@ -183,7 +183,7 @@ status_t wr_simulation_cm_res_lock(const char *lock_name)
 status_t wr_simulation_cm_res_unlock(const char *lock_name)
 {
     wr_config_t *inst_cfg = wr_get_inst_cfg();
-    uint32 curr_id = (uint32)inst_cfg->params.inst_id;
+    uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
     LOG_RUN_INF("[WR][simulation_cm]Simulate to unlock %s.", lock_name);
     if (g_simulation_cm.params.lock_owner_id == curr_id) {
         return wr_refresh_cm_config_lock_owner_id(CM_INVALID_ID32);

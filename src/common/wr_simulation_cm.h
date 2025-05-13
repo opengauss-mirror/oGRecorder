@@ -49,7 +49,7 @@ typedef enum en_cm_params {
 
 typedef struct st_cm_params {
     uint64 bitmap_online;
-    uint32 lock_owner_id;
+    uint32_t lock_owner_id;
 } cm_params_t;
 
 typedef struct st_simulation_cm {

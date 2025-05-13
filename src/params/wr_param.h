@@ -64,41 +64,41 @@ typedef enum cluster_run_mode_t { CLUSTER_PRIMARY = 0, CLUSTER_STANDBY = 1 } clu
 #endif
 
 typedef struct st_wr_recycle_meta_pos {
-    uint32 hwm;  // trigger to recycle, the unit is 0.01%
-    uint32 lwm;  // mark to end recycle, the unit is 0.01%
+    uint32_t hwm;  // trigger to recycle, the unit is 0.01%
+    uint32_t lwm;  // mark to end recycle, the unit is 0.01%
 } wr_recycle_meta_pos_t;
 
 typedef struct st_wr_params {
     char *root_name;  // root volume name
     int64 inst_id;
     char disk_lock_file_path[WR_UNIX_PATH_MAX];
-    int32 wr_mode;
-    uint32 cfg_session_num;
-    int32 lock_interval;
-    uint32 dlock_retry_count;
+    int32_t wr_mode;
+    uint32_t cfg_session_num;
+    int32_t lock_interval;
+    uint32_t dlock_retry_count;
 
     uint64 mes_pool_size;
     wr_nodes_list_t nodes_list;
     wr_listen_addr_t listen_addr;  // listen addr
-    uint32 channel_num;
-    uint32 work_thread_cnt;
+    uint32_t channel_num;
+    uint32_t work_thread_cnt;
     cs_pipe_type_t pipe_type;
     bool32 elapsed_switch;
-    uint32 shm_key;
-    uint32 ssl_detect_day;
+    uint32_t shm_key;
+    uint32_t ssl_detect_day;
     bool32 mes_with_ip;
     bool32 ip_white_list_on;
-    uint32 iothread_count;
-    uint32 workthread_count;
-    uint32 xlog_vg_id;
+    uint32_t iothread_count;
+    uint32_t workthread_count;
+    uint32_t xlog_vg_id;
     bool32 blackbox_detail_on;
-    uint32 mes_wait_timeout;
+    uint32_t mes_wait_timeout;
     bool32 enable_core_state_collect;
-    uint32 delay_clean_interval;
+    uint32_t delay_clean_interval;
     cluster_run_mode_t cluster_run_mode;
     wr_recycle_meta_pos_t recyle_meta_pos;
-    uint32 space_usage_hwm;
-    uint32 space_usage_lwm;
+    uint32_t space_usage_hwm;
+    uint32_t space_usage_lwm;
 } wr_params_t;
 
 typedef struct st_wr_config {
@@ -117,7 +117,7 @@ wr_config_t *wr_get_g_inst_cfg();
 status_t wr_load_config(wr_config_t *inst_cfg);
 status_t wr_set_cfg_dir(const char *home, wr_config_t *inst_cfg);
 
-static inline int32 wr_storage_mode(wr_config_t *inst_cfg)
+static inline int32_t wr_storage_mode(wr_config_t *inst_cfg)
 {
     return inst_cfg->params.wr_mode;
 }
@@ -142,7 +142,7 @@ status_t wr_set_ssl_param(const char *param_name, const char *param_value);
  * @[out]param value--ssl cert or ssl key
  * @* @return CM_SUCCESS - success;otherwise: failed
  */
-inline status_t wr_get_ssl_param(const char *param_name, char *param_value, uint32 size)
+inline status_t wr_get_ssl_param(const char *param_name, char *param_value, uint32_t size)
 {
     if (param_name == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "the ssl param name should not be null.");

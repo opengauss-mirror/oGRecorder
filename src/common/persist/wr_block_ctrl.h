@@ -54,8 +54,8 @@ typedef union st_wr_fs_block_cache_info {
         uint64 fs_aux_block_id;
 
         // for find the owner vg and cache slot
-        uint32 owner_vg_id;
-        uint32 owner_ftid_cache_index;
+        uint32_t owner_vg_id;
+        uint32_t owner_ftid_cache_index;
     };
     // this for cache fs_block_t and fs_aux_block_t
     struct {

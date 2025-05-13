@@ -55,7 +55,7 @@ typedef struct st_wr_au_t {
 } wr_au_head_t;
 
 typedef struct st_wr_au_list_t {
-    uint32 count;
+    uint32_t count;
     auid_t first;
     auid_t last;
 } wr_au_list_t;
@@ -64,8 +64,8 @@ typedef struct st_wr_au_root_t {
     uint64 version;
     uint64 free_root;  // .recycle ftid;
     uint64 count;
-    uint32 free_vol_id;  // the first volume that has free space.
-    uint32 reserve;
+    uint32_t free_vol_id;  // the first volume that has free space.
+    uint32_t reserve;
     wr_au_list_t free_list;
 } wr_au_root_t;
 #pragma pack()
@@ -75,9 +75,9 @@ void wr_init_au_root(wr_ctrl_t *wr_ctrl);
 status_t wr_alloc_au(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t *auid);
 
 void wr_update_core_ctrl(
-    wr_session_t *session, wr_vg_info_item_t *item, wr_core_ctrl_t *core, uint32 volume_id, bool32 is_only_root);
+    wr_session_t *session, wr_vg_info_item_t *item, wr_core_ctrl_t *core, uint32_t volume_id, bool32 is_only_root);
 status_t wr_get_au_head(wr_vg_info_item_t *item, auid_t auid, wr_au_head_t *au_head);
-status_t wr_get_au(wr_vg_info_item_t *item, auid_t auid, char *buf, int32 size);
+status_t wr_get_au(wr_vg_info_item_t *item, auid_t auid, char *buf, int32_t size);
 bool32 wr_cmp_auid(auid_t auid, uint64 id);
 void wr_set_auid(auid_t *auid, uint64 id);
 int64 wr_get_au_offset(wr_vg_info_item_t *item, auid_t auid);

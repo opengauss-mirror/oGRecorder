@@ -30,7 +30,7 @@
 #include "wr_defs.h"
 
 typedef struct st_wr_nodes_list {
-    uint32 inst_cnt;
+    uint32_t inst_cnt;
     uint64 inst_map;
     char nodes[WR_MAX_INSTANCES][CM_MAX_IP_LEN];
     uint16 ports[WR_MAX_INSTANCES];

@@ -31,13 +31,13 @@
 #include <termios.h>
 #endif
 
-static int32 wr_get_one_char()
+static int32_t wr_get_one_char()
 {
 #ifdef WIN32
     return _getch();
 #else
     size_t count;
-    int32 char_ascii;
+    int32_t char_ascii;
     struct termios oldt;
     struct termios newt;
     (void)tcgetattr(STDIN_FILENO, &oldt);
@@ -55,11 +55,11 @@ static int32 wr_get_one_char()
 #endif
 }
 
-status_t wr_receive_info_from_terminal(char *buff, int32 buff_size, bool32 is_plain_text)
+status_t wr_receive_info_from_terminal(char *buff, int32_t buff_size, bool32 is_plain_text)
 {
-    int32 pos = 0;
+    int32_t pos = 0;
     char char_ascii;
-    int32 key = 0;
+    int32_t key = 0;
     bool32 len_exceed = CM_FALSE;
     CM_POINTER(buff);
     do {
@@ -110,7 +110,7 @@ status_t wr_receive_info_from_terminal(char *buff, int32 buff_size, bool32 is_pl
             pos++;
         }
     } while (CM_TRUE);
-    int32 end = pos < buff_size - 1 ? pos : buff_size - 1;
+    int32_t end = pos < buff_size - 1 ? pos : buff_size - 1;
     buff[end] = '\0';
     (void)printf("\n");
     if (len_exceed == CM_TRUE) {
@@ -122,23 +122,23 @@ status_t wr_receive_info_from_terminal(char *buff, int32 buff_size, bool32 is_pl
 
 status_t wr_verify_password_str(const char *text, const char *rptext)
 {
-    uint32 len, rlen;
+    uint32_t len, rlen;
     char *name = "sys";
     CM_POINTER2(text, rptext);
 
     // Verify input twice pswd
-    len = (uint32)strlen(text);
-    rlen = (uint32)strlen(rptext);
+    len = (uint32_t)strlen(text);
+    rlen = (uint32_t)strlen(rptext);
     if (len != rlen || strcmp(text, rptext) != 0) {
         (void)printf("Input twice passwords are inconsistent.\n");
         return CM_ERROR;
     }
-    uint32 pwd_len = CM_PASSWD_MIN_LEN;
+    uint32_t pwd_len = CM_PASSWD_MIN_LEN;
     return cm_verify_password_str(name, text, pwd_len);
 }
 
 // catch plain from terminal
-status_t wr_catch_input_text(char *plain, uint32 plain_size)
+status_t wr_catch_input_text(char *plain, uint32_t plain_size)
 {
     char first[CM_PASSWD_MAX_LEN + 1] = {0};
     char second[CM_PASSWD_MAX_LEN + 1] = {0};
@@ -146,11 +146,11 @@ status_t wr_catch_input_text(char *plain, uint32 plain_size)
     errno_t errcode;
     do {
          (void)printf("Please enter password to encrypt: \n");
-        ret = wr_receive_info_from_terminal(first, (int32)sizeof(first), CM_FALSE);
+        ret = wr_receive_info_from_terminal(first, (int32_t)sizeof(first), CM_FALSE);
         WR_BREAK_IF_ERROR(ret);
 
          (void)printf("Please input password again: \n");
-        ret = wr_receive_info_from_terminal(second, (int32)sizeof(second), CM_FALSE);
+        ret = wr_receive_info_from_terminal(second, (int32_t)sizeof(second), CM_FALSE);
         WR_BREAK_IF_ERROR(ret);
 
         ret = wr_verify_password_str(first, second);

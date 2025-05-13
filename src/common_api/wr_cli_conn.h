@@ -41,7 +41,7 @@ extern "C" {
 #define HANDLE_VALUE(handle) ((handle) - (WR_HANDLE_BASE))
 #define DB_WR_DEFAULT_UDS_PATH "UDS:/tmp/.wr_unix_d_socket"
 extern char g_wr_inst_path[CM_MAX_PATH_LEN];
-extern int32 g_wr_tcp_conn_timeout;
+extern int32_t g_wr_tcp_conn_timeout;
 
 typedef struct st_wr_conn {
     wr_packet_t pack;  // for sending
@@ -49,8 +49,8 @@ typedef struct st_wr_conn {
     void *cli_vg_handles;
     bool32 flag;
     void *session;
-    uint32 server_version;
-    uint32 proto_version;
+    uint32_t server_version;
+    uint32_t proto_version;
 #ifdef ENABLE_WRTEST
     pid_t conn_pid;
 #endif
@@ -58,7 +58,7 @@ typedef struct st_wr_conn {
 } wr_conn_t;
 
 typedef struct st_wr_conn_opt {
-    int32 timeout;
+    int32_t timeout;
     char *user_name;
 } wr_conn_opt_t;
 

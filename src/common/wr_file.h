@@ -39,10 +39,10 @@ extern "C" {
 typedef struct st_wr_node_data {
     uint64 fid;
     ftid_t ftid;
-    int64 offset;
-    int64 size;
-    int32 mode;
-    uint32 vgid;
+    int64_t offset;
+    int64_t size;
+    int32_t mode;
+    uint32_t vgid;
     char *vg_name;
 } wr_node_data_t;
 
@@ -62,10 +62,10 @@ status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int
 status_t wr_close_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid);
 status_t wr_extend(wr_session_t *session, wr_node_data_t *node_data);
 status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data);
-status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64 length, char *vg_name);
-status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64 offset);
+status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64_t length, char *vg_name);
+status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64_t offset);
 status_t wr_update_file_written_size(
-    wr_session_t *session, uint32 vg_id, int64 offset, int64 size, wr_block_id_t ftid, uint64 fid);
+    wr_session_t *session, uint32_t vg_id, int64_t offset, int64_t size, wr_block_id_t ftid, uint64 fid);
 void wr_check_ft_node_free(gft_node_t *node);
 
 status_t wr_format_ft_node(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t auid);
@@ -78,7 +78,7 @@ status_t wr_update_ft_block_disk(wr_vg_info_item_t *vg_item, wr_ft_block_t *bloc
 status_t wr_refresh_root_ft(wr_vg_info_item_t *vg_item, bool32 check_version, bool32 active_refresh);
 
 status_t wr_update_au_disk(
-    wr_vg_info_item_t *vg_item, auid_t auid, ga_pool_id_e pool_id, uint32 first, uint32 count, uint32 size);
+    wr_vg_info_item_t *vg_item, auid_t auid, ga_pool_id_e pool_id, uint32_t first, uint32_t count, uint32_t size);
 // for tool or instance
 void wr_init_ft_root(wr_ctrl_t *wr_ctrl, gft_node_t **out_node);
 status_t wr_update_ft_root(wr_vg_info_item_t *vg_item);
@@ -116,7 +116,7 @@ status_t wr_check_rm_file(
     wr_session_t *session, wr_vg_info_item_t *vg_item, ftid_t ftid, bool32 *should_rm_file, gft_node_t **file_node);
 
 void wr_set_node_flag(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, bool32 is_set, uint32 flags);
+    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, bool32 is_set, uint32_t flags);
 void wr_validate_fs_meta(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node);
 status_t wr_invalidate_fs_meta(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node);
 
@@ -135,22 +135,22 @@ static inline void wr_set_fs_block_file_ver(gft_node_t *node, wr_fs_block_t *fs_
     return;
 }
 
-static inline int64 wr_get_fsb_offset(uint32 au_size, const wr_block_id_t *id)
+static inline int64_t wr_get_fsb_offset(uint32_t au_size, const wr_block_id_t *id)
 {
-    return ((int64)id->au * au_size + (int64)WR_FILE_SPACE_BLOCK_SIZE * id->block);
+    return ((int64_t)id->au * au_size + (int64_t)WR_FILE_SPACE_BLOCK_SIZE * id->block);
 }
 
-static inline int64 wr_get_ftb_offset(uint32 au_size, const wr_block_id_t *id)
+static inline int64_t wr_get_ftb_offset(uint32_t au_size, const wr_block_id_t *id)
 {
     if ((id->au) == 0) {
-        return (int64)WR_CTRL_ROOT_OFFSET;
+        return (int64_t)WR_CTRL_ROOT_OFFSET;
     }
-    return (int64)((uint64)id->au * au_size + (uint64)WR_BLOCK_SIZE * id->block);
+    return (int64_t)((uint64)id->au * au_size + (uint64)WR_BLOCK_SIZE * id->block);
 }
 
-static inline int64 wr_get_fab_offset(uint32 au_size, wr_block_id_t block_id)
+static inline int64_t wr_get_fab_offset(uint32_t au_size, wr_block_id_t block_id)
 {
-    return (int64)(WR_FS_AUX_SIZE * block_id.block + au_size * block_id.au);
+    return (int64_t)(WR_FS_AUX_SIZE * block_id.block + au_size * block_id.au);
 }
 
 static inline wr_ft_block_t *wr_get_ft_by_node(gft_node_t *node)
@@ -164,12 +164,12 @@ static inline wr_ft_block_t *wr_get_ft_by_node(gft_node_t *node)
     return (wr_ft_block_t *)(((char *)node - sizeof(wr_ft_block_t)) - (node->id.item * sizeof(gft_node_t)));
 }
 
-static inline gft_node_t *wr_get_node_by_ft(wr_ft_block_t *block, uint32 item)
+static inline gft_node_t *wr_get_node_by_ft(wr_ft_block_t *block, uint32_t item)
 {
     return (gft_node_t *)(((char *)block + sizeof(wr_ft_block_t)) + item * sizeof(gft_node_t));
 }
 
-static inline gft_node_t *wr_get_node_by_block_ctrl(wr_block_ctrl_t *block, uint32 item)
+static inline gft_node_t *wr_get_node_by_block_ctrl(wr_block_ctrl_t *block, uint32_t item)
 {
     wr_ft_block_t *ft_block = WR_GET_META_FROM_BLOCK_CTRL(wr_ft_block_t, block);
     return (gft_node_t *)((((char *)ft_block) + sizeof(wr_ft_block_t)) + item * sizeof(gft_node_t));
@@ -244,15 +244,15 @@ static inline void wr_unlatch_node(gft_node_t *node)
     WR_ASSERT_LOG(block_ctrl != NULL, "block_ctrl is NULL when unlatch node because node is root block");
     wr_unlatch(&block_ctrl->latch);
 }
-static inline wr_file_context_t *wr_get_file_context_by_handle(wr_file_run_ctx_t *file_run_ctx, int32 handle)
+static inline wr_file_context_t *wr_get_file_context_by_handle(wr_file_run_ctx_t *file_run_ctx, int32_t handle)
 {
     return &file_run_ctx->files.files_group[handle / WR_FILE_CONTEXT_PER_GROUP][handle % WR_FILE_CONTEXT_PER_GROUP];
 }
 // this is need to re-consturct the code-file-place
 typedef status_t (*wr_invalidate_other_nodes_proc_t)(
-    wr_vg_info_item_t *vg_item, char *meta_info, uint32 meta_info_size, bool32 *cmd_ack);
+    wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
 status_t wr_invalidate_other_nodes_proc(
-    wr_vg_info_item_t *vg_item, char *meta_info, uint32 meta_info_size, bool32 *cmd_ack);
+    wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
 void regist_invalidate_other_nodes_proc(wr_invalidate_other_nodes_proc_t proc);
 typedef status_t (*wr_broadcast_check_file_open_proc_t)(wr_vg_info_item_t *vg_item, uint64 ftid, bool32 *cmd_ack);
 void regist_broadcast_check_file_open_proc(wr_broadcast_check_file_open_proc_t proc);
@@ -260,12 +260,12 @@ void regist_broadcast_check_file_open_proc(wr_broadcast_check_file_open_proc_t p
 void wr_clean_all_sessions_latch();
 
 status_t wr_block_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *vg_item, wr_block_id_t block_id,
-    uint64 offset, char *data_buf, int32 size);
-status_t wr_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *vg_item, auid_t auid, uint32 au_offset,
-    char *data_buf, int32 size);
-status_t wr_write_zero2au(char *op_desc, wr_vg_info_item_t *vg_item, uint64 fid, auid_t auid, uint32 au_offset);
+    uint64 offset, char *data_buf, int32_t size);
+status_t wr_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *vg_item, auid_t auid, uint32_t au_offset,
+    char *data_buf, int32_t size);
+status_t wr_write_zero2au(char *op_desc, wr_vg_info_item_t *vg_item, uint64 fid, auid_t auid, uint32_t au_offset);
 status_t wr_try_write_zero_one_au(
-    char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 offset);
+    char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64_t offset);
 void wr_alarm_check_vg_usage(wr_session_t *session);
 #ifdef __cplusplus
 }

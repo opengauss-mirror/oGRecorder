@@ -41,7 +41,7 @@
 #include "wr_malloc.h"
 #include "wr_shm.h"
 
-uint32 g_shm_key = 0;
+uint32_t g_shm_key = 0;
 
 /* shared memory mapping */
 cm_shm_map_t g_shm_map;
@@ -55,9 +55,9 @@ static cm_shm_ctrl_t *cm_shm_ctrl(void)
     return (cm_shm_ctrl_t *)g_shm_map.entries[SHM_ID_MNG_CTRL].addr;
 }
 
-static uint32 cm_shm_idx_of(cm_shm_type_e type, uint32 id)
+static uint32_t cm_shm_idx_of(cm_shm_type_e type, uint32_t id)
 {
-    uint32 result;
+    uint32_t result;
 
     if (type == SHM_TYPE_FIXED) {
         if (id >= CM_FIXED_SHM_ID_TAIL) {
@@ -84,9 +84,9 @@ static uint32 cm_shm_idx_of(cm_shm_type_e type, uint32 id)
     return result;
 }
 
-cm_shm_key_t cm_shm_key_of(cm_shm_type_e type, uint32 id)
+cm_shm_key_t cm_shm_key_of(cm_shm_type_e type, uint32_t id)
 {
-    uint32 idx = cm_shm_idx_of(type, id);
+    uint32_t idx = cm_shm_idx_of(type, id);
 
     return idx != CM_INVALID_SHM_IDX ? CM_SHM_IDX_TO_KEY(idx) : CM_INVALID_SHM_KEY;
 }
@@ -114,12 +114,12 @@ static void cm_fill_shm_name(char *name, cm_shm_key_t key)
 }
 #endif
 
-cm_shm_handle_t cm_native_create_shm(cm_shm_key_t key, uint64 size, uint32 permission)
+cm_shm_handle_t cm_native_create_shm(cm_shm_key_t key, uint64 size, uint32_t permission)
 {
 #ifdef WIN32
     char name[CM_FILE_NAME_BUFFER_SIZE];
-    uint32 high = (uint32)(size >> 32);
-    uint32 low = (uint32)(size & 0xFFFFFFFF);
+    uint32_t high = (uint32_t)(size >> 32);
+    uint32_t low = (uint32_t)(size & 0xFFFFFFFF);
     (void)permission;
 
     cm_fill_shm_name(name, key);
@@ -127,7 +127,7 @@ cm_shm_handle_t cm_native_create_shm(cm_shm_key_t key, uint64 size, uint32 permi
     return CreateFileMapping(CM_INVALID_SHM_HANDLE, NULL, PAGE_READWRITE, high, low, name);
 #else
     /* PL/MDE:qinchaoli 712:Loss of precision (Context) (Type to Type) */
-    return shmget((key_t)key, size, (int32)(IPC_CREAT | IPC_EXCL | permission));
+    return shmget((key_t)key, size, (int32_t)(IPC_CREAT | IPC_EXCL | permission));
 #endif
 }
 
@@ -140,15 +140,15 @@ void cm_native_close_shm(cm_shm_handle_t handle)
 #endif
 }
 
-void *cm_native_attach_shm(cm_shm_handle_t handle, uint32 flag)
+void *cm_native_attach_shm(cm_shm_handle_t handle, uint32_t flag)
 {
 #ifdef WIN32
     return MapViewOfFile(handle, flag, 0, 0, 0);
 #else
-    uint32 retry_num = SHM_MAX_RETRY_ATTACH_NUM;
+    uint32_t retry_num = SHM_MAX_RETRY_ATTACH_NUM;
     uint64 offset;
     void *result = NULL;
-    for (uint32 i = 0; i < retry_num; i++) {
+    for (uint32_t i = 0; i < retry_num; i++) {
         result = shmat(handle, result, (int)flag);
         /* shmat will return -1 when error */
         if ((int64)result == -1) {
@@ -167,7 +167,7 @@ void *cm_native_attach_shm(cm_shm_handle_t handle, uint32 flag)
 #endif
 }
 
-static void *cm_create_shm(cm_shm_key_t key, uint64 size, uint32 flag, uint32 permission)
+static void *cm_create_shm(cm_shm_key_t key, uint64 size, uint32_t flag, uint32_t permission)
 {
     cm_shm_map_entry_t *entry = &g_shm_map.entries[CM_SHM_KEY2IDX(key)];
 
@@ -192,10 +192,10 @@ static void *cm_create_shm(cm_shm_key_t key, uint64 size, uint32 flag, uint32 pe
     } else {
 #ifdef WIN32
         /* for Windows 32bit OS, the memory address can't bigger than 4G,
-         * so convert uint64 to uint32.
+         * so convert uint64 to uint32_t.
          * IMPORTANT: NOT portable for Windows 64bit OS
          */
-        errno_t errcode = memset_s(entry->addr, size, 0, (uint32)size);
+        errno_t errcode = memset_s(entry->addr, size, 0, (uint32_t)size);
         if (errcode != EOK) {
             cm_panic(0);
         }
@@ -210,7 +210,7 @@ static void *cm_create_shm(cm_shm_key_t key, uint64 size, uint32 flag, uint32 pe
     return entry->addr;
 }
 
-cm_shm_handle_t cm_native_open_shm(uint32 key)
+cm_shm_handle_t cm_native_open_shm(uint32_t key)
 {
 #ifdef WIN32
     char name[CM_FILE_NAME_BUFFER_SIZE];
@@ -221,7 +221,7 @@ cm_shm_handle_t cm_native_open_shm(uint32 key)
 
     return (NULL == result) ? CM_INVALID_SHM_HANDLE : result;
 #else
-    return shmget((int32)key, 0, 0);
+    return shmget((int32_t)key, 0, 0);
 #endif
 }
 
@@ -236,7 +236,7 @@ uint64 cm_native_shm_size(cm_shm_key_t key)
         return 0;
     } else {
         struct shmid_ds shm_stat;
-        int32 ret;
+        int32_t ret;
         ret = shmctl(handle, IPC_STAT, &shm_stat);
         if (ret != -1) {
             return shm_stat.shm_segsz;
@@ -252,14 +252,14 @@ bool32 cm_native_detach_shm(void *addr)
 #ifdef WIN32
     return UnmapViewOfFile(addr);
 #else
-    int32 result = shmdt(addr);
+    int32_t result = shmdt(addr);
     return result != -1;
 #endif
 }
 
 #define SHM_CTRL_LOCK (cm_shm_ctrl()->lock_for_self)
 
-static void *cm_attach_to_existing_shm(cm_shm_key_t key, cm_shm_handle_t handle, uint64 size, uint32 flag)
+static void *cm_attach_to_existing_shm(cm_shm_key_t key, cm_shm_handle_t handle, uint64 size, uint32_t flag)
 {
     void *result = cm_native_attach_shm(handle, flag);
 
@@ -286,7 +286,7 @@ static void *cm_attach_to_existing_shm(cm_shm_key_t key, cm_shm_handle_t handle,
     return result;
 }
 
-void *cm_do_attach_shm_without_register(cm_shm_key_t key, uint64 size, uint32 flag, bool32 logging_open_err)
+void *cm_do_attach_shm_without_register(cm_shm_key_t key, uint64 size, uint32_t flag, bool32 logging_open_err)
 {
     cm_shm_map_entry_t *entry = CM_SHM_MAP_ENTRY_OF(key);
 
@@ -313,7 +313,7 @@ void *cm_do_attach_shm_without_register(cm_shm_key_t key, uint64 size, uint32 fl
     }
 }
 
-static void *cm_do_attach_shm(cm_shm_key_t key, uint64 size, uint32 flag, bool32 logging_open_err)
+static void *cm_do_attach_shm(cm_shm_key_t key, uint64 size, uint32_t flag, bool32 logging_open_err)
 {
     return cm_do_attach_shm_without_register(key, size, flag, logging_open_err);
 }
@@ -334,7 +334,7 @@ static status_t cm_create_shm_ctrl(void)
     return CM_SUCCESS;
 }
 
-static void *cm_create_shm_block(cm_shm_key_t key, uint64 size, uint32 flag)
+static void *cm_create_shm_block(cm_shm_key_t key, uint64 size, uint32_t flag)
 {
     return cm_create_shm(key, size, flag, CM_SHM_PERMISSION);
 }
@@ -349,7 +349,7 @@ static void init_entry(cm_shm_map_entry_t *entry)
 
 static void cm_init_shm_map(void)
 {
-    for (uint32 i = 0; i < ELEMENT_COUNT(g_shm_map.entries); i++) {
+    for (uint32_t i = 0; i < ELEMENT_COUNT(g_shm_map.entries); i++) {
         init_entry(&g_shm_map.entries[i]);
     }
 
@@ -415,9 +415,9 @@ static status_t cm_init_shm_ctrl()
     }
 }
 
-status_t cm_do_init_shm(uint32 shm_key)
+status_t cm_do_init_shm(uint32_t shm_key)
 {
-    int32 result;
+    int32_t result;
 
     g_shm_key = shm_key;
 
@@ -432,7 +432,7 @@ status_t cm_do_init_shm(uint32 shm_key)
     return result;
 }
 
-status_t cm_init_shm(uint32 shm_key)
+status_t cm_init_shm(uint32_t shm_key)
 {
     if (g_shm_inited) {
         return CM_SUCCESS;
@@ -447,14 +447,14 @@ status_t cm_init_shm(uint32 shm_key)
 }
 
 // todo 客户端不能加载共享内存
-static void *cm_do_get_shm(cm_shm_key_t key, uint64 size, uint32 flag)
+static void *cm_do_get_shm(cm_shm_key_t key, uint64 size, uint32_t flag)
 {
     void *result = cm_do_attach_shm(key, size, flag, CM_FALSE);
 
     return result != NULL ? result : cm_create_shm_block(key, size, flag);
 }
 
-void *cm_get_shm(cm_shm_type_e type, uint32 id, uint64 size, uint32 flag)
+void *cm_get_shm(cm_shm_type_e type, uint32_t id, uint64 size, uint32_t flag)
 {
     cm_shm_key_t key = cm_shm_key_of(type, id);
     if (key == CM_INVALID_SHM_KEY) {
@@ -466,7 +466,7 @@ void *cm_get_shm(cm_shm_type_e type, uint32 id, uint64 size, uint32 flag)
     return result;
 }
 
-void *cm_attach_shm(cm_shm_type_e type, uint32 id, uint64 size, uint32 flag)
+void *cm_attach_shm(cm_shm_type_e type, uint32_t id, uint64 size, uint32_t flag)
 {
     cm_shm_key_t key = cm_shm_key_of(type, id);
     if (key == CM_INVALID_SHM_KEY) {
@@ -485,7 +485,7 @@ bool32 cm_native_del_shm(cm_shm_handle_t handle)
 #ifdef WIN32
     return CloseHandle(handle);
 #else
-    int32 ret = shmctl(handle, IPC_RMID, NULL);
+    int32_t ret = shmctl(handle, IPC_RMID, NULL);
     return ret != -1;
 #endif
 }
@@ -527,7 +527,7 @@ bool32 del_shm_by_key(cm_shm_key_t key)
     return result;
 }
 
-bool32 cm_del_shm(cm_shm_type_e type, uint32 id)
+bool32 cm_del_shm(cm_shm_type_e type, uint32_t id)
 {
     cm_shm_key_t key = cm_shm_key_of(type, id);
     if (key == CM_INVALID_SHM_KEY) {
@@ -536,7 +536,7 @@ bool32 cm_del_shm(cm_shm_type_e type, uint32 id)
     return del_shm_by_key(key);
 }
 
-bool32 cm_detach_shm(cm_shm_type_e type, uint32 id)
+bool32 cm_detach_shm(cm_shm_type_e type, uint32_t id)
 {
     cm_shm_key_t key = cm_shm_key_of(type, id);
     if (key == CM_INVALID_SHM_KEY) {
@@ -580,7 +580,7 @@ sh_mem_p cm_trans_shm_offset(uint32_t key, void *ptr)
     sh_mem_t *shm_ptr = (sh_mem_t *)(void *)&ptr_uint64;
     cm_shm_map_entry_t *entry = CM_SHM_MAP_ENTRY_OF(key);
 
-    shm_ptr->offset = (uint32)((char *)ptr - (char *)entry->addr);
+    shm_ptr->offset = (uint32_t)((char *)ptr - (char *)entry->addr);
     shm_ptr->seg = CM_SHM_KEY2IDX(key);
 
     return ptr_uint64;
@@ -593,7 +593,7 @@ sh_mem_p cm_trans_shm_offset_from_malloc(uint32_t key, void *ptr)
     cm_shm_map_entry_t *entry = CM_SHM_MAP_ENTRY_OF(key);
     entry->handle = CM_INVALID_SHM_HANDLE;
     entry->addr = ptr;
-    shm_ptr->offset = (uint32)((char *)ptr - (char *)entry->addr);
+    shm_ptr->offset = (uint32_t)((char *)ptr - (char *)entry->addr);
     shm_ptr->seg = CM_SHM_KEY2IDX(key);
     return ptr_uint64;
 }

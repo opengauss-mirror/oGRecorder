@@ -42,17 +42,17 @@ typedef struct st_wr_conn_opt wr_conn_opt_t;
 
 typedef struct st_wr_rw_param {
     wr_conn_t *conn;
-    int32 handle;
+    int32_t handle;
     wr_env_t *wr_env;
     wr_file_context_t *context;
-    int64 offset;
+    int64_t offset;
     bool32 atom_oper;
     bool32 is_read;
 } wr_rw_param_t;
 
 typedef struct st_wr_load_ctrl_info {
     const char *vg_name;
-    uint32 index;
+    uint32_t index;
 } wr_load_ctrl_info_t;
 
 typedef struct st_wr_open_file_info {
@@ -66,7 +66,7 @@ typedef struct st_wr_close_file_info {
 
 typedef struct st_wr_create_file_info {
     const char *file_path;
-    uint32 flag;
+    uint32_t flag;
 } wr_create_file_info_t;
 
 typedef struct st_wr_open_dir_info {
@@ -77,7 +77,7 @@ typedef struct st_wr_open_dir_info {
 typedef struct st_wr_close_dir_info {
     uint64 pftid;
     const char *vg_name;
-    uint32 vg_id;
+    uint32_t vg_id;
 } wr_close_dir_info_t;
 
 typedef struct st_wr_add_or_remove_info {
@@ -88,10 +88,10 @@ typedef struct st_wr_add_or_remove_info {
 typedef struct st_wr_extend_info {
     uint64 fid;
     uint64 ftid;
-    int64 offset;
-    int64 size;
+    int64_t offset;
+    int64_t size;
     const char *vg_name;
-    uint32 vg_id;
+    uint32_t vg_id;
 } wr_extend_info_t;
 
 typedef struct st_wr_rename_file_info {
@@ -108,56 +108,58 @@ typedef struct st_wr_refresh_file_info {
     uint64 fid;
     uint64 ftid;
     const char *vg_name;
-    uint32 vg_id;
-    int64 offset;
+    uint32_t vg_id;
+    int64_t offset;
 } wr_refresh_file_info_t;
 
 typedef struct st_wr_refresh_volume_info {
-    uint32 volume_id;
+    uint32_t volume_id;
     const char *vg_name;
-    uint32 vg_id;
+    uint32_t vg_id;
 } wr_refresh_volume_info_t;
 
 typedef struct st_wr_truncate_file_info {
-    int64 length;
-    int64 handle;
-    int64 truncateType;
+    int64_t length;
+    int64_t handle;
+    int64_t truncateType;
 } wr_truncate_file_info_t;
 
 typedef struct st_wr_stat_file_info {
     const char *name;
-    int64 offset;
-    int64 size;
+    int64_t offset;
+    int64_t size;
 } wr_stat_file_info_t;
 typedef struct st_wr_write_file_info {
-    int64 offset;
-    int64 handle;
-    int64 size;
+    int64_t offset;
+    int64_t handle;
+    int64_t size;
+    int64_t rel_size;
     void *buf;
 } wr_write_file_info_t;
 
 typedef struct st_wr_read_file_info {
-    int64 offset;
-    int64 handle;
-    int64 size;
+    int64_t offset;
+    int64_t handle;
+    int64_t size;
+    int64_t rel_size;
     void *buf;
 } wr_read_file_info_t;
 
 typedef struct st_wr_query_file_num_info {
     const char *vfs_name;
-    uint32 file_num;
+    uint32_t file_num;
 } wr_query_file_num_info_t;
 
 typedef struct st_wr_refresh_file_table_info {
     uint64 block_id;
     const char *vg_name;
-    uint32 vg_id;
+    uint32_t vg_id;
 } wr_refresh_file_table_info_t;
 
 typedef struct st_wr_update_written_size_info {
     uint64 fid;
     uint64 ftid;
-    uint32 vg_id;
+    uint32_t vg_id;
     uint64 offset;
     uint64 size;
 } wr_update_written_size_info_t;
@@ -180,22 +182,22 @@ typedef struct st_wr_remove_dir_info {
 
 typedef struct st_wr_get_server_info {
     char *home;
-    uint32 objectid;
-    uint32 server_pid;
+    uint32_t objectid;
+    uint32_t server_pid;
 } wr_get_server_info_t;
 
 typedef struct st_wr_fallocate_info {
     uint64 fid;
     uint64 ftid;
-    int64 offset;
-    int64 size;
-    uint32 vg_id;
-    int32 mode;
+    int64_t offset;
+    int64_t size;
+    uint32_t vg_id;
+    int32_t mode;
 } wr_fallocate_info_t;
 
 typedef struct st_wr_exist_recv_info {
-    int32 result;
-    int32 type;
+    int32_t result;
+    int32_t type;
 } wr_exist_recv_info_t;
 
 #define WRAPI_BLOCK_SIZE 512
@@ -204,7 +206,7 @@ typedef struct st_wr_exist_recv_info {
 #define WR_DEFAULT_UDS_PATH "UDS:/tmp/.wr_unix_d_socket"
 #define SESSION_LOCK_TIMEOUT 500 // tickets
 
-status_t wr_kick_host_sync(wr_conn_t *conn, int64 kick_hostid);
+status_t wr_kick_host_sync(wr_conn_t *conn, int64_t kick_hostid);
 status_t wr_alloc_conn(wr_conn_t **conn);
 void wr_free_conn(wr_conn_t *conn);
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
@@ -225,22 +227,21 @@ status_t wr_remove_file_impl(wr_conn_t *conn, const char *file_path);
 status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int *handle);
 status_t wr_close_file_impl(wr_conn_t *conn, int handle);
 status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_item_type_t *type);
-int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin);
-status_t wr_write_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long int offset);
+int64_t wr_seek_file_impl(wr_conn_t *conn, int handle, int64_t offset, int origin);
 status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst);
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType);
 status_t wr_stat_file_impl(wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *count);
 status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node);
 
-status_t wr_cli_handshake(wr_conn_t *conn, uint32 max_open_file);
-status_t wr_init_client(uint32 max_open_files, char *home);
+status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file);
+status_t wr_init_client(uint32_t max_open_files, char *home);
 void wr_destroy(void);
 status_t wr_get_fname_impl(int handle, char *fname, int fname_size);
-status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32 *file_num);
+status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32_t *file_num);
 
-status_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, int size, long long offset);
-status_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);
-status_t wr_get_addr_impl(wr_conn_t *conn, int32 handle, long long offset, char *pool_name, char *image_name,
+int64_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);
+int64_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);
+status_t wr_get_addr_impl(wr_conn_t *conn, int32_t handle, long long offset, char *pool_name, char *image_name,
     char *obj_addr, unsigned int *obj_id, unsigned long int *obj_offset);
 gft_node_t *wr_get_node_by_path_impl(wr_conn_t *conn, const char *path);
 status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, const char *scope);

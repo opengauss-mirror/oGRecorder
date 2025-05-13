@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-void wr_cli_get_err(wr_packet_t *pack, int32 *errcode, char **errmsg)
+void wr_cli_get_err(wr_packet_t *pack, int32_t *errcode, char **errmsg)
 {
     wr_init_get(pack);
     (void)wr_get_int32(pack, errcode);
@@ -42,14 +42,14 @@ void wr_cli_get_err(wr_packet_t *pack, int32 *errcode, char **errmsg)
     }
 }
 
-int32 wr_get_pack_err(wr_conn_t *conn, wr_packet_t *pack)
+int32_t wr_get_pack_err(wr_conn_t *conn, wr_packet_t *pack)
 {
-    int32 errcode = -1;
+    int32_t errcode = -1;
     char *errmsg = NULL;
     wr_cli_get_err(pack, &errcode, &errmsg);
     if (errcode == ERR_WR_VERSION_NOT_MATCH) {
         conn->server_version = wr_get_version(pack);
-        uint32 new_proto_version = MIN(WR_PROTO_VERSION, conn->server_version);
+        uint32_t new_proto_version = MIN(WR_PROTO_VERSION, conn->server_version);
         LOG_RUN_INF(
             "[CHECK_PROTO]The client protocol version need be changed, old protocol version is %hhu, new protocol version is %hhu.",
             conn->proto_version, new_proto_version);

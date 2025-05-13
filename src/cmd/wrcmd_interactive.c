@@ -38,8 +38,8 @@
 #endif
 
 typedef struct st_wr_cmd_history_list {
-    uint32 nbytes;
-    uint32 nwidths;
+    uint32_t nbytes;
+    uint32_t nwidths;
     char hist_buf[MAX_CMD_LEN];
 } wr_cmd_history_list_t;
 
@@ -51,7 +51,7 @@ bool8 g_run_interatively = CM_FALSE;
 
 char g_cur_path[WR_FILE_PATH_MAX_LENGTH] = {0};
 
-bool8 cmd_check_need_convert_path(const char *input_path, uint32 *cur_path_len)
+bool8 cmd_check_need_convert_path(const char *input_path, uint32_t *cur_path_len)
 {
     if (!g_run_interatively) {
         return CM_FALSE;
@@ -71,10 +71,10 @@ bool8 cmd_check_need_convert_path(const char *input_path, uint32 *cur_path_len)
 status_t cmd_check_convert_path(const char *input_args, void **convert_result, int *convert_size)
 {
     status_t ret;
-    uint32 input_path_len;
-    uint32 cur_path_len;
+    uint32_t input_path_len;
+    uint32_t cur_path_len;
     char *convert_path;
-    uint32 convert_path_len;
+    uint32_t convert_path_len;
 
     if (!cmd_check_need_convert_path(input_args, &cur_path_len)) {
         return CM_SUCCESS;
@@ -107,7 +107,7 @@ status_t cmd_check_convert_path(const char *input_args, void **convert_result, i
 
 status_t wr_cmd_check_device_path(const char *path)
 {
-    uint32 cur_path_len;
+    uint32_t cur_path_len;
 
     if (cmd_check_need_convert_path(path, &cur_path_len)) {
         return CM_SUCCESS;
@@ -164,12 +164,12 @@ status_t wr_cmd_check_path(char *path)
     return status;
 }
 
-status_t wr_cmd_format_path(char *org_path, char *out_path_buf, uint32 out_buf_len, uint32 *out_path_len)
+status_t wr_cmd_format_path(char *org_path, char *out_path_buf, uint32_t out_buf_len, uint32_t *out_path_len)
 {
     char *sub_path;
     char *saved = NULL;
-    uint32 sub_path_len;
-    uint32 cur_len = 0;
+    uint32_t sub_path_len;
+    uint32_t cur_len = 0;
 
     if (org_path == NULL || out_path_buf == NULL) {
         return CM_ERROR;
@@ -212,9 +212,9 @@ void wr_cmd_cd_proc(int argc, char **args)
     char *input_path = args[WR_ARG_IDX_2];
     char format_path[WR_FILE_PATH_MAX_LENGTH] = {0};
     char merged_path[WR_FILE_PATH_MAX_LENGTH] = {0};
-    uint32 path_len;
-    uint32 format_path_len;
-    uint32 cur_path_len = strlen(g_cur_path);
+    uint32_t path_len;
+    uint32_t format_path_len;
+    uint32_t cur_path_len = strlen(g_cur_path);
 
     if (argc != 3) {
         WR_PRINT_ERROR("args num %d error.\n", argc - 1);
@@ -309,7 +309,7 @@ wr_interactive_cmd_t g_wr_interactive_cmd[] = {
 
 static bool32 get_interactive_cmd_idx(int argc, char **argv, uint32_t *idx)
 {
-    for (uint32 i = 0; i < sizeof(g_wr_interactive_cmd) / sizeof(g_wr_interactive_cmd[0]); ++i) {
+    for (uint32_t i = 0; i < sizeof(g_wr_interactive_cmd) / sizeof(g_wr_interactive_cmd[0]); ++i) {
         if (strcmp(g_wr_interactive_cmd[i].cmd, argv[WR_ARG_IDX_1]) == 0) {
             *idx = i;
             return CM_TRUE;
@@ -318,26 +318,26 @@ static bool32 get_interactive_cmd_idx(int argc, char **argv, uint32_t *idx)
     return CM_FALSE;
 }
 
-static uint32 wr_cmd_utf8_chr_widths(char *chr, uint32 c_bytes)
+static uint32_t wr_cmd_utf8_chr_widths(char *chr, uint32_t c_bytes)
 {
     wchar_t wchr;
-    uint32 c_widths = 0;
+    uint32_t c_widths = 0;
     (void)mbtowc(&wchr, chr, c_bytes);
 #ifndef WIN32
-    c_widths = (uint32)wcwidth(wchr);
+    c_widths = (uint32_t)wcwidth(wchr);
 #endif
     return c_widths;
 }
 
-void wr_cmd_clean_line(uint32 line_widths)
+void wr_cmd_clean_line(uint32_t line_widths)
 {
-    uint32 line_wid = line_widths;
+    uint32_t line_wid = line_widths;
     while (line_wid--) {
         wr_cmd_write(3, "\b \b");
     }
 }
 
-int32 wr_utf8_chr_bytes(uint8 c, uint32 *bytes)
+int32_t wr_utf8_chr_bytes(uint8 c, uint32_t *bytes)
 {
     uint8 chr = c;
     // 1 byte character
@@ -362,7 +362,7 @@ int32 wr_utf8_chr_bytes(uint8 c, uint32 *bytes)
     }
 }
 
-status_t wr_utf8_reverse_str_bytes(const char *str, uint32 len, uint32 *bytes)
+status_t wr_utf8_reverse_str_bytes(const char *str, uint32_t len, uint32_t *bytes)
 {
     const char* cur_c = str;
 
@@ -383,14 +383,14 @@ status_t wr_utf8_reverse_str_bytes(const char *str, uint32 len, uint32 *bytes)
 }
 
 /* Calculate the position and total number of spaces used to space at the end of a line */
-void wr_cmd_set_endspace(wr_cmd_history_list_t hist_list, uint32 ws_col, uint32 welcome_width,
-                       uint32 *spacenum, bool8 *endspace)
+void wr_cmd_set_endspace(wr_cmd_history_list_t hist_list, uint32_t ws_col, uint32_t welcome_width,
+                       uint32_t *spacenum, bool8 *endspace)
 {
-    uint32 offset = 0;
-    uint32 c_bytes = 0;
-    uint32 c_widths = 0;
-    uint32 nwidths = 0;
-    uint32 space_num = 0;
+    uint32_t offset = 0;
+    uint32_t c_bytes = 0;
+    uint32_t c_widths = 0;
+    uint32_t nwidths = 0;
+    uint32_t space_num = 0;
 
     (void)memset_s(endspace, MAX_CMD_LEN, 0, MAX_CMD_LEN);
     while (offset < hist_list.nbytes) {
@@ -407,8 +407,8 @@ void wr_cmd_set_endspace(wr_cmd_history_list_t hist_list, uint32 ws_col, uint32 
     *spacenum = space_num;
 }
 
-void wr_cmd_hist_turn_up(const int *hist_count, int *list_num, uint32 *nbytes, uint32 *nwidths, uint32 ws_col,
-                          uint32 welcome_width, uint32 *spacenum, bool8 *endspace, char *cmd_buf, uint32 max_len)
+void wr_cmd_hist_turn_up(const int *hist_count, int *list_num, uint32_t *nbytes, uint32_t *nwidths, uint32_t ws_col,
+                          uint32_t welcome_width, uint32_t *spacenum, bool8 *endspace, char *cmd_buf, uint32_t max_len)
 {
     if (*list_num >= *hist_count) {
         return;
@@ -429,8 +429,8 @@ void wr_cmd_hist_turn_up(const int *hist_count, int *list_num, uint32 *nbytes, u
     wr_cmd_set_endspace(g_hist_list[*list_num], ws_col, welcome_width, spacenum, endspace);
 }
 
-void wr_cmd_hist_turn_down(int *list_num, uint32 *nbytes, uint32 *nwidths, uint32 ws_col, uint32 welcome_width,
-                            uint32 *spacenum, bool8 *endspace, char *cmd_buf, uint32 max_len)
+void wr_cmd_hist_turn_down(int *list_num, uint32_t *nbytes, uint32_t *nwidths, uint32_t ws_col, uint32_t welcome_width,
+                            uint32_t *spacenum, bool8 *endspace, char *cmd_buf, uint32_t max_len)
 {
     if (*list_num <= 1) {
         return;
@@ -451,7 +451,7 @@ void wr_cmd_hist_turn_down(int *list_num, uint32 *nbytes, uint32 *nwidths, uint3
     wr_cmd_set_endspace(g_hist_list[*list_num], ws_col, welcome_width, spacenum, endspace);
 }
 
-void wr_cmd_push_history(uint32 cmd_bytes, uint32 cmd_width, int *hist_count, char *cmd_buf, uint32 max_len)
+void wr_cmd_push_history(uint32_t cmd_bytes, uint32_t cmd_width, int *hist_count, char *cmd_buf, uint32_t max_len)
 {
     if (cmd_bytes == 0) {
         return;
@@ -475,11 +475,11 @@ void wr_cmd_push_history(uint32 cmd_bytes, uint32 cmd_width, int *hist_count, ch
 }
 
 #ifndef WIN32
-void wr_cmd_set_terminal(uint32 *ws_col, struct termios *oldt)
+void wr_cmd_set_terminal(uint32_t *ws_col, struct termios *oldt)
 {
     struct winsize size;
     status_t status = ioctl(STDIN_FILENO, TIOCGWINSZ, &size);
-    const uint32 DEFAULT_WS_COL = 80;
+    const uint32_t DEFAULT_WS_COL = 80;
     /* set default ws_col when ioctl fails */
     *ws_col = (status != CM_SUCCESS) ? DEFAULT_WS_COL : size.ws_col;
 
@@ -497,15 +497,15 @@ void wr_cmd_set_terminal(uint32 *ws_col, struct termios *oldt)
 }
 #endif
 
-void wr_cmd_handle_backspace(char *cmd_buf, uint32 *nbytes, uint32 *nwidths, bool8 *endspace,
-                              uint32 *spacenum, uint32 ws_col, uint32 welcome_width)
+void wr_cmd_handle_backspace(char *cmd_buf, uint32_t *nbytes, uint32_t *nwidths, bool8 *endspace,
+                              uint32_t *spacenum, uint32_t ws_col, uint32_t welcome_width)
 {
     char chr[WR_UTF8_CHR_SIZE];
-    uint32 c_bytes = 0;
-    uint32 c_widths = 0;
-    uint32 tmp_nbytes = *nbytes;
-    uint32 tmp_nwidths = *nwidths;
-    uint32 tmp_spacenum = *spacenum;
+    uint32_t c_bytes = 0;
+    uint32_t c_widths = 0;
+    uint32_t tmp_nbytes = *nbytes;
+    uint32_t tmp_nwidths = *nwidths;
+    uint32_t tmp_spacenum = *spacenum;
 
     if (tmp_nbytes == 0) {
         return;
@@ -537,23 +537,23 @@ void wr_cmd_handle_backspace(char *cmd_buf, uint32 *nbytes, uint32 *nwidths, boo
     *spacenum = tmp_spacenum;
 }
 
-void wr_cmd_handle_common_key(int32 input_key_char, char *cmd_buf, uint32 *nbytes, uint32 *nwidths, bool8 *endspace,
-                               uint32 *spacenum, uint32 ws_col, uint32 welcome_width)
+void wr_cmd_handle_common_key(int32_t input_key_char, char *cmd_buf, uint32_t *nbytes, uint32_t *nwidths, bool8 *endspace,
+                               uint32_t *spacenum, uint32_t ws_col, uint32_t welcome_width)
 {
-    int32 key_char = input_key_char;
+    int32_t key_char = input_key_char;
     char chr[WR_UTF8_CHR_SIZE];
-    uint32 c_bytes = 0;
-    uint32 c_widths = 0;
-    uint32 tmp_nbytes = *nbytes;
-    uint32 tmp_nwidths = *nwidths;
-    uint32 tmp_spacenum = *spacenum;
+    uint32_t c_bytes = 0;
+    uint32_t c_widths = 0;
+    uint32_t tmp_nbytes = *nbytes;
+    uint32_t tmp_nwidths = *nwidths;
+    uint32_t tmp_spacenum = *spacenum;
 
     (void)wr_utf8_chr_bytes((uint8)key_char, &c_bytes);
     if (tmp_nbytes + c_bytes > MAX_INPUT_LEN) {
         return;
     }
     (void)memset_s(chr, WR_UTF8_CHR_SIZE, key_char, 1);
-    for (uint32 i = 1; i < c_bytes; i++) {
+    for (uint32_t i = 1; i < c_bytes; i++) {
         key_char = getchar();
         (void)memset_s(chr + i, WR_UTF8_CHR_SIZE - i, key_char, 1);
     }
@@ -587,15 +587,15 @@ void wr_cmd_handle_common_key(int32 input_key_char, char *cmd_buf, uint32 *nbyte
     *spacenum = tmp_spacenum;
 }
 
-bool8 wr_cmd_fgets(int *hist_count, int *list_num, uint32 welcome_width, char *cmd_buf, uint32 max_len)
+bool8 wr_cmd_fgets(int *hist_count, int *list_num, uint32_t welcome_width, char *cmd_buf, uint32_t max_len)
 {
-    int32 key_char = 0;
-    int32 direction_key = 0;
-    uint32 nbytes = 0;
-    uint32 nwidths = 0;
-    uint32 spacenum = 0; // Record the number of spaces filled at the end of the line.
+    int32_t key_char = 0;
+    int32_t direction_key = 0;
+    uint32_t nbytes = 0;
+    uint32_t nwidths = 0;
+    uint32_t spacenum = 0; // Record the number of spaces filled at the end of the line.
     bool8 endspace[MAX_CMD_LEN] = {0}; // Record the line number with space at the end of the line.
-    uint32 ws_col = 0;
+    uint32_t ws_col = 0;
 
 #ifndef WIN32
     struct termios oldt;
@@ -652,10 +652,10 @@ bool8 wr_cmd_fgets(int *hist_count, int *list_num, uint32 welcome_width, char *c
     return CM_FALSE;
 }
 
-uint32 wr_cmd_print_welcome()
+uint32_t wr_cmd_print_welcome()
 {
     bool8 isConnected = wr_get_connection_opt_status();
-        uint32 num = printf("wrcmd%s%s%s%s> ", isConnected ? "@connected" : "",
+        uint32_t num = printf("wrcmd%s%s%s%s> ", isConnected ? "@connected" : "",
         strcmp(g_cur_path, "") == CM_SUCCESS ? "" : "(",
         strcmp(g_cur_path, "") == CM_SUCCESS ? "" : g_cur_path,
         strcmp(g_cur_path, "") == CM_SUCCESS ? "" : ")");
@@ -684,7 +684,7 @@ bool8 wr_exe_interactive_cmd(int argc, char **args)
     return CM_TRUE;
 }
 
-int wr_cmd_parse_args(char *cmd_buf, char **args, uint32 max_arg_num)
+int wr_cmd_parse_args(char *cmd_buf, char **args, uint32_t max_arg_num)
 {
     char *tmpArg;
     char *saved = NULL;
@@ -707,19 +707,19 @@ void cmd_print_interactive_help(char *prog_name, wr_help_type help_type)
         return;
     }
 
-    for (uint32 i = 0; i < sizeof(g_wr_interactive_cmd) / sizeof(g_wr_interactive_cmd[0]); ++i) {
+    for (uint32_t i = 0; i < sizeof(g_wr_interactive_cmd) / sizeof(g_wr_interactive_cmd[0]); ++i) {
         g_wr_interactive_cmd[i].help(prog_name, help_type);
     }
 }
 
 void wr_cmd_run_interactively()
 {
-    uint32 welcome_width = 0;
+    uint32_t welcome_width = 0;
     int hist_count = 0;
     int list_num = 0;
     char *args[WR_MAX_ARG_NUM] = {0};
     int argc;
-    uint32 cmd_idx;
+    uint32_t cmd_idx;
     bool8 go_ahead;
     bool8 exit_cmd;
     setlocale(LC_CTYPE, "");

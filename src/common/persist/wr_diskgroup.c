@@ -50,7 +50,7 @@ extern "C" {
 #define WR_FP_FREE (0)
 #define WR_FP_INUSE (1)
 typedef struct st_vglock_fp {
-    uint32 state;
+    uint32_t state;
     char file_name[WR_MAX_FILE_LEN];
     FILE *fp;  // each process has itself fp
 } vglock_fp_t;
@@ -62,10 +62,10 @@ wr_vg_info_t *g_vgs_info = NULL;
 
 bool32 g_is_wr_server = WR_FALSE;
 static wr_rdwr_type_e g_is_wr_readwrite = WR_STATUS_NORMAL;
-static uint32 g_master_instance_id = WR_INVALID_ID32;
+static uint32_t g_master_instance_id = WR_INVALID_ID32;
 static const char *const g_wr_lock_vg_file = "wr_vg.lck";
-static int32 g_wr_lock_vg_fd = CM_INVALID_INT32;
-static uint32 g_wr_recover_thread_id = 0;
+static int32_t g_wr_lock_vg_fd = CM_INVALID_INT32;
+static uint32_t g_wr_recover_thread_id = 0;
 
 // CAUTION: wr_admin manager command just like wr_create_vg,cannot call it,
 
@@ -92,12 +92,12 @@ bool32 wr_is_readonly(void)
     return g_is_wr_readwrite == WR_STATUS_READONLY;
 }
 
-uint32 wr_get_master_id()
+uint32_t wr_get_master_id()
 {
     return g_master_instance_id;
 }
 
-void wr_set_master_id(uint32 id)
+void wr_set_master_id(uint32_t id)
 {
     g_master_instance_id = id;
     LOG_RUN_INF("set master id is %u.", id);
@@ -108,22 +108,22 @@ void wr_set_server_flag(void)
     g_is_wr_server = WR_TRUE;
 }
 
-int32 wr_get_server_status_flag(void)
+int32_t wr_get_server_status_flag(void)
 {
-    return (int32)g_is_wr_readwrite;
+    return (int32_t)g_is_wr_readwrite;
 }
 
-void wr_set_server_status_flag(int32 wr_status)
+void wr_set_server_status_flag(int32_t wr_status)
 {
     g_is_wr_readwrite = wr_status;
 }
 
-void wr_set_recover_thread_id(uint32 thread_id)
+void wr_set_recover_thread_id(uint32_t thread_id)
 {
     g_wr_recover_thread_id = thread_id;
 }
 
-uint32 wr_get_recover_thread_id(void)
+uint32_t wr_get_recover_thread_id(void)
 {
     return g_wr_recover_thread_id;
 }
@@ -155,7 +155,7 @@ wr_vg_info_item_t *wr_find_vg_item(const char *vg_name)
     return NULL;
 }
 
-wr_vg_info_item_t *wr_find_vg_item_by_id(uint32 vg_id)
+wr_vg_info_item_t *wr_find_vg_item_by_id(uint32_t vg_id)
 {
     if (vg_id > g_vgs_info->group_num) {
         return NULL;
@@ -197,12 +197,12 @@ status_t wr_check_entry_path(char *entry_path1, char *entry_path2, bool32 *resul
     return CM_SUCCESS;
 }
 
-status_t wr_check_dup_vg(wr_vg_info_t *config, uint32 vg_no, bool32 *result)
+status_t wr_check_dup_vg(wr_vg_info_t *config, uint32_t vg_no, bool32 *result)
 {
     char *last_vg_name = config->volume_group[vg_no - 1].vg_name;
     char *last_entry_path = config->volume_group[vg_no - 1].entry_path;
 
-    for (uint32 i = 0; i < vg_no - 1; i++) {
+    for (uint32_t i = 0; i < vg_no - 1; i++) {
         if (cm_str_equal_ins(last_vg_name, config->volume_group[i].vg_name)) {
             *result = CM_TRUE;
             return CM_SUCCESS;
@@ -216,7 +216,7 @@ status_t wr_check_dup_vg(wr_vg_info_t *config, uint32 vg_no, bool32 *result)
     return CM_SUCCESS;
 }
 
-status_t wr_load_vg_ctrl_part(wr_vg_info_item_t *vg_item, int64 offset, void *buf, int32 size, bool32 *remote)
+status_t wr_load_vg_ctrl_part(wr_vg_info_item_t *vg_item, int64_t offset, void *buf, int32_t size, bool32 *remote)
 {
 
     return CM_SUCCESS;
@@ -244,7 +244,7 @@ void wr_unlock_vg_mem(wr_vg_info_item_t *vg_item)
 
 static void wr_free_vglock_fp(const char *lock_file, FILE *fp)
 {
-    int32 i;
+    int32_t i;
     for (i = 0; i < WR_MAX_OPEN_VG; i++) {
         if (g_fp_list[i].state == WR_FP_FREE) {
             continue;
@@ -262,8 +262,8 @@ static void wr_free_vglock_fp(const char *lock_file, FILE *fp)
 
 static FILE *wr_get_vglock_fp(const char *lock_file, bool32 need_new)
 {
-    int32 i;
-    int32 ifree = -1;
+    int32_t i;
+    int32_t ifree = -1;
     for (i = 0; i < WR_MAX_OPEN_VG; i++) {
         if (g_fp_list[i].state == WR_FP_FREE) {
             ifree = (ifree == -1) ? i : ifree;
@@ -282,8 +282,8 @@ static FILE *wr_get_vglock_fp(const char *lock_file, bool32 need_new)
         return NULL;
     }
 
-    uint32 len = (uint32)strlen(lock_file);
-    int32 ret = memcpy_sp(g_fp_list[ifree].file_name, WR_MAX_FILE_LEN, lock_file, len);
+    uint32_t len = (uint32_t)strlen(lock_file);
+    int32_t ret = memcpy_sp(g_fp_list[ifree].file_name, WR_MAX_FILE_LEN, lock_file, len);
     WR_SECUREC_RETURN_IF_ERROR(ret, NULL);
     g_fp_list[ifree].file_name[len] = '\0';
     g_fp_list[ifree].fp = fopen(lock_file, "w");
@@ -307,13 +307,13 @@ static status_t wr_pre_lockfile_name(const char *entry_path, char *lock_file, wr
     char *home = inst_cfg->params.disk_lock_file_path;
     char superblock[WR_MAX_FILE_LEN];
     text_t pname, sub;
-    pname.len = (uint32)strlen(entry_path);
+    pname.len = (uint32_t)strlen(entry_path);
     pname.str = (char *)entry_path;
     if (!cm_fetch_rtext(&pname, '/', '\0', &sub)) {
         pname = sub;
     }
 
-    int32 iret_snprintf;
+    int32_t iret_snprintf;
     if (pname.len == 0) {
         iret_snprintf = snprintf_s(lock_file, WR_MAX_FILE_LEN, WR_MAX_FILE_LEN - 1, "%s/%s", home, WR_SIMUFILE_NAME);
         WR_SECUREC_SS_RETURN_IF_ERROR(iret_snprintf, CM_ERROR);
@@ -484,7 +484,7 @@ status_t wr_lock_share_disk_vg(const char *entry_path, wr_config_t *inst_cfg)
 status_t wr_lock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg)
 {
     LOG_DEBUG_INF("Lock vg storage, lock vg:%s.", entry_path);
-    int32 wr_mode = wr_storage_mode(inst_cfg);
+    int32_t wr_mode = wr_storage_mode(inst_cfg);
     if (wr_mode == WR_MODE_DISK) {
         char lock_file[WR_MAX_FILE_LEN];
         if (wr_pre_lockfile_name(entry_path, lock_file, inst_cfg) != CM_SUCCESS) {
@@ -546,7 +546,7 @@ status_t wr_lock_vg_storage_w(wr_vg_info_item_t *vg_item, const char *entry_path
     return CM_SUCCESS;
 }
 
-status_t wr_unlock_vg_raid(wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id)
+status_t wr_unlock_vg_raid(wr_vg_info_item_t *vg_item, const char *entry_path, int64_t inst_id)
 {
     dlock_t lock;
     status_t status = cm_alloc_dlock(&lock, WR_CTRL_VG_LOCK_OFFSET, inst_id);
@@ -569,7 +569,7 @@ status_t wr_unlock_vg_raid(wr_vg_info_item_t *vg_item, const char *entry_path, i
     return CM_SUCCESS;
 }
 
-status_t wr_unlock_vg_share_disk(wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id)
+status_t wr_unlock_vg_share_disk(wr_vg_info_item_t *vg_item, const char *entry_path, int64_t inst_id)
 {
     unsigned int lock_id;
     status_t status;
@@ -601,7 +601,7 @@ status_t wr_unlock_vg_share_disk(wr_vg_info_item_t *vg_item, const char *entry_p
     return CM_SUCCESS;
 }
 
-status_t wr_unlock_vg(int32 wr_mode, wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id)
+status_t wr_unlock_vg(int32_t wr_mode, wr_vg_info_item_t *vg_item, const char *entry_path, int64_t inst_id)
 {
     if (wr_mode == WR_MODE_SHARE_DISK) {
         return wr_unlock_vg_share_disk(vg_item, entry_path, inst_id);
@@ -613,7 +613,7 @@ status_t wr_unlock_vg(int32 wr_mode, wr_vg_info_item_t *vg_item, const char *ent
 status_t wr_unlock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg)
 {
     LOG_DEBUG_INF("Unlock vg storage, lock vg:%s.", entry_path);
-    int32 wr_mode = wr_storage_mode(inst_cfg);
+    int32_t wr_mode = wr_storage_mode(inst_cfg);
     if (wr_mode == WR_MODE_DISK) {
         char lock_file[WR_MAX_FILE_LEN];
         if (wr_pre_lockfile_name(entry_path, lock_file, inst_cfg) != CM_SUCCESS) {
@@ -651,7 +651,7 @@ status_t wr_unlock_vg_storage(wr_vg_info_item_t *vg_item, const char *entry_path
 }
 
 status_t wr_check_lock_remain_share_disk(
-    wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id, bool32 *is_remain)
+    wr_vg_info_item_t *vg_item, const char *entry_path, int64_t inst_id, bool32 *is_remain)
 {
     unsigned int lock_id;
     *is_remain = CM_TRUE;
@@ -668,9 +668,9 @@ status_t wr_check_lock_remain_share_disk(
 }
 
 status_t wr_check_lock_remain_cluster_raid(
-    wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id, bool32 *is_remain)
+    wr_vg_info_item_t *vg_item, const char *entry_path, int64_t inst_id, bool32 *is_remain)
 {
-    int32 fd = 0;
+    int32_t fd = 0;
     dlock_t lock;
     *is_remain = CM_TRUE;
     status_t status = cm_alloc_dlock(&lock, WR_CTRL_VG_LOCK_OFFSET, inst_id);
@@ -693,7 +693,7 @@ status_t wr_check_lock_remain_cluster_raid(
     return CM_SUCCESS;
 }
 status_t wr_check_lock_remain_inner(
-    int32 wr_mode, wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id, bool32 *is_remain)
+    int32_t wr_mode, wr_vg_info_item_t *vg_item, const char *entry_path, int64_t inst_id, bool32 *is_remain)
 {
     if (wr_mode == WR_MODE_SHARE_DISK) {
         return wr_check_lock_remain_share_disk(vg_item, entry_path, inst_id, is_remain);
@@ -704,7 +704,7 @@ status_t wr_check_lock_remain_inner(
     return CM_ERROR;
 }
 
-status_t wr_write_ctrl_to_disk(wr_vg_info_item_t *vg_item, int64 offset, void *buf, uint32 size)
+status_t wr_write_ctrl_to_disk(wr_vg_info_item_t *vg_item, int64_t offset, void *buf, uint32_t size)
 {
     CM_ASSERT(vg_item != NULL);
     CM_ASSERT(buf != NULL);
@@ -741,16 +741,16 @@ status_t wr_update_volume_ctrl(wr_vg_info_item_t *vg_item)
     vg_item->wr_ctrl->volume.version++;
     vg_item->wr_ctrl->volume.checksum = wr_get_checksum(&vg_item->wr_ctrl->volume, WR_VOLUME_CTRL_SIZE);
     status = wr_write_ctrl_to_disk(
-        vg_item, (int64)WR_CTRL_VOLUME_OFFSET, &vg_item->wr_ctrl->volume, WR_VOLUME_CTRL_SIZE);
+        vg_item, (int64_t)WR_CTRL_VOLUME_OFFSET, &vg_item->wr_ctrl->volume, WR_VOLUME_CTRL_SIZE);
     if (status == CM_SUCCESS) {
         // write to backup area
         status = wr_write_ctrl_to_disk(
-            vg_item, (int64)WR_CTRL_BAK_VOLUME_OFFSET, &vg_item->wr_ctrl->volume, WR_VOLUME_CTRL_SIZE);
+            vg_item, (int64_t)WR_CTRL_BAK_VOLUME_OFFSET, &vg_item->wr_ctrl->volume, WR_VOLUME_CTRL_SIZE);
     }
     return status;
 }
 
-status_t wr_update_redo_ctrl(wr_vg_info_item_t *vg_item, uint32 index, uint64 offset, uint64 lsn)
+status_t wr_update_redo_ctrl(wr_vg_info_item_t *vg_item, uint32_t index, uint64 offset, uint64 lsn)
 {
     status_t status;
     wr_redo_ctrl_t *redo_ctrl = &vg_item->wr_ctrl->redo_ctrl;
@@ -759,15 +759,15 @@ status_t wr_update_redo_ctrl(wr_vg_info_item_t *vg_item, uint32 index, uint64 of
     redo_ctrl->lsn = lsn;
     redo_ctrl->version++;
     redo_ctrl->checksum = wr_get_checksum(redo_ctrl, WR_DISK_UNIT_SIZE);
-    status = wr_write_ctrl_to_disk(vg_item, (int64)WR_CTRL_REDO_OFFSET, redo_ctrl, WR_DISK_UNIT_SIZE);
+    status = wr_write_ctrl_to_disk(vg_item, (int64_t)WR_CTRL_REDO_OFFSET, redo_ctrl, WR_DISK_UNIT_SIZE);
     if (status == CM_SUCCESS) {
         // write to backup area
-        status = wr_write_ctrl_to_disk(vg_item, (int64)WR_CTRL_BAK_REDO_OFFSET, redo_ctrl, WR_DISK_UNIT_SIZE);
+        status = wr_write_ctrl_to_disk(vg_item, (int64_t)WR_CTRL_BAK_REDO_OFFSET, redo_ctrl, WR_DISK_UNIT_SIZE);
     }
     return status;
 }
 
-status_t wr_update_volume_id_info(wr_vg_info_item_t *vg_item, uint32 id)
+status_t wr_update_volume_id_info(wr_vg_info_item_t *vg_item, uint32_t id)
 {
     WR_RETURN_IF_ERROR(wr_update_core_ctrl_disk(vg_item));
     WR_RETURN_IF_ERROR(wr_update_volume_ctrl(vg_item) != CM_SUCCESS);
@@ -775,7 +775,7 @@ status_t wr_update_volume_id_info(wr_vg_info_item_t *vg_item, uint32 id)
     uint64 attr_offset = id * sizeof(wr_volume_attr_t);
     char *align_buf =
         (char *)vg_item->wr_ctrl->core.volume_attrs + (attr_offset / WR_DISK_UNIT_SIZE) * WR_DISK_UNIT_SIZE;
-    int64 offset = align_buf - (char *)vg_item->wr_ctrl;
+    int64_t offset = align_buf - (char *)vg_item->wr_ctrl;
     if (wr_write_ctrl_to_disk(vg_item, offset, align_buf, WR_DISK_UNIT_SIZE) != CM_SUCCESS) {
         return CM_ERROR;
     }
@@ -791,7 +791,7 @@ status_t wr_update_volume_id_info(wr_vg_info_item_t *vg_item, uint32 id)
 }
 
 status_t wr_write_volume_inst(
-    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64 offset, const void *buf, uint32 size)
+    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64_t offset, const void *buf, uint32_t size)
 {
     void *temp_buf = (void *)buf;
     CM_ASSERT(offset % WR_DISK_UNIT_SIZE == 0);
@@ -805,10 +805,10 @@ status_t wr_write_volume_inst(
         // some redo logs about free can not align. rp_redo_free_fs_block
         errno_t errcode = memcpy_s(align_buf, size, buf, size);
         securec_check_ret(errcode);
-        return wr_write_volume(volume, offset, align_buf, (int32)size);
+        return wr_write_volume(volume, offset, align_buf, (int32_t)size);
     }
     CM_ASSERT(((uint64)temp_buf) % WR_DISK_UNIT_SIZE == 0);
-    return wr_write_volume(volume, offset, temp_buf, (int32)size);
+    return wr_write_volume(volume, offset, temp_buf, (int32_t)size);
 }
 
 uint32_t wr_find_free_volume_id(const wr_vg_info_item_t *vg_item)
@@ -822,7 +822,7 @@ uint32_t wr_find_free_volume_id(const wr_vg_info_item_t *vg_item)
 }
 
 status_t wr_gen_volume_head(
-    wr_volume_header_t *vol_head, wr_vg_info_item_t *vg_item, const char *volume_name, uint32 id)
+    wr_volume_header_t *vol_head, wr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id)
 {
     vol_head->vol_type.id = id;
     errno_t errcode = strcpy_s(vol_head->vol_type.entry_volume_name, WR_MAX_VOLUME_PATH_LEN, volume_name);
@@ -831,13 +831,13 @@ status_t wr_gen_volume_head(
     vol_head->valid_flag = WR_CTRL_VALID_FLAG;
     errcode = strcpy_s(vol_head->vg_name, WR_MAX_NAME_LEN, vg_item->vg_name);
     WR_SECUREC_SS_RETURN_IF_ERROR(errcode, CM_ERROR);
-    wr_set_software_version((wr_vg_header_t *)vol_head, (uint32)WR_SOFTWARE_VERSION);
+    wr_set_software_version((wr_vg_header_t *)vol_head, (uint32_t)WR_SOFTWARE_VERSION);
     (void)cm_gettimeofday(&vol_head->create_time);
     vol_head->checksum = wr_get_checksum((char *)vol_head, WR_VG_DATA_SIZE);
     return CM_SUCCESS;
 }
 
-status_t wr_cmp_volume_head(wr_vg_info_item_t *vg_item, const char *volume_name, uint32 id)
+status_t wr_cmp_volume_head(wr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id)
 {
 #ifndef WIN32
     char buf[WR_ALIGN_SIZE] __attribute__((__aligned__(WR_DISK_UNIT_SIZE)));
@@ -847,7 +847,7 @@ status_t wr_cmp_volume_head(wr_vg_info_item_t *vg_item, const char *volume_name,
     status_t status = CM_ERROR;
     wr_volume_header_t *vol_cmp_head = (wr_volume_header_t *)buf;
     do {
-        WR_BREAK_IF_ERROR(wr_read_volume(&vg_item->volume_handle[id], 0, vol_cmp_head, (int32)WR_ALIGN_SIZE));
+        WR_BREAK_IF_ERROR(wr_read_volume(&vg_item->volume_handle[id], 0, vol_cmp_head, (int32_t)WR_ALIGN_SIZE));
         if (vol_cmp_head->valid_flag == WR_CTRL_VALID_FLAG) {
             // cannot add a exists volume
             WR_THROW_ERROR(
@@ -860,7 +860,7 @@ status_t wr_cmp_volume_head(wr_vg_info_item_t *vg_item, const char *volume_name,
 }
 
 status_t wr_add_volume_vg_ctrl(
-    wr_ctrl_t *vg_ctrl, uint32 id, uint64 vol_size, const char *volume_name, volume_slot_e volume_flag)
+    wr_ctrl_t *vg_ctrl, uint32_t id, uint64 vol_size, const char *volume_name, volume_slot_e volume_flag)
 {
     return CM_SUCCESS;
 }
@@ -894,13 +894,13 @@ uint64 wr_get_vg_latch_shm_offset(wr_vg_info_item_t *vg_item)
 }
 
 // NOTE:use in server.
-status_t wr_check_volume(wr_vg_info_item_t *vg_item, uint32 volumeid)
+status_t wr_check_volume(wr_vg_info_item_t *vg_item, uint32_t volumeid)
 {
     return CM_SUCCESS;
 }
 
 // first check volume is valid.
-status_t wr_check_write_volume(wr_vg_info_item_t *vg_item, uint32 volumeid, int64 offset, void *buf, uint32 size)
+status_t wr_check_write_volume(wr_vg_info_item_t *vg_item, uint32_t volumeid, int64_t offset, void *buf, uint32_t size)
 {
     wr_volume_t *volume;
     WR_RETURN_IF_ERROR(wr_check_volume(vg_item, volumeid));
@@ -910,7 +910,7 @@ status_t wr_check_write_volume(wr_vg_info_item_t *vg_item, uint32 volumeid, int6
 
 // first check volume is valid.
 status_t wr_check_read_volume(
-    wr_vg_info_item_t *vg_item, uint32 volumeid, int64 offset, void *buf, int32 size, bool32 *remote)
+    wr_vg_info_item_t *vg_item, uint32_t volumeid, int64_t offset, void *buf, int32_t size, bool32 *remote)
 {
     wr_volume_t *volume;
     WR_RETURN_IF_ERROR(wr_check_volume(vg_item, volumeid));
@@ -927,19 +927,19 @@ void regist_remote_read_proc(wr_remote_read_proc_t proc)
 
 static inline bool32 wr_need_load_remote(int size)
 {
-    return ((remote_read_proc != NULL) && (!wr_need_exec_local()) && (size <= (int32)WR_LOADDISK_BUFFER_SIZE));
+    return ((remote_read_proc != NULL) && (!wr_need_exec_local()) && (size <= (int32_t)WR_LOADDISK_BUFFER_SIZE));
 }
 
 bool32 wr_need_exec_local(void)
 {
     wr_config_t *cfg = wr_get_inst_cfg();
-    uint32 master_id = wr_get_master_id();
-    uint32 curr_id = (uint32)(cfg->params.inst_id);
+    uint32_t master_id = wr_get_master_id();
+    uint32_t curr_id = (uint32_t)(cfg->params.inst_id);
     return ((curr_id == master_id));
 }
 
 status_t wr_read_volume_inst(
-    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64 offset, void *buf, int32 size, bool32 *remote_chksum)
+    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64_t offset, void *buf, int32_t size, bool32 *remote_chksum)
 {
     status_t status = CM_ERROR;
     CM_ASSERT(offset % WR_DISK_UNIT_SIZE == 0);
@@ -947,7 +947,7 @@ status_t wr_read_volume_inst(
     CM_ASSERT(((uint64)buf) % WR_DISK_UNIT_SIZE == 0);
     while (get_instance_status_proc != NULL && get_instance_status_proc() != WR_STATUS_RECOVERY &&
            wr_need_load_remote(size) == CM_TRUE && status != CM_SUCCESS) {
-        if (size == (int32)sizeof(wr_ctrl_t)) {
+        if (size == (int32_t)sizeof(wr_ctrl_t)) {
             LOG_RUN_INF("Try to load wrctrl from remote.");
         }
         status = remote_read_proc(vg_item->vg_name, volume, offset, buf, size);
@@ -972,9 +972,9 @@ status_t wr_read_volume_inst(
     }
 
     if (wr_is_server()) {
-        uint32 recover_thread_id = wr_get_recover_thread_id();
-        uint32 curr_thread_id = wr_get_current_thread_id();
-        uint32 recover_status = get_instance_status_proc();
+        uint32_t recover_thread_id = wr_get_recover_thread_id();
+        uint32_t curr_thread_id = wr_get_current_thread_id();
+        uint32_t recover_status = get_instance_status_proc();
         if (recover_status != WR_STATUS_OPEN && recover_thread_id != curr_thread_id &&
             vg_item->status == WR_VG_STATUS_OPEN) {
             WR_THROW_ERROR(ERR_WR_RECOVER_CAUSE_BREAK);
@@ -993,7 +993,7 @@ status_t wr_read_volume_inst(
     return CM_SUCCESS;
 }
 
-status_t wr_read_volume_4standby(const char *vg_name, uint32 volume_id, int64 offset, void *buf, uint32 size)
+status_t wr_read_volume_4standby(const char *vg_name, uint32_t volume_id, int64_t offset, void *buf, uint32_t size)
 {
     wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
     if (vg_item == NULL) {
@@ -1022,7 +1022,7 @@ status_t wr_read_volume_4standby(const char *vg_name, uint32 volume_id, int64 of
         return CM_ERROR;
     }
 
-    if (wr_read_volume(volume, offset, buf, (int32)size) != CM_SUCCESS) {
+    if (wr_read_volume(volume, offset, buf, (int32_t)size) != CM_SUCCESS) {
         LOG_RUN_ERR("Read volume for standby failed, failed to load disk(%s) data.", volume->name_p);
         return CM_ERROR;
     }

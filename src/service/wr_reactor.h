@@ -61,12 +61,12 @@ typedef enum en_reactor_status {
 } reactor_status_t;
 
 typedef struct st_reactor {
-    uint32 id;
+    uint32_t id;
     thread_t iothread;
     int epollfd;
     atomic32_t session_count;
     reactor_status_t status;
-    uint32 workthread_count;
+    uint32_t workthread_count;
     cm_event_t idle_evnt;
     thread_lock_t lock;
     cm_thread_pool_t workthread_pool;
@@ -74,7 +74,7 @@ typedef struct st_reactor {
 } reactor_t;
 
 typedef struct st_reactors {
-    uint32 reactor_count;
+    uint32_t reactor_count;
     atomic_t roudroubin;
     reactor_t *reactor_arr;
 } reactors_t;

@@ -141,7 +141,7 @@ wr_log_def_t g_wr_instance_log[] = {
     {CM_LOG_BLACKBOX, "blackbox/wrinstance.blog"},
 };
 
-uint32 g_wr_warn_id[] = {
+uint32_t g_wr_warn_id[] = {
     WARN_WR_SPACEUSAGE_ID,
 };
 
@@ -165,18 +165,18 @@ wr_log_def_t *wr_get_cmd_log_def()
 {
     return g_wr_cmd_log;
 }
-uint32 wr_get_instance_log_def_count()
+uint32_t wr_get_instance_log_def_count()
 {
     return sizeof(g_wr_instance_log) / sizeof(wr_log_def_t);
 }
-uint32 wr_get_cmd_log_def_count()
+uint32_t wr_get_cmd_log_def_count()
 {
     return sizeof(g_wr_cmd_log) / sizeof(wr_log_def_t);
 }
 
 static status_t wr_init_log_file(log_param_t *log_param, wr_config_t *inst_cfg)
 {
-    int64 val_int64;
+    int64_t val_int64;
     uint16 val_uint16;
     char *value = NULL;
 
@@ -225,7 +225,7 @@ static status_t wr_init_log_home_ex(wr_config_t *inst_cfg, char *log_parm_value,
     bool32 verify_flag = CM_FALSE;
     // register error callback function
     char *value = cm_get_config_value(&inst_cfg->config, log_param_name);
-    uint32 val_len = (value == NULL) ? 0 : (uint32)strlen(value);
+    uint32_t val_len = (value == NULL) ? 0 : (uint32_t)strlen(value);
     if (val_len >= CM_MAX_LOG_HOME_LEN) {
         WR_THROW_ERROR(ERR_INIT_LOGGER, "%s value: %s is out of range.", log_param_name, log_parm_value);
         return CM_ERROR;
@@ -287,7 +287,7 @@ static status_t wr_load_log_compressed(wr_config_t *inst_cfg, log_param_t *log_p
 }
 static status_t wr_init_loggers_inner(wr_config_t *inst_cfg, log_param_t *log_param)
 {
-    uint32 val_uint32;
+    uint32_t val_uint32;
     char *value = NULL;
 
     value = cm_get_config_value(&inst_cfg->config, "_LOG_BACKUP_FILE_COUNT");
@@ -324,7 +324,7 @@ static status_t wr_init_loggers_inner(wr_config_t *inst_cfg, log_param_t *log_pa
     WR_RETURN_IF_ERROR(status);
 
     value = cm_get_config_value(&inst_cfg->config, "_LOG_LEVEL");
-    status = cm_str2uint32(value, (uint32 *)&log_param->log_level);
+    status = cm_str2uint32(value, (uint32_t *)&log_param->log_level);
     WR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_LEVEL"));
     if (log_param->log_level > MAX_LOG_LEVEL) {
         CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_LEVEL");
@@ -332,7 +332,7 @@ static status_t wr_init_loggers_inner(wr_config_t *inst_cfg, log_param_t *log_pa
     }
 
     value = cm_get_config_value(&inst_cfg->config, "_AUDIT_LEVEL");
-    if (cm_str2uint32(value, (uint32 *)&log_param->audit_level) != CM_SUCCESS) {
+    if (cm_str2uint32(value, (uint32_t *)&log_param->audit_level) != CM_SUCCESS) {
         CM_THROW_ERROR(ERR_INVALID_PARAM, "_AUDIT_LEVEL");
         return CM_ERROR;
     }
@@ -343,10 +343,10 @@ static status_t wr_init_loggers_inner(wr_config_t *inst_cfg, log_param_t *log_pa
     return wr_load_log_compressed(inst_cfg, log_param);
 }
 
-status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32 log_def_count, char *name)
+status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32_t log_def_count, char *name)
 {
     char file_name[CM_FULL_PATH_BUFFER_SIZE];
-    uint32 buffer_len = CM_FULL_PATH_BUFFER_SIZE;
+    uint32_t buffer_len = CM_FULL_PATH_BUFFER_SIZE;
     log_param_t *log_param = cm_log_param_instance();
     log_param->log_level = 0;
     char alarm_dir[CM_MAX_LOG_HOME_LEN];
@@ -362,7 +362,7 @@ status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32 lo
         return CM_ERROR;
     }
 
-    int32 ret;
+    int32_t ret;
     for (size_t i = 0; i < log_def_count; i++) {
         if (log_def[i].log_id == CM_LOG_ALARM) {
             ret = snprintf_s(file_name, buffer_len, (buffer_len - 1), "%s/%s", alarm_dir, log_def[i].log_filename);
@@ -378,7 +378,7 @@ status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32 lo
     }
     log_param->log_instance_startup = CM_TRUE;
     cm_init_error_handler(cm_set_log_error);
-    status_t status = cm_set_log_module_name(name, (int32)strlen(name));
+    status_t status = cm_set_log_module_name(name, (int32_t)strlen(name));
     WR_RETURN_IF_ERROR(status);
     errno_t rc = strcpy_sp(log_param->instance_name, CM_MAX_NAME_LEN, name);
     if (rc != EOK) {
@@ -393,7 +393,7 @@ status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32 lo
 static void sql_audit_init_assist(
     wr_session_t *session, status_t status, wr_cmd_type_e cmd_type, wr_audit_assist_t *assist)
 {
-    int32 ret, tz_hour, tz_min;
+    int32_t ret, tz_hour, tz_min;
     const char *err_msg = NULL;
     char *user_name = cm_sys_user_name();
     cs_get_remote_host(&session->pipe, assist->os_host);
@@ -414,10 +414,10 @@ static void sql_audit_init_assist(
     }
 
     (void)cm_date2str(
-        g_timer()->now, "yyyy-mm-dd hh24:mi:ss.ff3", assist->date + ret, CM_MAX_TIME_STRLEN - (uint32)ret);
+        g_timer()->now, "yyyy-mm-dd hh24:mi:ss.ff3", assist->date + ret, CM_MAX_TIME_STRLEN - (uint32_t)ret);
 
     // SESSIONID
-    assist->sid = (int32)session->id;
+    assist->sid = (int32_t)session->id;
     assist->session_id.str = assist->session_buf;
     cm_int2text(assist->sid, &assist->session_id);
     assist->session_id.str[assist->session_id.len] = '\0';
@@ -430,29 +430,29 @@ static void sql_audit_init_assist(
     }
     PRTS_RETVOID_IFERR(
         snprintf_s(assist->return_code_buf, CM_MAX_NUMBER_LEN, CM_MAX_NUMBER_LEN - 1, "WR-%05d", assist->code));
-    assist->return_code.len = (uint32)strlen(assist->return_code_buf);
+    assist->return_code.len = (uint32_t)strlen(assist->return_code_buf);
     assist->return_code.str[assist->return_code.len] = '\0';
 }
 
 static void sql_audit_create_message(
-    wr_audit_assist_t *assist, char *resource, char *action, char *log_msg, uint32 *log_msg_len)
+    wr_audit_assist_t *assist, char *resource, char *action, char *log_msg, uint32_t *log_msg_len)
 {
-    int32 ret = snprintf_s(log_msg, CM_T2S_LARGER_BUFFER_SIZE, CM_T2S_LARGER_BUFFER_SIZE - 1,
+    int32_t ret = snprintf_s(log_msg, CM_T2S_LARGER_BUFFER_SIZE, CM_T2S_LARGER_BUFFER_SIZE - 1,
         "SESSIONID:[%u] \"%s\" USER:[%u] \"%s\" HOST:[%u] \"%s\" "
         "RESOURCE:[%u] \"%s\" ACTION:[%u] \"%s\" RETURNCODE:[%u] \"%s\" ",
         assist->session_id.len, assist->session_id.str,     // SESSIONID
-        (uint32)strlen(assist->db_user), assist->db_user,   // USER
-        (uint32)strlen(assist->os_host), assist->os_host,   // HOST
-        (uint32)strlen(resource), resource,                 // RESOURCE
-        (uint32)strlen(action), action,                     // ACTION
+        (uint32_t)strlen(assist->db_user), assist->db_user,   // USER
+        (uint32_t)strlen(assist->os_host), assist->os_host,   // HOST
+        (uint32_t)strlen(resource), resource,                 // RESOURCE
+        (uint32_t)strlen(action), action,                     // ACTION
         assist->return_code.len, assist->return_code.str);  // RETURNCODE
-    if (SECUREC_UNLIKELY(ret == -1) || (uint32)(ret + 1) > CM_T2S_LARGER_BUFFER_SIZE) {
+    if (SECUREC_UNLIKELY(ret == -1) || (uint32_t)(ret + 1) > CM_T2S_LARGER_BUFFER_SIZE) {
         *log_msg_len = CM_T2S_LARGER_BUFFER_SIZE - 1;
         log_msg[CM_T2S_LARGER_BUFFER_SIZE - 1] = '\0';
         return;
     }
 
-    *log_msg_len = (uint32)ret + 1;
+    *log_msg_len = (uint32_t)ret + 1;
     log_msg[*log_msg_len - 1] = '\"';
     log_msg[*log_msg_len] = '\0';
 }
@@ -461,7 +461,7 @@ static void sql_audit_log(wr_session_t *session, status_t status, uint8 cmd_type
 {
     wr_audit_assist_t assist = {0};
     char *log_msg = cm_get_t2s_addr();
-    uint32 log_msg_len;
+    uint32_t log_msg_len;
 
     sql_audit_init_assist(session, status, cmd_type, &assist);
     sql_audit_create_message(&assist, session->audit_info.resource, session->audit_info.action, log_msg, &log_msg_len);
@@ -474,7 +474,7 @@ void sql_record_audit_log(void *sess, status_t status, uint8 cmd_type)
         return;
     }
     wr_session_t *session = (wr_session_t *)sess;
-    uint32 audit_level = cm_log_param_instance()->audit_level;
+    uint32_t audit_level = cm_log_param_instance()->audit_level;
     if ((audit_level & WR_AUDIT_MODIFY) == 0 && cmd_type >= WR_CMD_MODIFY_BEGIN && cmd_type < WR_CMD_MODIFY_END) {
         return;
     }

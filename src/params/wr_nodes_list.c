@@ -39,19 +39,19 @@ status_t wr_extract_nodes_list(char *nodes_list_str, wr_nodes_list_t *nodes_list
 {
     status_t status = cm_split_mes_urls(nodes_list->nodes, nodes_list->ports, nodes_list_str);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "WR_NODES_LIST format is wrong"));
-    int32 node_cnt = 0;
+    int32_t node_cnt = 0;
     for (int i = 0; i < WR_MAX_INSTANCES; i++) {
         if (nodes_list->ports[i] != 0) {
             nodes_list->inst_map |= ((uint64)1 << i);
             node_cnt++;
         }
     }
-    nodes_list->inst_cnt = (uint32)node_cnt;
+    nodes_list->inst_cnt = (uint32_t)node_cnt;
     LOG_RUN_INF("There are %d instances in incoming WR_NODES_LIST.", node_cnt);
     return CM_SUCCESS;
 }
 
-static status_t wr_alloc_and_extract_inst_addrs(char *nodes_list_str, uint32 *inst_cnt, mes_addr_t **inst_addrs)
+static status_t wr_alloc_and_extract_inst_addrs(char *nodes_list_str, uint32_t *inst_cnt, mes_addr_t **inst_addrs)
 {
     wr_nodes_list_t nodes_list;
     securec_check_ret(memset_sp(&nodes_list, sizeof(wr_nodes_list_t), 0, sizeof(wr_nodes_list_t)));
@@ -69,7 +69,7 @@ static status_t wr_alloc_and_extract_inst_addrs(char *nodes_list_str, uint32 *in
         return CM_ERROR;
     }
     mes_addr_t *inst_addr = &((*inst_addrs)[0]);
-    for (uint32 i = 0; i < WR_MAX_INSTANCES; ++i) {
+    for (uint32_t i = 0; i < WR_MAX_INSTANCES; ++i) {
         if (nodes_list.ports[i] != 0) {
             inst_addr->inst_id = i;
             err = strcpy_sp(inst_addr->ip, sizeof(inst_addr->ip), nodes_list.nodes[i]);
@@ -105,15 +105,15 @@ status_t wr_verify_nodes_list(void *lex, void *def)
 
 // addition or deletion of new instances is not allowed.
 // only replacement of old instances is allowed.
-static status_t check_nodes_list_validity(uint32 inst_cnt, const mes_addr_t *inst_addrs)
+static status_t check_nodes_list_validity(uint32_t inst_cnt, const mes_addr_t *inst_addrs)
 {
     if (inst_cnt != g_inst_cfg->params.nodes_list.inst_cnt) {
         WR_THROW_ERROR(
             ERR_WR_INVALID_PARAM, "instance_ids in WR_NODES_LIST are not allowed to be changed dynamically");
         return CM_ERROR;
     }
-    for (uint32 i = 0; i < inst_cnt; ++i) {
-        uint32 inst_id = inst_addrs[i].inst_id;
+    for (uint32_t i = 0; i < inst_cnt; ++i) {
+        uint32_t inst_id = inst_addrs[i].inst_id;
         if (inst_addrs[i].port == 0) {
             WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "IP ports in WR_NODES_LIST cannot be zero");
             return CM_ERROR;
@@ -131,10 +131,10 @@ static status_t check_nodes_list_validity(uint32 inst_cnt, const mes_addr_t *ins
     return CM_SUCCESS;
 }
 
-static status_t modify_ips_in_params(uint32 inst_cnt, const mes_addr_t *inst_addrs)
+static status_t modify_ips_in_params(uint32_t inst_cnt, const mes_addr_t *inst_addrs)
 {
-    for (uint32 i = 0; i < inst_cnt; ++i) {
-        uint32 inst_id = inst_addrs[i].inst_id;
+    for (uint32_t i = 0; i < inst_cnt; ++i) {
+        uint32_t inst_id = inst_addrs[i].inst_id;
         g_inst_cfg->params.nodes_list.ports[inst_id] = inst_addrs[i].port;
         if (strcmp(g_inst_cfg->params.nodes_list.nodes[inst_id], inst_addrs[i].ip) != 0) {
             securec_check_ret(strcpy_sp(g_inst_cfg->params.nodes_list.nodes[inst_id], CM_MAX_IP_LEN, inst_addrs[i].ip));
@@ -145,7 +145,7 @@ static status_t modify_ips_in_params(uint32 inst_cnt, const mes_addr_t *inst_add
 
 status_t wr_update_local_nodes_list(char *nodes_list_str)
 {
-    uint32 inst_cnt = 0;
+    uint32_t inst_cnt = 0;
     mes_addr_t *inst_addrs = NULL;
     CM_RETURN_IFERR(wr_alloc_and_extract_inst_addrs(nodes_list_str, &inst_cnt, &inst_addrs));
     CM_RETURN_IFERR(check_nodes_list_validity(inst_cnt, inst_addrs));

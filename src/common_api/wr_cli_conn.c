@@ -34,9 +34,9 @@ char g_wr_inst_path[CM_MAX_PATH_LEN] = {0};
 typedef struct st_wr_conn_info {
     // protect connections
     latch_t conn_latch;
-    uint32 conn_num;
+    uint32_t conn_num;
     bool32 isinit;
-    int32 timeout;  // - 1: never time out
+    int32_t timeout;  // - 1: never time out
 } wr_conn_info_t;
 static wr_conn_info_t g_wr_conn_info = {{0, 0, 0, 0, 0}, 0, CM_FALSE, 0};
 
@@ -92,7 +92,7 @@ status_t wr_try_conn(wr_conn_opt_t *options, wr_conn_t *conn, const char *addr)
         wr_free_packet_buffer(&conn->pack);
         status = wr_connect(addr, options, conn);
         WR_BREAK_IFERR2(status, LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client connet server failed."));
-        uint32 max_open_file = WR_MAX_OPEN_FILES;
+        uint32_t max_open_file = WR_MAX_OPEN_FILES;
         conn->proto_version = WR_PROTO_VERSION;
         status = wr_cli_handshake(conn, max_open_file);
         WR_BREAK_IFERR3(status, LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client handshake to server failed."),

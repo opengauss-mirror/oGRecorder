@@ -70,7 +70,7 @@ typedef struct st_wr_srv_args {
 } wr_srv_args_t;
 
 typedef struct st_wr_instance {
-    int32 lock_fd;
+    int32_t lock_fd;
     latch_t switch_latch;
     wr_config_t inst_cfg;
     wr_instance_status_e status;
@@ -83,7 +83,7 @@ typedef struct st_wr_instance {
     wr_cm_res cm_res;
     uint64 inst_work_status_map;  // one bit one inst, bit value is 1 means inst ok, 0 means inst not ok
     spinlock_t inst_work_lock;
-    int32 cluster_proto_vers[WR_MAX_INSTANCES];
+    int32_t cluster_proto_vers[WR_MAX_INSTANCES];
     bool8 is_maintain;
     bool8 is_cleaning;
     bool8 no_grab_lock;
@@ -114,9 +114,9 @@ void wr_free_log_ctrl();
 void wr_check_peer_by_inst(wr_instance_t *inst, uint64 inst_id);
 uint64 wr_get_inst_work_status(void);
 void wr_set_inst_work_status(uint64 cur_inst_map);
-status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try_lock, uint32 *master_id);
-void wr_recovery_when_primary(wr_session_t *session, wr_instance_t *inst, uint32 curr_id, bool32 grab_lock);
-status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32 *master_id);
+status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try_lock, uint32_t *master_id);
+void wr_recovery_when_primary(wr_session_t *session, wr_instance_t *inst, uint32_t curr_id, bool32 grab_lock);
+status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32_t *master_id);
 void wr_get_cm_lock_and_recover(thread_t *thread);
 void wr_delay_clean_proc(thread_t *thread);
 void wr_hashmap_dynamic_extend_and_redistribute_proc(thread_t *thread);

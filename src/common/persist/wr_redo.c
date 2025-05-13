@@ -34,7 +34,7 @@
 #include "wr_syn_meta.h"
 #include "wr_defs_print.h"
 
-status_t wr_reset_log_slot_head(uint32 vg_id, char *log_buf)
+status_t wr_reset_log_slot_head(uint32_t vg_id, char *log_buf)
 {
     CM_ASSERT(vg_id < WR_MAX_VOLUME_GROUP_NUM);
     wr_vg_info_item_t *first_vg_item = wr_get_first_vg_item();
@@ -52,12 +52,12 @@ status_t wr_reset_log_slot_head(uint32 vg_id, char *log_buf)
         first_vg_item->vg_name, vg_id, redo_start, WR_DISK_UNIT_SIZE);
     return status;
 }
-void wr_put_log(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_type_t type, void *data, uint32 size)
+void wr_put_log(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_type_t type, void *data, uint32_t size)
 {
     return;
 }
 
-status_t wr_write_redolog_to_disk(wr_vg_info_item_t *vg_item, uint32 volume_id, int64 offset, char *buf, uint32 size)
+status_t wr_write_redolog_to_disk(wr_vg_info_item_t *vg_item, uint32_t volume_id, int64 offset, char *buf, uint32_t size)
 {
     CM_ASSERT(vg_item != NULL);
     CM_ASSERT(buf != NULL);
@@ -78,12 +78,12 @@ status_t wr_write_redolog_to_disk(wr_vg_info_item_t *vg_item, uint32 volume_id, 
     return CM_SUCCESS;
 }
 
-status_t wr_flush_log_v0_inner(wr_vg_info_item_t *vg_item, char *log_buf, uint32 flush_size)
+status_t wr_flush_log_v0_inner(wr_vg_info_item_t *vg_item, char *log_buf, uint32_t flush_size)
 {
     wr_vg_info_item_t *first_vg_item = wr_get_first_vg_item();
     uint64 redo_start = wr_get_redo_log_v0_start(first_vg_item->wr_ctrl, vg_item->id);
     if (flush_size > WR_INSTANCE_LOG_SPLIT_SIZE) {
-        LOG_RUN_ERR("redo log size %u is bigger than %u", flush_size, (uint32)WR_INSTANCE_LOG_SPLIT_SIZE);
+        LOG_RUN_ERR("redo log size %u is bigger than %u", flush_size, (uint32_t)WR_INSTANCE_LOG_SPLIT_SIZE);
         return CM_ERROR;
     }
     status_t status = wr_write_redolog_to_disk(first_vg_item, 0, redo_start, log_buf, flush_size);
@@ -94,14 +94,14 @@ status_t wr_flush_log_v0_inner(wr_vg_info_item_t *vg_item, char *log_buf, uint32
     return status;
 }
 
-status_t wr_flush_log_inner(wr_vg_info_item_t *vg_item, char *log_buf, uint32 flush_size)
+status_t wr_flush_log_inner(wr_vg_info_item_t *vg_item, char *log_buf, uint32_t flush_size)
 {
     wr_ctrl_t *wr_ctrl = vg_item->wr_ctrl;
     wr_redo_ctrl_t *redo_ctrl = &wr_ctrl->redo_ctrl;
-    uint32 redo_index = redo_ctrl->redo_index;
+    uint32_t redo_index = redo_ctrl->redo_index;
     auid_t redo_au = redo_ctrl->redo_start_au[redo_index];
     uint64 redo_size = (uint64)redo_ctrl->redo_size[redo_index];
-    uint32 count = redo_ctrl->count;
+    uint32_t count = redo_ctrl->count;
     CM_ASSERT(flush_size < WR_VG_LOG_SPLIT_SIZE);
     uint64 log_start = wr_get_vg_au_size(wr_ctrl) * redo_au.au;
     uint64 offset = redo_ctrl->offset;
@@ -122,16 +122,16 @@ status_t wr_flush_log_inner(wr_vg_info_item_t *vg_item, char *log_buf, uint32 fl
         }
         uint64 log_start_next = wr_get_vg_au_size(wr_ctrl) * redo_au_next.au;
         LOG_DEBUG_INF("Begin to flush redo log, offset is %lld, size is %llu.", offset, flush_size_1);
-        status = wr_write_redolog_to_disk(vg_item, redo_au.volume, (int64)log_offset, log_buf, (uint32)flush_size_1);
+        status = wr_write_redolog_to_disk(vg_item, redo_au.volume, (int64)log_offset, log_buf, (uint32_t)flush_size_1);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to flush redo log, offset is %lld, size is %u.", log_offset, (uint32)flush_size_1);
+            LOG_RUN_ERR("Failed to flush redo log, offset is %lld, size is %u.", log_offset, (uint32_t)flush_size_1);
             return status;
         }
         LOG_DEBUG_INF("Begin to flush redo log, offset is %d, size is %llu.", 0, flush_size_2);
         status = wr_write_redolog_to_disk(
-            vg_item, redo_au_next.volume, (int64)log_start_next, log_buf + flush_size_1, (uint32)flush_size_2);
+            vg_item, redo_au_next.volume, (int64)log_start_next, log_buf + flush_size_1, (uint32_t)flush_size_2);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to flush redo log, offset is %d, size is %u.", 0, (uint32)flush_size_2);
+            LOG_RUN_ERR("Failed to flush redo log, offset is %d, size is %u.", 0, (uint32_t)flush_size_2);
             return status;
         }
         log_ctrl->offset = flush_size_2;
@@ -157,8 +157,8 @@ status_t wr_flush_log(wr_vg_info_item_t *vg_item, char *log_buf)
 {
     errno_t errcode = 0;
     wr_redo_batch_t *batch = (wr_redo_batch_t *)(log_buf);
-    uint32 data_size;
-    uint32 flush_size;
+    uint32_t data_size;
+    uint32_t flush_size;
     if (batch->size == sizeof(wr_redo_batch_t) || vg_item->status == WR_VG_STATUS_RECOVERY) {
         return CM_SUCCESS;
     }
@@ -170,7 +170,7 @@ status_t wr_flush_log(wr_vg_info_item_t *vg_item, char *log_buf)
     uint64 tail = (uint64)(flush_size - sizeof(wr_redo_batch_t));
     errcode = memcpy_s(log_buf + tail, sizeof(wr_redo_batch_t), batch, sizeof(wr_redo_batch_t));
     securec_check_ret(errcode);
-    uint32 software_version = wr_get_software_version(&vg_item->wr_ctrl->vg_info);
+    uint32_t software_version = wr_get_software_version(&vg_item->wr_ctrl->vg_info);
     LOG_DEBUG_INF("[REDO] Before flush log, batch size is %u, count is %d, flush size is %u.", batch->size,
         batch->count, flush_size);
     if (software_version < WR_SOFTWARE_VERSION_2) {
@@ -199,7 +199,7 @@ bool32 rp_check_block_addr(const wr_block_addr_his_t *addr_his, const void *bloc
     CM_ASSERT(addr_his != NULL);
     CM_ASSERT(block != NULL);
 
-    for (uint32 i = 0; i < addr_his->count; i++) {
+    for (uint32_t i = 0; i < addr_his->count; i++) {
         if (addr_his->addrs[i] == block) {
             return CM_TRUE;
         }
@@ -247,7 +247,7 @@ status_t rp_redo_rename_file(wr_session_t *session, wr_vg_info_item_t *vg_item, 
     }
 
     if (vg_item->status == WR_VG_STATUS_RECOVERY) {
-        int32 ret = snprintf_s(node->name, WR_MAX_NAME_LEN, strlen(data->name), "%s", data->name);
+        int32_t ret = snprintf_s(node->name, WR_MAX_NAME_LEN, strlen(data->name), "%s", data->name);
         WR_SECUREC_SS_RETURN_IF_ERROR(ret, CM_ERROR);
     }
 
@@ -288,7 +288,7 @@ status_t rb_redo_rename_file(wr_session_t *session, wr_vg_info_item_t *vg_item, 
         WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_FNODE_CHECK, "invalid node"));
     }
 
-    int32 ret = snprintf_s(node->name, WR_MAX_NAME_LEN, strlen(data->old_name), "%s", data->old_name);
+    int32_t ret = snprintf_s(node->name, WR_MAX_NAME_LEN, strlen(data->old_name), "%s", data->old_name);
     WR_SECUREC_SS_RETURN_IF_ERROR(ret, CM_ERROR);
     return CM_SUCCESS;
 }
@@ -334,13 +334,13 @@ status_t rp_redo_format_fs_block(wr_session_t *session, wr_vg_info_item_t *vg_it
 }
 
 void rb_redo_clean_resource(
-    wr_session_t *session, wr_vg_info_item_t *item, auid_t auid, ga_pool_id_e pool_id, uint32 first, uint32 count)
+    wr_session_t *session, wr_vg_info_item_t *item, auid_t auid, ga_pool_id_e pool_id, uint32_t first, uint32_t count)
 {
     wr_fs_block_header *block;
-    uint32 obj_id = first;
-    uint32 last = first;
+    uint32_t obj_id = first;
+    uint32_t last = first;
     CM_ASSERT(count > 0);
-    for (uint32 i = 0; i < count; i++) {
+    for (uint32_t i = 0; i < count; i++) {
         block = (wr_fs_block_header *)wr_buffer_get_meta_addr(pool_id, obj_id);
         CM_ASSERT(block != NULL);
         wr_unregister_buffer_cache(session, item, block->common.id);

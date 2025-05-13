@@ -70,10 +70,10 @@ char *wr_get_cmd_desc(wr_cmd_type_e cmd_type)
     return g_wr_cmd_desc[WR_CMD_TYPE_OFFSET(cmd_type)];
 }
 
-typedef status_t (*recv_func_t)(void *link, char *buf, uint32 size, int32 *recv_size);
-typedef status_t (*recv_timed_func_t)(void *link, char *buf, uint32 size, uint32 timeout);
-typedef status_t (*send_timed_func_t)(void *link, const char *buf, uint32 size, uint32 timeout);
-typedef status_t (*wait_func_t)(void *link, uint32 wait_for, int32 timeout, bool32 *ready);
+typedef status_t (*recv_func_t)(void *link, char *buf, uint32_t size, int32_t *recv_size);
+typedef status_t (*recv_timed_func_t)(void *link, char *buf, uint32_t size, uint32_t timeout);
+typedef status_t (*send_timed_func_t)(void *link, const char *buf, uint32_t size, uint32_t timeout);
+typedef status_t (*wait_func_t)(void *link, uint32_t wait_for, int32_t timeout, bool32 *ready);
 
 typedef struct st_vio {
     recv_func_t vio_recv;
@@ -144,13 +144,13 @@ status_t wr_put_text(wr_packet_t *pack, text_t *text)
 
 status_t wr_put_str_with_cutoff(wr_packet_t *pack, const char *str)
 {
-    uint32 size;
+    uint32_t size;
     char *addr = NULL;
     errno_t errcode = 0;
 
     CM_ASSERT(pack != NULL);
     CM_ASSERT(str != NULL);
-    size = (uint32)strlen(str);
+    size = (uint32_t)strlen(str);
     addr = WR_WRITE_ADDR(pack);
     if (size != 0) {
         // for such as err msg , len max is 2K, too long for wr packet, which is fixed len at present, so cut it off
@@ -192,23 +192,23 @@ status_t wr_write(cs_pipe_t *pipe, wr_packet_t *pack)
 /* before call cs_read_tcp_packet(), cs_tcp_wait() is called */
 static status_t wr_read_packet(cs_pipe_t *pipe, wr_packet_t *pack, bool32 cs_client)
 {
-    int32 remain_size, offset, recv_size;
+    int32_t remain_size, offset, recv_size;
     bool32 ready = CM_FALSE;
 
     offset = 0;
     status_t status;
     char *cs_mes = cs_client ? "read wait for server response" : "read wait for client request";
     for (;;) {
-        status = VIO_RECV(pipe, pack->buf + offset, (uint32)(pack->buf_size - offset), &recv_size);
+        status = VIO_RECV(pipe, pack->buf + offset, (uint32_t)(pack->buf_size - offset), &recv_size);
         WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_TCP_RECV, "uds", cm_get_sock_error()));
         offset += recv_size;
-        if (offset >= (int32)sizeof(wr_packet_head_t)) {
+        if (offset >= (int32_t)sizeof(wr_packet_head_t)) {
             break;
         }
         status = VIO_WAIT(pipe, CS_WAIT_FOR_READ, CM_NETWORK_IO_TIMEOUT, &ready);
         WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_TCP_TIMEOUT, cs_mes));
         if (!ready) {
-            WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_TCP_TIMEOUT_REMAIN, (uint32)(sizeof(uint32) - offset)));
+            WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_TCP_TIMEOUT_REMAIN, (uint32_t)(sizeof(uint32_t) - offset)));
         }
     }
 
@@ -219,7 +219,7 @@ static status_t wr_read_packet(cs_pipe_t *pipe, wr_packet_t *pack, bool32 cs_cli
         CM_ASSERT(0);
     }
 
-    remain_size = (int32)pack->head->size - offset;
+    remain_size = (int32_t)pack->head->size - offset;
     if (remain_size <= 0) {
         return CM_SUCCESS;
     }
@@ -232,7 +232,7 @@ static status_t wr_read_packet(cs_pipe_t *pipe, wr_packet_t *pack, bool32 cs_cli
        return CM_ERROR;
     }
 
-    status = VIO_RECV_TIMED(pipe, pack->buf + offset, (uint32)remain_size, CM_NETWORK_IO_TIMEOUT);
+    status = VIO_RECV_TIMED(pipe, pack->buf + offset, (uint32_t)remain_size, CM_NETWORK_IO_TIMEOUT);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_TCP_RECV, "Receive protocol failed."));
 
     return CM_SUCCESS;
@@ -263,7 +263,7 @@ static status_t wr_call_base(cs_pipe_t *pipe, wr_packet_t *req, wr_packet_t *ack
 
     if (!ready) {
         WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_SOCKET_TIMEOUT, pipe->socket_timeout / (int32)CM_TIME_THOUSAND_UN));
+            CM_ERROR, WR_THROW_ERROR(ERR_SOCKET_TIMEOUT, pipe->socket_timeout / (int32_t)CM_TIME_THOUSAND_UN));
     }
 
     return wr_read(pipe, ack, CM_TRUE);

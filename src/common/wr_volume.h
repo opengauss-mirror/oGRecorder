@@ -35,8 +35,8 @@ extern "C" {
 extern uint64 g_log_offset;
 status_t wr_open_volume(const char *name, const char *code, int flags, wr_volume_t *volume);
 void wr_close_volume(wr_volume_t *volume);
-status_t wr_read_volume(wr_volume_t *volume, int64 offset, void *buf, int32 size);
-status_t wr_write_volume(wr_volume_t *volume, int64 offset, const void *buf, int32 size);
+status_t wr_read_volume(wr_volume_t *volume, int64 offset, void *buf, int32_t size);
+status_t wr_write_volume(wr_volume_t *volume, int64 offset, const void *buf, int32_t size);
 uint64 wr_get_volume_size(wr_volume_t *volume);
 
 status_t wr_open_simple_volume(const char *name, int flags, wr_simple_volume_t *volume);
