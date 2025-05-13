@@ -53,9 +53,9 @@ extern "C" {
 
 static void wr_close_background_task(wr_instance_t *inst)
 {
-    uint32 bg_task_base_id = wr_get_uwression_startid() - (uint32)WR_BACKGROUND_TASK_NUM;
-    for (uint32 i = 0; i < WR_BACKGROUND_TASK_NUM; i++) {
-        uint32 bg_task_id = bg_task_base_id + i;
+    uint32_t bg_task_base_id = wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM;
+    for (uint32_t i = 0; i < WR_BACKGROUND_TASK_NUM; i++) {
+        uint32_t bg_task_id = bg_task_base_id + i;
         if (inst->threads[bg_task_id].id != 0) {
             cm_close_thread(&inst->threads[bg_task_id]);
         }
@@ -103,7 +103,7 @@ static void wr_clean_server()
 static void handle_main_wait(void)
 {
     int64 periods = 0;
-    uint32 interval = 500;
+    uint32_t interval = 500;
     do {
         if (g_wr_instance.abort_status == CM_TRUE) {
             break;
@@ -126,7 +126,7 @@ static void handle_main_wait(void)
 static status_t wr_recovery_background_task(wr_instance_t *inst)
 {
     LOG_RUN_INF("create wr recovery background task.");
-    uint32 recovery_thread_id = wr_get_uwression_startid() - (uint32)WR_BACKGROUND_TASK_NUM;
+    uint32_t recovery_thread_id = wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM;
     status_t status = cm_create_thread(
         wr_get_cm_lock_and_recover, 0, &g_wr_instance, &(g_wr_instance.threads[recovery_thread_id]));
     return status;
@@ -135,7 +135,7 @@ static status_t wr_recovery_background_task(wr_instance_t *inst)
 static status_t wr_delay_clean_background_task(wr_instance_t *inst)
 {
     LOG_RUN_INF("create wr delay clean background task.");
-    uint32 delay_clean_idx = wr_get_delay_clean_task_idx();
+    uint32_t delay_clean_idx = wr_get_delay_clean_task_idx();
     status_t status =
         cm_create_thread(wr_delay_clean_proc, 0, &g_wr_instance, &(g_wr_instance.threads[delay_clean_idx]));
     return status;
@@ -170,7 +170,7 @@ status_t wr_srv_parse_home(int argc, char **argv, int *argIdx, wr_srv_args_t *wr
         return CM_ERROR;
     }
     char *home = (char *)argv[*argIdx + 1];
-    uint32 len = (uint32)strlen(home);
+    uint32_t len = (uint32_t)strlen(home);
     if (len == 0 || len >= WR_MAX_PATH_BUFFER_SIZE) {
         (void)printf("the len of path specified by -D is invalid.\n");
         return CM_ERROR;

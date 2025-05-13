@@ -46,7 +46,7 @@ status_t wr_reactor_set_oneshot(wr_session_t *session)
 
 static wr_workthread_t *wr_reactor_get_workthread(reactor_t *reactor)
 {
-    uint32 pos = 0;
+    uint32_t pos = 0;
     for (pos = 0; pos < reactor->workthread_count; pos++) {
         if (reactor->workthread_ctx[pos].status == THREAD_STATUS_IDLE &&
             reactor->workthread_ctx[pos].thread_obj->task == NULL) {
@@ -76,7 +76,7 @@ static void wr_reactor_session_entry(void *param)
     }
     wr_init_packet(&session->recv_pack, CM_FALSE);
     wr_init_packet(&session->send_pack, CM_FALSE);
-    session->pipe.socket_timeout = (int32)CM_SOCKET_TIMEOUT;
+    session->pipe.socket_timeout = (int32_t)CM_SOCKET_TIMEOUT;
     (void)wr_process_single_cmd(&session);
     // do NOT add any code after here, and can not use any data of wr_workthread_t from here
     if (session != NULL) {
@@ -210,7 +210,7 @@ static status_t wr_reactor_start_threadpool(reactor_t *reactor)
     }
 
     pooling_thread_t *poolingthread = NULL;
-    for (uint32 pos = 0; pos < reactor->workthread_count; pos++) {
+    for (uint32_t pos = 0; pos < reactor->workthread_count; pos++) {
         if (cm_get_idle_pooling_thread(&reactor->workthread_pool, &poolingthread) != CM_SUCCESS) {
             LOG_RUN_ERR("[reactor] failed to get idle work thread pool, errno %d", cm_get_os_error());
             return CM_ERROR;
@@ -228,7 +228,7 @@ static status_t wr_reactors_start()
 {
     reactor_t *reactor = NULL;
     reactors_t *pool = &g_wr_instance.reactors;
-    for (uint32 i = 0; i < pool->reactor_count; i++) {
+    for (uint32_t i = 0; i < pool->reactor_count; i++) {
         reactor = &pool->reactor_arr[i];
         reactor->id = i;
         reactor->workthread_count = g_wr_instance.inst_cfg.params.workthread_count;
@@ -291,7 +291,7 @@ void wr_pause_reactors()
     if (pool->reactor_arr == NULL) {
         return;
     }
-    for (uint32 i = 0; i < pool->reactor_count; i++) {
+    for (uint32_t i = 0; i < pool->reactor_count; i++) {
         reactor = &pool->reactor_arr[i];
         reactor->status = REACTOR_STATUS_PAUSING;
         while (reactor->status != REACTOR_STATUS_PAUSED && !reactor->iothread.closed) {
@@ -308,7 +308,7 @@ void wr_continue_reactors()
         return;
     }
 
-    for (uint32 i =0; i < pool->reactor_count; i++) {
+    for (uint32_t i =0; i < pool->reactor_count; i++) {
         reactor = &pool->reactor_arr[i];
         reactor->status = REACTOR_STATUS_RUNNING;
     }
@@ -321,7 +321,7 @@ void wr_destroy_reactors()
     if (pool->reactor_arr == NULL) {
         return;
     }
-    for (uint32 pos = 0; pos < pool->reactor_count; pos++) {
+    for (uint32_t pos = 0; pos < pool->reactor_count; pos++) {
         reactor = &pool->reactor_arr[pos];
         (void)epoll_close(reactor->epollfd);
         if (reactor->iothread.closed == CM_FALSE) {

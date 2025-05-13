@@ -34,21 +34,21 @@ typedef void (*cmd_parser_clean_convert_args_t)(char *convert_result, int conver
 typedef struct st_wr_args_t {
     char short_name;                     // args short name
     const char *long_name;               // args long name ,can be null
-    int32 required;                      // CM_TRUE required,  CM_FALSE optional
-    int32 required_args;                 // CM_TRUE required,  CM_FALSE not need
+    int32_t required;                      // CM_TRUE required,  CM_FALSE optional
+    int32_t required_args;                 // CM_TRUE required,  CM_FALSE not need
     cmd_parser_check_args_t check_args;  // if want to check input_args, set it, can be NULL
     cmd_parser_convert_args_t convert_args;
     cmd_parser_clean_convert_args_t clean_convert_args;
-    int32 inputed;     // CM_TRUE input-ed by user, CM_FALSE not input
+    int32_t inputed;     // CM_TRUE input-ed by user, CM_FALSE not input
     char *input_args;  // if required_args is CM_TRUE,  should get value from user
     void *convert_result;
-    int32 convert_result_size;
+    int32_t convert_result_size;
 } wr_args_t;
 
 typedef status_t (*cmd_parse_check_t)(wr_args_t *cmd_args_set, int set_size);
 typedef struct st_wr_args_set_t {
     wr_args_t *cmd_args;
-    int32 args_size;
+    int32_t args_size;
     cmd_parse_check_t args_check;
 } wr_args_set_t;
 

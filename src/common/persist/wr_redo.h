@@ -114,8 +114,8 @@ typedef struct st_wr_redo_recycle_ft_node_t {
 
 typedef struct st_wr_redo_format_ft_t {
     auid_t auid;
-    uint32 obj_id;
-    uint32 count;
+    uint32_t obj_id;
+    uint32_t count;
     wr_block_id_t old_last_block;
     gft_list_t old_free_list;
 } wr_redo_format_ft_t;
@@ -147,15 +147,15 @@ typedef struct st_wr_redo_volop_t {
     char attr[WR_DISK_UNIT_SIZE];
     char def[WR_DISK_UNIT_SIZE];
     bool32 is_add;
-    uint32 volume_count;
+    uint32_t volume_count;
     uint64 core_version;
     uint64 volume_version;
 } wr_redo_volop_t;
 
 typedef struct st_wr_redo_format_fs_t {
     auid_t auid;
-    uint32 obj_id;
-    uint32 count;
+    uint32_t obj_id;
+    uint32_t count;
     wr_fs_block_list_t old_free_list;
 } wr_redo_format_fs_t;
 
@@ -220,13 +220,13 @@ typedef struct st_wr_redo_set_fs_block_list_t {
 
 typedef struct st_wr_redo_set_file_flag_t {
     ftid_t ftid;
-    uint32 flags;
-    uint32 old_flags;
+    uint32_t flags;
+    uint32_t old_flags;
 } wr_redo_set_file_flag_t;
 
 typedef struct st_wr_redo_entry {
     wr_redo_type_t type;
-    uint32 size;
+    uint32_t size;
     char data[0];
 } wr_redo_entry_t;
 
@@ -234,32 +234,32 @@ typedef struct st_wr_redo_entry {
 
 // sizeof(wr_redo_batch_t) should be eight-byte aligned
 typedef struct st_wr_redo_batch {
-    uint32 size;
-    uint32 hash_code;
+    uint32_t size;
+    uint32_t hash_code;
     date_t time;
     uint64 lsn;
-    uint32 count;  // entry count;
+    uint32_t count;  // entry count;
     char reverse[4];
     char data[0];
 } wr_redo_batch_t;
 #pragma pack()
 
 // todo: deleteredo log begin in disk
-static inline uint64 wr_get_redo_log_v0_start(wr_ctrl_t *wr_ctrl, uint32 vg_id)
+static inline uint64 wr_get_redo_log_v0_start(wr_ctrl_t *wr_ctrl, uint32_t vg_id)
 {
     uint64 au_size = wr_get_vg_au_size(wr_ctrl);
     uint64 redo_start = CM_CALC_ALIGN(WR_VOLUME_HEAD_SIZE, au_size) + vg_id * WR_INSTANCE_LOG_SPLIT_SIZE;
     return redo_start;
 }
 
-static inline uint32 wr_get_log_size(uint64 au_size)
+static inline uint32_t wr_get_log_size(uint64 au_size)
 {
     if (au_size < WR_VG_LOG_BUFFER_SIZE && au_size > 0) {
         uint64 m = WR_VG_LOG_BUFFER_SIZE / au_size;
         uint64 n = WR_VG_LOG_BUFFER_SIZE % au_size;
-        return (n == 0) ? (uint32)WR_VG_LOG_BUFFER_SIZE : (uint32)((m + 1) * au_size);
+        return (n == 0) ? (uint32_t)WR_VG_LOG_BUFFER_SIZE : (uint32_t)((m + 1) * au_size);
     }
-    return (uint32)au_size;
+    return (uint32_t)au_size;
 }
 
 #define WR_REDO_BATCH_HEAD_SIZE OFFSET_OF(wr_redo_batch_t, data)
@@ -267,7 +267,7 @@ static inline uint32 wr_get_log_size(uint64 au_size)
 
 typedef status_t (*wr_replay_proc)(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_entry_t *entry);
 typedef status_t (*wr_rollback_proc)(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_entry_t *entry);
-typedef status_t (*wr_flush_proc)(wr_session_t *session, wr_vg_info_item_t *vg_item, void *data, uint32 size);
+typedef status_t (*wr_flush_proc)(wr_session_t *session, wr_vg_info_item_t *vg_item, void *data, uint32_t size);
 typedef void (*wr_print_proc)(wr_redo_entry_t *entry);
 
 typedef struct st_wr_redo_handler {
@@ -280,20 +280,20 @@ typedef struct st_wr_redo_handler {
 #define WR_MAX_BLOCK_ADDR_NUM 10
 typedef struct st_wr_block_addr_his_t {
     void *addrs[WR_MAX_BLOCK_ADDR_NUM];
-    uint32 count;
+    uint32_t count;
 } wr_block_addr_his_t;
 void rp_init_block_addr_history(wr_block_addr_his_t *addr_his);
 void rp_insert_block_addr_history(wr_block_addr_his_t *addr_his, void *block);
 bool32 rp_check_block_addr(const wr_block_addr_his_t *addr_his, const void *block);
 
-status_t wr_write_redolog_to_disk(wr_vg_info_item_t *item, uint32 volume_id, int64 offset, char *buf, uint32 size);
-void wr_put_log(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_type_t type, void *data, uint32 size);
+status_t wr_write_redolog_to_disk(wr_vg_info_item_t *item, uint32_t volume_id, int64 offset, char *buf, uint32_t size);
+void wr_put_log(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_redo_type_t type, void *data, uint32_t size);
 status_t wr_flush_log(wr_vg_info_item_t *vg_item, char *log_buf);
 status_t wr_process_redo_log(wr_session_t *session, wr_vg_info_item_t *vg_item);
-status_t wr_reset_log_slot_head(uint32 vg_id, char *log_buf);
+status_t wr_reset_log_slot_head(uint32_t vg_id, char *log_buf);
 void wr_rollback_mem_update(wr_session_t *session, wr_vg_info_item_t *vg_item);
 void rb_redo_clean_resource(
-    wr_session_t *session, wr_vg_info_item_t *item, auid_t auid, ga_pool_id_e pool_id, uint32 first, uint32 count);
+    wr_session_t *session, wr_vg_info_item_t *item, auid_t auid, ga_pool_id_e pool_id, uint32_t first, uint32_t count);
 
 #ifdef __cplusplus
 }

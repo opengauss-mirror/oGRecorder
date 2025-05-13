@@ -84,7 +84,7 @@ add_compile_options(-freg-struct-return)
 add_compile_options(-Wl,-Bsymbolic)
 add_compile_options(-rdynamic)
 add_compile_options(-Wall)
-# add_compile_options(-Werror)
+add_compile_options(-Werror)
 
 add_compile_options(-Wvla)
 add_compile_options(-Wcast-align)

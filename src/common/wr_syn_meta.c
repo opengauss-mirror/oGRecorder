@@ -51,7 +51,7 @@ void wr_del_syn_meta(wr_vg_info_item_t *vg_item, wr_block_ctrl_t *block_ctrl, in
     }
     wr_latch_x(&vg_item->syn_meta_desc.latch);
     LOG_DEBUG_INF("del syn meta for fid:%llu, ftid:%llu, file_ver:%llu, type:%u, id:%llu, ref_cnt:%llu",
-        block_ctrl->fid, block_ctrl->ftid, block_ctrl->file_ver, (uint32)block_ctrl->type,
+        block_ctrl->fid, block_ctrl->ftid, block_ctrl->file_ver, (uint32_t)block_ctrl->type,
         WR_ID_TO_U64(block_ctrl->block_id), block_ctrl->syn_meta_ref_cnt);
     cm_bilist_del(&block_ctrl->syn_meta_node, &vg_item->syn_meta_desc.bilist);
     wr_buffer_recycle_disable(block_ctrl, CM_FALSE);
@@ -125,7 +125,7 @@ bool32 wr_syn_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item)
         int64 syn_meta_ref_cnt = (int64)cm_atomic_get((atomic_t *)&block_ctrl->syn_meta_ref_cnt);
 
         LOG_DEBUG_INF("try syn meta for fid:%llu, ftid:%llu, file_ver:%llu, type:%u, id:%llu, ref_cnt:%llu",
-            block_ctrl->fid, block_ctrl->ftid, block_ctrl->file_ver, (uint32)block_ctrl->type,
+            block_ctrl->fid, block_ctrl->ftid, block_ctrl->file_ver, (uint32_t)block_ctrl->type,
             WR_ID_TO_U64(block_ctrl->block_id), block_ctrl->syn_meta_ref_cnt);
 
         is_valid = wr_is_block_ctrl_valid(block_ctrl);
@@ -166,7 +166,7 @@ bool32 wr_syn_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item)
     return cm_bilist_empty(&vg_item->syn_meta_desc.bilist);
 }
 
-status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint32 size, bool32 *ack)
+status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint32_t size, bool32 *ack)
 {
     if (!enable_syn_meta || meta_syn2other_nodes_proc == NULL) {
         return CM_SUCCESS;
@@ -183,8 +183,8 @@ status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint
         WR_RETURN_IFERR2(CM_ERROR, LOG_DEBUG_ERR("Failed to find vg:%u.", meta_syn->vg_id));
     }
 
-    uint32 meta_len = wr_buffer_cache_get_block_size(meta_syn->meta_type);
-    uint32 check_sum = wr_get_checksum(meta_syn->meta, meta_len);
+    uint32_t meta_len = wr_buffer_cache_get_block_size(meta_syn->meta_type);
+    uint32_t check_sum = wr_get_checksum(meta_syn->meta, meta_len);
     wr_common_block_t *syn_meta_block = WR_GET_COMMON_BLOCK_HEAD(meta_syn->meta);
     if (meta_len != meta_syn->meta_len || check_sum != syn_meta_block->checksum) {
         WR_RETURN_IFERR2(CM_ERROR,
@@ -239,13 +239,13 @@ status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint
     *ack = CM_TRUE;
     LOG_DEBUG_INF(
         "syn ack:%u when notify syn meta file:%llu, file_ver:%llu, vg :%u, block: %llu type:%u, with version:%llu.",
-        (uint32)(*ack), meta_syn->fid, meta_syn->file_ver, meta_syn->vg_id, meta_syn->meta_block_id,
+        (uint32_t)(*ack), meta_syn->fid, meta_syn->file_ver, meta_syn->vg_id, meta_syn->meta_block_id,
         meta_syn->meta_type, meta_syn->syn_meta_version);
     return CM_SUCCESS;
 }
 
 status_t wr_invalidate_meta_remote(
-    wr_session_t *session, wr_invalidate_meta_msg_t *invalidate_meta_msg, uint32 size, bool32 *invalid_ack)
+    wr_session_t *session, wr_invalidate_meta_msg_t *invalidate_meta_msg, uint32_t size, bool32 *invalid_ack)
 {
     return CM_SUCCESS;
 }

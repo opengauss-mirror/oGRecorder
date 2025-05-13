@@ -34,9 +34,9 @@ extern "C" {
 
 // should not too big.it will allow to insert max node in oa map is MAX_OAMAP_NUM
 #define MAX_OAMAP_BUCKET_NUM (1024 * 1024 * 2)
-typedef uint32 (*cm_oamap_hash_t)(void *key);
+typedef uint32_t (*cm_oamap_hash_t)(void *key);
 typedef bool32 (*cm_oamap_compare_t)(void *key1, void *key2);
-typedef uint32 cm_oamap_iterator_t;
+typedef uint32_t cm_oamap_iterator_t;
 
 typedef enum tag_cm_oamap_bucket_state {
     FREE,
@@ -46,37 +46,37 @@ typedef enum tag_cm_oamap_bucket_state {
 
 // open address map is use for small numbers of key map
 typedef struct tag_cm_oamap_bucket {
-    uint32 hash : 30;
-    uint32 state : 2;
+    uint32_t hash : 30;
+    uint32_t state : 2;
 } cm_oamap_bucket_t;
 
 typedef struct tag_cm_oamap {
     cm_oamap_bucket_t *buckets;
     void **key;
     void **value;
-    uint32 num;
-    uint32 used;
-    uint32 deleted;
+    uint32_t num;
+    uint32_t used;
+    uint32_t deleted;
     cm_oamap_compare_t compare_func;
 } cm_oamap_t;
 
 // mem_ctx == NULL will use the standard malloc and free
 void cm_oamap_init_mem(cm_oamap_t *map);
 
-int32 cm_oamap_init(
-    cm_oamap_t *map, uint32 init_capacity, cm_oamap_compare_t compare_func /* , memory_context_t *mem_ctx */);
+int32_t cm_oamap_init(
+    cm_oamap_t *map, uint32_t init_capacity, cm_oamap_compare_t compare_func /* , memory_context_t *mem_ctx */);
 
 void cm_oamap_destroy(cm_oamap_t *map);
 
-int32 cm_oamap_insert(cm_oamap_t *map, uint32 hash, void *key, void *value);
+int32_t cm_oamap_insert(cm_oamap_t *map, uint32_t hash, void *key, void *value);
 
-void *cm_oamap_lookup(cm_oamap_t *map, uint32 hash, void *key);
+void *cm_oamap_lookup(cm_oamap_t *map, uint32_t hash, void *key);
 
-void *cm_oamap_remove(cm_oamap_t *map, uint32 hash, void *key);
+void *cm_oamap_remove(cm_oamap_t *map, uint32_t hash, void *key);
 
 void cm_oamap_reset_iterator(cm_oamap_iterator_t *iter);
 
-int32 cm_oamap_fetch(cm_oamap_t *map, cm_oamap_iterator_t *iter, void **key, void **value);
+int32_t cm_oamap_fetch(cm_oamap_t *map, cm_oamap_iterator_t *iter, void **key, void **value);
 
 bool32 cm_oamap_ptr_compare(void *key1, void *key2);
 
@@ -86,12 +86,12 @@ bool32 cm_oamap_uint32_compare(void *key1, void *key2);
 
 bool32 cm_oamap_string_compare(void *key1, void *key2);
 
-uint32 cm_oamap_size(cm_oamap_t *map);
+uint32_t cm_oamap_size(cm_oamap_t *map);
 
-uint32 cm_hash_uint32_shard(uint32 val);
-uint32 cm_hash_int64(int64 i64);
-uint32 cm_hash_text(const text_t *text, uint32 range);
-uint32 cm_hash_string(const char *str, uint32 range);
+uint32_t cm_hash_uint32_shard(uint32_t val);
+uint32_t cm_hash_int64(int64 i64);
+uint32_t cm_hash_text(const text_t *text, uint32_t range);
+uint32_t cm_hash_string(const char *str, uint32_t range);
 
 #ifdef __cplusplus
 }

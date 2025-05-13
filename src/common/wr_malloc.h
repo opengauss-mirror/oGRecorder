@@ -36,7 +36,7 @@ extern "C" {
 
 #define cm_malloc(size) (cm_malloc_ex(size, __LINE__, __FILE_NAME__))
 
-static inline void *cm_malloc_ex(uint32 size, uint32 line, char *file)
+static inline void *cm_malloc_ex(uint32_t size, uint32_t line, char *file)
 {
     CM_ASSERT(size != 0);
     // To do some je_malloc
@@ -46,7 +46,7 @@ static inline void *cm_malloc_ex(uint32 size, uint32 line, char *file)
 
 #define cm_free free
 
-static inline void *cm_malloc_align(uint32 alignment, uint32 size)
+static inline void *cm_malloc_align(uint32_t alignment, uint32_t size)
 {
 #ifndef WIN32
     int ret;

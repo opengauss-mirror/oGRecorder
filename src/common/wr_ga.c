@@ -31,8 +31,8 @@
 
 char *g_app_area_addr;
 
-int32 g_sys_shm_id = -1;
-int32 g_app_shm_id = -1;
+int32_t g_sys_shm_id = -1;
+int32_t g_app_shm_id = -1;
 
 spinlock_t g_ga_attach_mutex = 0;
 
@@ -61,7 +61,7 @@ void ga_reset_app_pools()
 }
 
 // clang-format on
-static inline ga_pool_t *ga_get_pool(uint32 id)
+static inline ga_pool_t *ga_get_pool(uint32_t id)
 {
     return &g_app_pools[GA_POOL_IDX(id)];
 }
@@ -70,17 +70,17 @@ void ga_set_pool_def(ga_pool_id_e pool_id, const ga_pool_def_t *def)
 {
     ga_pool_t *pool;
     CM_ASSERT(def != NULL);
-    pool = ga_get_pool((uint32)pool_id);
+    pool = ga_get_pool((uint32_t)pool_id);
     pool->def = *def;
-    pool->capacity = CM_ALIGN_512((uint32)sizeof(ga_pool_ctrl_t));
-    pool->capacity += CM_ALIGN_512(((ulong)def->object_size + (uint32)sizeof(ga_object_map_t)) * def->object_count);
+    pool->capacity = CM_ALIGN_512((uint32_t)sizeof(ga_pool_ctrl_t));
+    pool->capacity += CM_ALIGN_512(((ulong)def->object_size + (uint32_t)sizeof(ga_object_map_t)) * def->object_count);
     LOG_RUN_INF("Succeed to init pool %s, object count is %u, object size is %u, ex_max is %u.", pool->pool_name,
         pool->def.object_count, pool->def.object_size, pool->def.ex_max);
 }
 
-static inline ga_object_map_t *ga_object_map(ga_pool_t *pool, uint32 object_id)
+static inline ga_object_map_t *ga_object_map(ga_pool_t *pool, uint32_t object_id)
 {
-    uint32 ex_pool_id;
+    uint32_t ex_pool_id;
     ga_object_map_t *ex_object_map;
 
     CM_ASSERT(pool != NULL);
@@ -94,7 +94,7 @@ static inline ga_object_map_t *ga_object_map(ga_pool_t *pool, uint32 object_id)
     }
 }
 
-static void ga_append_into_queue(ga_pool_t *pool, ga_queue_t *queue, uint32 object_id)
+static void ga_append_into_queue(ga_pool_t *pool, ga_queue_t *queue, uint32_t object_id)
 {
     ga_object_map_t *obj_map = ga_object_map(pool, object_id);
 
@@ -116,15 +116,15 @@ static void ga_append_into_queue(ga_pool_t *pool, ga_queue_t *queue, uint32 obje
     queue->count++;
 }
 
-void ga_append_into_queue_by_pool_id(ga_pool_id_e pool_id, ga_queue_t *queue, uint32 object_id)
+void ga_append_into_queue_by_pool_id(ga_pool_id_e pool_id, ga_queue_t *queue, uint32_t object_id)
 {
     ga_pool_t *pool = ga_get_pool(pool_id);
     ga_append_into_queue(pool, queue, object_id);
 }
 
-static uint32 ga_remove_from_queue(ga_pool_t *pool, ga_queue_t *queue)
+static uint32_t ga_remove_from_queue(ga_pool_t *pool, ga_queue_t *queue)
 {
-    uint32 object_id;
+    uint32_t object_id;
 
     CM_ASSERT(pool != NULL);
     CM_ASSERT(queue != NULL);
@@ -161,22 +161,22 @@ static void ga_concat_queue(ga_pool_t *pool, ga_queue_t *queue1, ga_queue_t *que
 
 static void ga_init_pool(ga_offset_t offset, ga_pool_t *pool)
 {
-    uint32 i, object_offset;
+    uint32_t i, object_offset;
     CM_ASSERT(pool != NULL);
 
     pool->addr = g_app_area_addr + offset;
 
-    object_offset = (uint32)sizeof(ga_pool_ctrl_t) + pool->def.object_count * (uint32)sizeof(ga_object_map_t);
+    object_offset = (uint32_t)sizeof(ga_pool_ctrl_t) + pool->def.object_count * (uint32_t)sizeof(ga_object_map_t);
     pool->object_addr = pool->addr + object_offset;
 
     pool->ctrl = (ga_pool_ctrl_t *)pool->addr;
-    pool->object_map = (ga_object_map_t *)(pool->addr + (uint32)sizeof(ga_pool_ctrl_t));
+    pool->object_map = (ga_object_map_t *)(pool->addr + (uint32_t)sizeof(ga_pool_ctrl_t));
 
     pool->object_map[0].prior = CM_INVALID_ID32;
 
     for (i = 0; i < pool->def.object_count - 1; i++) {
         pool->object_map[i].next = i + 1;
-        pool->object_map[(uint32)(i + 1)].prior = i;
+        pool->object_map[(uint32_t)(i + 1)].prior = i;
     }
 
     pool->object_map[pool->def.object_count - 1].next = CM_INVALID_ID32;
@@ -194,10 +194,10 @@ static void ga_init_pool(ga_offset_t offset, ga_pool_t *pool)
 status_t ga_create_global_area(void)
 {
     uint64 app_area_size, offset;
-    uint32 i;
+    uint32_t i;
     uint64 *pool_offsets;
 
-    app_area_size = CM_ALIGN_512(GA_APP_POOL_COUNT * (uint32)sizeof(ulong));
+    app_area_size = CM_ALIGN_512(GA_APP_POOL_COUNT * (uint32_t)sizeof(ulong));
     for (i = 0; i < GA_APP_POOL_COUNT; i++) {
         if (g_app_pools[i].capacity == 0) {
             LOG_RUN_ERR("The application pool %u is not defined.", i);
@@ -207,13 +207,13 @@ status_t ga_create_global_area(void)
         app_area_size += g_app_pools[i].capacity;
     }
 
-    g_app_area_addr = (char *)cm_get_shm(SHM_TYPE_FIXED, (uint32)SHM_ID_APP_GA, app_area_size, CM_SHM_ATTACH_RW);
+    g_app_area_addr = (char *)cm_get_shm(SHM_TYPE_FIXED, (uint32_t)SHM_ID_APP_GA, app_area_size, CM_SHM_ATTACH_RW);
     if (g_app_area_addr == NULL) {
         LOG_RUN_ERR("Can't create the application area because of failed to get shm, area size = %llu.", app_area_size);
         return ERR_WR_GA_INIT;
     }
 
-    offset = CM_ALIGN_512(GA_APP_POOL_COUNT * (uint32)sizeof(ulong));
+    offset = CM_ALIGN_512(GA_APP_POOL_COUNT * (uint32_t)sizeof(ulong));
     pool_offsets = (uint64 *)g_app_area_addr;
 
     for (i = 0; i < GA_APP_POOL_COUNT; i++) {
@@ -227,18 +227,18 @@ status_t ga_create_global_area(void)
 
 void ga_destroy_global_area(void)
 {
-    uint32 i;
+    uint32_t i;
 
     for (i = 0; i < CM_GA_SHM_MAX_ID; i++) {
         (void)cm_del_shm(SHM_TYPE_GA, i);
     }
 
-    (void)cm_del_shm(SHM_TYPE_FIXED, (uint32)SHM_ID_APP_GA);
+    (void)cm_del_shm(SHM_TYPE_FIXED, (uint32_t)SHM_ID_APP_GA);
 }
 
-static status_t ga_attach_pool(ga_pool_id_e id, uint32 attach_perm)
+static status_t ga_attach_pool(ga_pool_id_e id, uint32_t attach_perm)
 {
-    uint32 i, object_offset;
+    uint32_t i, object_offset;
     char *area_addr;
     ga_pool_t *pool = &g_app_pools[id];
     ulong *pool_offsets;
@@ -248,10 +248,10 @@ static status_t ga_attach_pool(ga_pool_id_e id, uint32 attach_perm)
 
     pool->addr = area_addr + pool_offsets[id];
     pool->ctrl = (ga_pool_ctrl_t *)(pool->addr);
-    pool->object_map = (ga_object_map_t *)(pool->addr + (uint32)sizeof(ga_pool_ctrl_t));
+    pool->object_map = (ga_object_map_t *)(pool->addr + (uint32_t)sizeof(ga_pool_ctrl_t));
     pool->def = pool->ctrl->def;
 
-    object_offset = (uint32)sizeof(ga_pool_ctrl_t) + pool->def.object_count * (uint32)sizeof(ga_object_map_t);
+    object_offset = (uint32_t)sizeof(ga_pool_ctrl_t) + pool->def.object_count * (uint32_t)sizeof(ga_object_map_t);
     pool->object_addr = pool->addr + object_offset;
 
     if (pool->ctrl->ex_count > GA_MAX_EXTENDED_POOLS) {
@@ -265,19 +265,19 @@ static status_t ga_attach_pool(ga_pool_id_e id, uint32 attach_perm)
     }
 
     for (i = 0; i < pool->ctrl->ex_count; i++) {
-        pool->ex_pool_addr[i] = (char *)cm_attach_shm(SHM_TYPE_GA, (uint32)pool->ctrl->ex_shm_id[i], 0, attach_perm);
+        pool->ex_pool_addr[i] = (char *)cm_attach_shm(SHM_TYPE_GA, (uint32_t)pool->ctrl->ex_shm_id[i], 0, attach_perm);
     }
     return CM_SUCCESS;
 }
 
-status_t ga_attach_area(uint32 attach_perm)
+status_t ga_attach_area(uint32_t attach_perm)
 {
-    uint32 i = 0;
+    uint32_t i = 0;
 
-    g_app_area_addr = (char *)cm_attach_shm(SHM_TYPE_FIXED, (uint32)SHM_ID_APP_GA, 0, attach_perm);
+    g_app_area_addr = (char *)cm_attach_shm(SHM_TYPE_FIXED, (uint32_t)SHM_ID_APP_GA, 0, attach_perm);
     if (g_app_area_addr == NULL) {
-        uint64 app_area_size = CM_ALIGN_512(GA_APP_POOL_COUNT * (uint32)sizeof(ulong));
-        g_app_area_addr = (char *)cm_get_shm(SHM_TYPE_FIXED, (uint32)SHM_ID_APP_GA, app_area_size, CM_SHM_ATTACH_RW);
+        uint64 app_area_size = CM_ALIGN_512(GA_APP_POOL_COUNT * (uint32_t)sizeof(ulong));
+        g_app_area_addr = (char *)cm_get_shm(SHM_TYPE_FIXED, (uint32_t)SHM_ID_APP_GA, app_area_size, CM_SHM_ATTACH_RW);
 
         if (g_app_area_addr == NULL) {
             LOG_RUN_ERR("can't attach the application are, area size = %llu.", app_area_size);
@@ -298,7 +298,7 @@ status_t ga_attach_area(uint32 attach_perm)
 static void ga_detach_pool(ga_pool_id_e id)
 {
     ga_pool_t *pool = &g_app_pools[id];
-    uint32 i;
+    uint32_t i;
 
     if (!pool->ctrl) {
         return;
@@ -312,23 +312,23 @@ static void ga_detach_pool(ga_pool_id_e id)
 
     for (i = 0; i < pool->ctrl->ex_count; i++) {
         if (pool->ex_pool_addr[i] != NULL) {
-            (void)cm_detach_shm(SHM_TYPE_GA, (uint32)pool->ctrl->ex_shm_id[i]);
+            (void)cm_detach_shm(SHM_TYPE_GA, (uint32_t)pool->ctrl->ex_shm_id[i]);
         }
     }
 }
 
 void ga_detach_area(void)
 {
-    uint32 i = 0;
+    uint32_t i = 0;
 
     for (i = 0; i < GA_APP_POOL_COUNT; i++) {
         ga_detach_pool((ga_pool_id_e)i);
     }
 
-    (void)cm_detach_shm(SHM_TYPE_FIXED, (uint32)SHM_ID_APP_GA);
+    (void)cm_detach_shm(SHM_TYPE_FIXED, (uint32_t)SHM_ID_APP_GA);
 }
 
-uint32 ga_get_pool_usage(ga_pool_id_e pool_id)
+uint32_t ga_get_pool_usage(ga_pool_id_e pool_id)
 {
     ga_pool_t *pool = &g_app_pools[GA_POOL_IDX(pool_id)];
 
@@ -337,26 +337,26 @@ uint32 ga_get_pool_usage(ga_pool_id_e pool_id)
     }
     uint64 max_usable_obj_cnt = (uint64)(pool->ctrl->def.ex_max + 1) * pool->ctrl->def.object_count;
     uint64 max_init_obj_cnt = (uint64)(pool->ctrl->ex_count + 1) * pool->ctrl->def.object_count;
-    uint32 usage = (uint32)((max_init_obj_cnt - pool->ctrl->free_objects.count) * GA_USAGE_UNIT) / max_usable_obj_cnt;
+    uint32_t usage = (uint32_t)((max_init_obj_cnt - pool->ctrl->free_objects.count) * GA_USAGE_UNIT) / max_usable_obj_cnt;
     return usage;
 }
 
 static status_t ga_extend_pool(ga_pool_id_e pool_id)
 {
     ulong ex_pool_size;
-    uint32 ex_start_id, object_id, object_cost, i;
+    uint32_t ex_start_id, object_id, object_cost, i;
     char *ex_addr;
     ga_queue_t ex_objects;
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
     ga_object_map_t *object_map;
-    uint32 pool_shm_id = GA_EXT_SHM_POOLID(pool_id) * GA_MAX_EXTENDED_POOLS + pool->ctrl->ex_count;
+    uint32_t pool_shm_id = GA_EXT_SHM_POOLID(pool_id) * GA_MAX_EXTENDED_POOLS + pool->ctrl->ex_count;
 
     if (pool->def.ex_max <= pool->ctrl->ex_count) {
         WR_RETURN_IFERR2(CM_ERROR,
             LOG_RUN_ERR("the extended number of %s pool reach to limitation %u.", pool->pool_name, pool->def.ex_max));
     }
 
-    object_cost = pool->def.object_size + (uint32)sizeof(ga_object_map_t);
+    object_cost = pool->def.object_size + (uint32_t)sizeof(ga_object_map_t);
     ex_pool_size = (ulong)object_cost * pool->def.object_count;
 
     ex_addr = (char *)cm_get_shm(SHM_TYPE_GA, pool_shm_id, ex_pool_size, CM_SHM_ATTACH_RW);
@@ -365,7 +365,7 @@ static status_t ga_extend_pool(ga_pool_id_e pool_id)
             CM_ERROR, LOG_RUN_ERR("get shared memory in failure when extending the %s pool.", pool->pool_name));
     }
 
-    pool->ctrl->ex_shm_id[pool->ctrl->ex_count] = (int32)pool_shm_id;
+    pool->ctrl->ex_shm_id[pool->ctrl->ex_count] = (int32_t)pool_shm_id;
     pool->ex_pool_addr[pool->ctrl->ex_count] = ex_addr;
     ex_start_id = (pool->ctrl->ex_count + 1) * pool->def.object_count;
 
@@ -378,10 +378,10 @@ static status_t ga_extend_pool(ga_pool_id_e pool_id)
     for (i = 0; i < pool->def.object_count - 1; i++) {
         object_id = ex_start_id + i;
         object_map[i].next = object_id + 1;
-        object_map[(uint32)(i + 1)].prior = object_id;
+        object_map[(uint32_t)(i + 1)].prior = object_id;
     }
 
-    object_map[(uint32)(pool->def.object_count - 1)].next = CM_INVALID_ID32;
+    object_map[(uint32_t)(pool->def.object_count - 1)].next = CM_INVALID_ID32;
 
     ex_objects.first = ex_start_id;
     ex_objects.last = ex_start_id + pool->def.object_count - 1;
@@ -392,10 +392,10 @@ static status_t ga_extend_pool(ga_pool_id_e pool_id)
     return CM_SUCCESS;
 }
 
-uint32 ga_alloc_object(ga_pool_id_e pool_id, uint32 specific_id)
+uint32_t ga_alloc_object(ga_pool_id_e pool_id, uint32_t specific_id)
 {
-    uint32 object_id, next_id, prior_id;
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    uint32_t object_id, next_id, prior_id;
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
 
     cm_spin_lock(&pool->ctrl->mutex, NULL);
 
@@ -442,11 +442,11 @@ uint32 ga_alloc_object(ga_pool_id_e pool_id, uint32 specific_id)
     return object_id;
 }
 
-int32 ga_alloc_object_list(ga_pool_id_e pool_id, uint32 count, ga_queue_t *list)
+int32_t ga_alloc_object_list(ga_pool_id_e pool_id, uint32_t count, ga_queue_t *list)
 {
-    uint32 last_id, i;
+    uint32_t last_id, i;
     status_t status;
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
 
     CM_ASSERT(list != NULL);
     GA_INIT_QUEUE(list);
@@ -489,15 +489,15 @@ int32 ga_alloc_object_list(ga_pool_id_e pool_id, uint32 count, ga_queue_t *list)
 
     return CM_SUCCESS;
 }
-uint32 ga_next_object(ga_pool_id_e pool_id, uint32 object_id)
+uint32_t ga_next_object(ga_pool_id_e pool_id, uint32_t object_id)
 {
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
     return ga_object_map(pool, object_id)->next;
 }
 
-void ga_free_object(ga_pool_id_e pool_id, uint32 object_id)
+void ga_free_object(ga_pool_id_e pool_id, uint32_t object_id)
 {
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
 
     // For test cursor free mutiply times
     CM_ASSERT(object_id != CM_INVALID_ID32);
@@ -509,7 +509,7 @@ void ga_free_object(ga_pool_id_e pool_id, uint32 object_id)
 
 void ga_free_object_list(ga_pool_id_e pool_id, ga_queue_t *list)
 {
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
     CM_ASSERT(list != NULL);
 
     if (list->count == 0) {
@@ -527,11 +527,11 @@ void ga_free_object_list(ga_pool_id_e pool_id, ga_queue_t *list)
     (ga_offset_t)(object_id) * (ga_offset_t)(pool)->def.object_size))
 
 // clang-format on
-char *ga_object_addr(ga_pool_id_e pool_id, uint32 object_id)
+char *ga_object_addr(ga_pool_id_e pool_id, uint32_t object_id)
 {
     ulong offset;
-    uint32 ex_pool_id;
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    uint32_t ex_pool_id;
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
 
     if (object_id < pool->def.object_count) {
         return pool->addr + GA_MAIN_POOL_OBJECT_OFFSET(pool, object_id);
@@ -550,7 +550,7 @@ char *ga_object_addr(ga_pool_id_e pool_id, uint32 object_id)
             cm_spin_lock(&g_ga_attach_mutex, NULL);
             if (pool->ex_pool_addr[ex_pool_id] == NULL) {
                 pool->ex_pool_addr[ex_pool_id] =
-                    (char *)cm_attach_shm(SHM_TYPE_GA, (uint32)pool->ctrl->ex_shm_id[ex_pool_id], 0, CM_SHM_ATTACH_RW);
+                    (char *)cm_attach_shm(SHM_TYPE_GA, (uint32_t)pool->ctrl->ex_shm_id[ex_pool_id], 0, CM_SHM_ATTACH_RW);
             }
 
             cm_spin_unlock(&g_ga_attach_mutex);
@@ -564,12 +564,12 @@ char *ga_object_addr(ga_pool_id_e pool_id, uint32 object_id)
     }
 }
 
-cm_shm_key_t ga_object_key(ga_pool_id_e pool_id, uint32 object_id)
+cm_shm_key_t ga_object_key(ga_pool_id_e pool_id, uint32_t object_id)
 {
-    ga_pool_t *pool = ga_get_pool((uint32)pool_id);
+    ga_pool_t *pool = ga_get_pool((uint32_t)pool_id);
     if (object_id < pool->def.object_count) {
         return cm_shm_key_of(SHM_TYPE_FIXED, SHM_ID_APP_GA);
     }
-    uint32 ex_pool_id = object_id / pool->def.object_count - 1;
-    return cm_shm_key_of(SHM_TYPE_GA, (uint32)pool->ctrl->ex_shm_id[ex_pool_id]);
+    uint32_t ex_pool_id = object_id / pool->def.object_count - 1;
+    return cm_shm_key_of(SHM_TYPE_GA, (uint32_t)pool->ctrl->ex_shm_id[ex_pool_id]);
 }

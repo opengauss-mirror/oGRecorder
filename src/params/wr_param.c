@@ -155,7 +155,7 @@ static const char *g_wr_config_file = (const char *)"wr_inst.ini";
 static status_t wr_load_threadpool_cfg(wr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "IO_THREADS");
-    int32 count = 0;
+    int32_t count = 0;
     status_t status = cm_str2int(value, &count);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "IO_THREADS"));
 
@@ -163,7 +163,7 @@ static status_t wr_load_threadpool_cfg(wr_config_t *inst_cfg)
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "IO_THREADS");
         return CM_ERROR;
     }
-    inst_cfg->params.iothread_count = (uint32)count;
+    inst_cfg->params.iothread_count = (uint32_t)count;
 
     value = cm_get_config_value(&inst_cfg->config, "WORK_THREADS");
     status = cm_str2int(value, &count);
@@ -172,7 +172,7 @@ static status_t wr_load_threadpool_cfg(wr_config_t *inst_cfg)
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "WORK_THREADS");
         return CM_ERROR;
     }
-    inst_cfg->params.workthread_count = (uint32)count;
+    inst_cfg->params.workthread_count = (uint32_t)count;
 
     return CM_SUCCESS;
 }
@@ -180,7 +180,7 @@ static status_t wr_load_threadpool_cfg(wr_config_t *inst_cfg)
 static status_t wr_load_session_cfg(wr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "MAX_SESSION_NUMS");
-    int32 sessions;
+    int32_t sessions;
     status_t status = cm_str2int(value, &sessions);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "MAX_SESSION_NUMS"));
 
@@ -188,13 +188,13 @@ static status_t wr_load_session_cfg(wr_config_t *inst_cfg)
         WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "MAX_SESSION_NUMS"));
     }
 
-    inst_cfg->params.cfg_session_num = (uint32)sessions;
+    inst_cfg->params.cfg_session_num = (uint32_t)sessions;
     return CM_SUCCESS;
 }
 
 static status_t wr_load_disk_lock_file_path(wr_config_t *inst_cfg)
 {
-    int32 ret;
+    int32_t ret;
     char *value = cm_get_config_value(&inst_cfg->config, "_DISK_LOCK_FILE_PATH");
     status_t status = wr_verify_lock_file_path(value);
     WR_RETURN_IFERR2(
@@ -264,7 +264,7 @@ static status_t wr_load_mes_conn_type(wr_config_t *inst_cfg)
 
 static status_t wr_load_mes_channel_num(wr_config_t *inst_cfg)
 {
-    uint32 channel_num;
+    uint32_t channel_num;
     char *value = cm_get_config_value(&inst_cfg->config, "INTERCONNECT_CHANNEL_NUM");
     status_t status = cm_str2uint32(value, &channel_num);
     WR_RETURN_IFERR2(
@@ -281,7 +281,7 @@ static status_t wr_load_mes_channel_num(wr_config_t *inst_cfg)
 
 static status_t wr_load_mes_work_thread_cnt(wr_config_t *inst_cfg)
 {
-    uint32 work_thread_cnt;
+    uint32_t work_thread_cnt;
     char *value = cm_get_config_value(&inst_cfg->config, "WORK_THREAD_COUNT");
     status_t status = cm_str2uint32(value, &work_thread_cnt);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid parameter value of 'WORK_THREAD_COUNT'"));
@@ -310,12 +310,12 @@ static status_t wr_load_mes_elapsed_switch(wr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-static status_t wr_load_random_file(uchar *value, int32 value_len)
+static status_t wr_load_random_file(uchar *value, int32_t value_len)
 {
     char file_name[CM_FILE_NAME_BUFFER_SIZE];
     char dir_name[CM_FILE_NAME_BUFFER_SIZE];
-    int32 handle;
-    int32 file_size;
+    int32_t handle;
+    int32_t file_size;
     PRTS_RETURN_IFERR(snprintf_s(
         dir_name, CM_FILE_NAME_BUFFER_SIZE, CM_FILE_NAME_BUFFER_SIZE - 1, "%s/wr_protect", g_inst_cfg->home));
     if (!cm_dir_exist(dir_name)) {
@@ -336,7 +336,7 @@ static status_t wr_load_random_file(uchar *value, int32 value_len)
     return CM_SUCCESS;
 }
 
-int32 wr_decrypt_pwd_cb(const char *cipher_text, uint32 cipher_len, char *plain_text, uint32 plain_len)
+int32_t wr_decrypt_pwd_cb(const char *cipher_text, uint32_t cipher_len, char *plain_text, uint32_t plain_len)
 {
     if (cipher_text == NULL) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
@@ -355,12 +355,12 @@ int32 wr_decrypt_pwd_cb(const char *cipher_text, uint32 cipher_len, char *plain_
             LOG_DEBUG_ERR("[WR] failed to decrypt SSL cipher: plain len [%u] is invalid.", plain_len));
     }
     cipher_t cipher;
-    if (cm_base64_decode(cipher_text, cipher_len, (uchar *)&cipher, (uint32)(sizeof(cipher_t) + 1)) == 0) {
+    if (cm_base64_decode(cipher_text, cipher_len, (uchar *)&cipher, (uint32_t)(sizeof(cipher_t) + 1)) == 0) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
             LOG_DEBUG_ERR("[WR] failed to decode SSL cipher."));
     }
     if (cipher.cipher_len > 0) {
-        status_t status = wr_load_random_file(cipher.rand, (int32)sizeof(cipher.rand));
+        status_t status = wr_load_random_file(cipher.rand, (int32_t)sizeof(cipher.rand));
         WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_VALUE_ERROR, "[WR] load random component failed."));
         status = cm_decrypt_pwd(&cipher, (uchar *)plain_text, &plain_len);
         WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_VALUE_ERROR, "[WR] failed to decrypt ssl pwd."));
@@ -397,7 +397,7 @@ status_t wr_load_mes_ssl(wr_config_t *inst_cfg)
     value = cm_get_config_value(&inst_cfg->config, "SSL_CERT_NOTIFY_TIME");
     status = wr_set_ssl_param("SSL_CERT_NOTIFY_TIME", value);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "SSL_CERT_NOTIFY_TIME"));
-    uint32 alert_value;
+    uint32_t alert_value;
     status = cm_str2uint32(value, &alert_value);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "SSL_CERT_NOTIFY_TIME"));
     value = cm_get_config_value(&inst_cfg->config, "SSL_PERIOD_DETECTION");
@@ -428,14 +428,14 @@ status_t wr_load_mes_ssl(wr_config_t *inst_cfg)
 static status_t wr_load_mes_wait_timeout(wr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "MES_WAIT_TIMEOUT");
-    int32 timeout = 0;
+    int32_t timeout = 0;
     status_t status = cm_str2int(value, &timeout);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "MES_WAIT_TIMEOUT"));
     if (timeout < WR_MES_MIN_WAIT_TIMEOUT || timeout > WR_MES_MAX_WAIT_TIMEOUT) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "MES_WAIT_TIMEOUT");
         return CM_ERROR;
     }
-    inst_cfg->params.mes_wait_timeout = (uint32)timeout;
+    inst_cfg->params.mes_wait_timeout = (uint32_t)timeout;
     return CM_SUCCESS;
 }
 
@@ -455,7 +455,7 @@ static status_t wr_load_mes_params(wr_config_t *inst_cfg)
 static status_t wr_load_disk_lock_interval(wr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "DISK_LOCK_INTERVAL");
-    int32 lock_interval;
+    int32_t lock_interval;
 
     status_t status = cm_str2int(value, &lock_interval);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "DISK_LOCK_INTERVAL"));
@@ -471,7 +471,7 @@ static status_t wr_load_disk_lock_interval(wr_config_t *inst_cfg)
 static status_t wr_load_dlock_retry_count(wr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "DLOCK_RETRY_COUNT");
-    uint32 dlock_retry_count;
+    uint32_t dlock_retry_count;
 
     status_t status = cm_str2uint32(value, &dlock_retry_count);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "DLOCK_RETRY_COUNT"));
@@ -539,7 +539,7 @@ static status_t wr_load_listen_addr(wr_config_t *inst_cfg)
 static status_t wr_load_xlog_vg_id(wr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "XLOG_VG_ID");
-    int32 xlog_vg_id = 0;
+    int32_t xlog_vg_id = 0;
     status_t status = cm_str2int(value, &xlog_vg_id);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "XLOG_VG_ID"));
 
@@ -548,7 +548,7 @@ static status_t wr_load_xlog_vg_id(wr_config_t *inst_cfg)
         WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "XLOG_VG_ID"));
     }
 
-    inst_cfg->params.xlog_vg_id = (uint32)xlog_vg_id;
+    inst_cfg->params.xlog_vg_id = (uint32_t)xlog_vg_id;
     LOG_RUN_INF("The xlog vg id is %d.", inst_cfg->params.xlog_vg_id);
     return CM_SUCCESS;
 }
@@ -562,7 +562,7 @@ status_t wr_set_cfg_dir(const char *home, wr_config_t *inst_cfg)
         if (home_env == NULL || home_env[0] == '\0') {
             WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid cfg dir"));
         }
-        uint32 len = (uint32)strlen(home_env);
+        uint32_t len = (uint32_t)strlen(home_env);
         if (len >= WR_MAX_PATH_BUFFER_SIZE) {
             WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid cfg dir len"));
         }
@@ -570,13 +570,13 @@ status_t wr_set_cfg_dir(const char *home, wr_config_t *inst_cfg)
         WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid cfg dir"));
 
     } else {
-        uint32 len = (uint32)strlen(home);
+        uint32_t len = (uint32_t)strlen(home);
         if (len >= WR_MAX_PATH_BUFFER_SIZE) {
             WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid cfg dir");
             return CM_ERROR;
         }
     }
-    int32 iret_snprintf = snprintf_s(inst_cfg->home, WR_MAX_PATH_BUFFER_SIZE, WR_MAX_PATH_BUFFER_SIZE - 1, "%s",
+    int32_t iret_snprintf = snprintf_s(inst_cfg->home, WR_MAX_PATH_BUFFER_SIZE, WR_MAX_PATH_BUFFER_SIZE - 1, "%s",
         is_home_empty ? home_realpath : home);
     WR_SECUREC_SS_RETURN_IF_ERROR(iret_snprintf, CM_ERROR);
 
@@ -659,7 +659,7 @@ static status_t wr_load_enable_core_state_collect(wr_config_t *inst_cfg)
 
 status_t wr_load_delay_clean_interval_core(char *value, wr_config_t *inst_cfg)
 {
-    uint32 delay_clean_interval;
+    uint32_t delay_clean_interval;
 
     status_t status = cm_str2uint32(value, &delay_clean_interval);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "DELAY_CLEAN_INTERVAL"));
@@ -682,7 +682,7 @@ static status_t wr_load_space_usage(wr_config_t *inst_cfg)
 {
     char *hwm_value = cm_get_config_value(&inst_cfg->config, "VG_SPACE_USAGE_HWM");
     char *lwm_value = cm_get_config_value(&inst_cfg->config, "VG_SPACE_USAGE_LWM");
-    int32 hwm, lwm;
+    int32_t hwm, lwm;
     status_t status = cm_str2int(hwm_value, &hwm);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "VG_SPACE_USAGE_HWM"));
     status = cm_str2int(lwm_value, &lwm);
@@ -699,8 +699,8 @@ static status_t wr_load_space_usage(wr_config_t *inst_cfg)
         WR_RETURN_IFERR2(
             CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "VG_SPACE_USAGE_LWM is greater than VG_SPACE_USAGE_HWM"));
     }
-    inst_cfg->params.space_usage_hwm = (uint32)hwm;
-    inst_cfg->params.space_usage_lwm = (uint32)lwm;
+    inst_cfg->params.space_usage_hwm = (uint32_t)hwm;
+    inst_cfg->params.space_usage_lwm = (uint32_t)lwm;
     return CM_SUCCESS;
 }
 
@@ -820,7 +820,7 @@ status_t wr_set_cfg_param(char *name, char *value, char *scope)
 
     // 1. parse name
     wr_def_t def;
-    text_t text = {.str = name, .len = (uint32)strlen(name)};
+    text_t text = {.str = name, .len = (uint32_t)strlen(name)};
     if (text.len == 0) {
         WR_RETURN_IFERR2(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, text.str));
     }
@@ -846,7 +846,7 @@ status_t wr_get_cfg_param(const char *name, char **value)
 {
     CM_ASSERT(name != NULL);
     wr_def_t def;
-    text_t text = {.str = (char *)name, .len = (uint32)strlen(name)};
+    text_t text = {.str = (char *)name, .len = (uint32_t)strlen(name)};
     if (text.len == 0) {
         WR_RETURN_IFERR2(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, text.str));
     }

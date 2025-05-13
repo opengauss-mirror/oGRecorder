@@ -59,13 +59,13 @@ status_t wr_alloc_au(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t *
 }
 
 void wr_update_core_ctrl(
-    wr_session_t *session, wr_vg_info_item_t *item, wr_core_ctrl_t *core, uint32 volume_id, bool32 is_only_root)
+    wr_session_t *session, wr_vg_info_item_t *item, wr_core_ctrl_t *core, uint32_t volume_id, bool32 is_only_root)
 {
     CM_ASSERT(item != NULL);
     CM_ASSERT(core != NULL);
 
     char *buf;
-    uint32 size;
+    uint32_t size;
 
     if (is_only_root) {
         buf = (char *)core;
@@ -84,7 +84,7 @@ int64 wr_get_au_offset(wr_vg_info_item_t *item, auid_t auid)
     return (int64)((uint64)auid.au * (uint64)wr_get_vg_au_size(item->wr_ctrl));
 }
 
-status_t wr_get_au(wr_vg_info_item_t *item, auid_t auid, char *buf, int32 size)
+status_t wr_get_au(wr_vg_info_item_t *item, auid_t auid, char *buf, int32_t size)
 {
     if (auid.volume >= WR_MAX_VOLUMES) {
         return CM_ERROR;
@@ -92,7 +92,7 @@ status_t wr_get_au(wr_vg_info_item_t *item, auid_t auid, char *buf, int32 size)
 
     bool32 remote = CM_FALSE;
     int64_t offset = wr_get_au_offset(item, auid);
-    return wr_check_read_volume(item, (uint32)auid.volume, offset, buf, size, &remote);
+    return wr_check_read_volume(item, (uint32_t)auid.volume, offset, buf, size, &remote);
 }
 
 status_t wr_get_au_head(wr_vg_info_item_t *item, auid_t auid, wr_au_head_t *au_head)
@@ -143,7 +143,7 @@ status_t wr_get_volume_version(wr_vg_info_item_t *item, uint64 *version)
 #endif
     bool32 remote = CM_FALSE;
     status_t status =
-        wr_load_vg_ctrl_part(item, (int64)WR_CTRL_VOLUME_OFFSET, temp, (int32)WR_DISK_UNIT_SIZE, &remote);
+        wr_load_vg_ctrl_part(item, (int64)WR_CTRL_VOLUME_OFFSET, temp, (int32_t)WR_DISK_UNIT_SIZE, &remote);
     if (status != CM_SUCCESS) {
         LOG_DEBUG_ERR("Failed to load vg core version %s.", item->entry_path);
         return status;

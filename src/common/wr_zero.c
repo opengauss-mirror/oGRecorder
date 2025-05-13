@@ -30,16 +30,16 @@
 #endif
 #include "cm_log.h"
 
-static int32 wr_zero_mmap_fd = 0;
+static int32_t wr_zero_mmap_fd = 0;
 static char *wr_zero_buf = NULL;
-static uint32 wr_zero_buf_len = 0;
+static uint32_t wr_zero_buf_len = 0;
 
 status_t wr_init_zero_buf()
 {
-    uint32 len = WR_DEFAULT_AU_SIZE;
+    uint32_t len = WR_DEFAULT_AU_SIZE;
     char *buf = NULL;
 #ifndef WIN32
-    int32 fd = open("/dev/zero", O_RDWR);
+    int32_t fd = open("/dev/zero", O_RDWR);
     if (fd < 0) {
         LOG_RUN_ERR("Failed to open /dev/zero");
         return CM_ERROR;
@@ -86,7 +86,7 @@ char *wr_get_zero_buf()
     return wr_zero_buf;
 }
 
-uint32 wr_get_zero_buf_len()
+uint32_t wr_get_zero_buf_len()
 {
     return wr_zero_buf_len;
 }

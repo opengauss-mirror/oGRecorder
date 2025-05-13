@@ -65,10 +65,10 @@ typedef enum st_wr_background_task_type {
 } wr_background_task_type_e;
 
 typedef struct st_wr_bg_task_info {
-    uint32 task_num_max;
-    uint32 my_task_id;
-    uint32 vg_id_beg;
-    uint32 vg_id_end;
+    uint32_t task_num_max;
+    uint32_t my_task_id;
+    uint32_t vg_id_beg;
+    uint32_t vg_id_end;
     void *task_args;
 } wr_bg_task_info_t;
 
@@ -76,7 +76,7 @@ typedef struct wr_cli_info {
     uint64 cli_pid;
     int64 start_time;
     char process_name[WR_FILE_NAME_BUFFER_SIZE + 1];
-    uint32 thread_id;
+    uint32_t thread_id;
     uint64 connect_time;
 } wr_cli_info_t;
 
@@ -89,15 +89,15 @@ typedef enum st_wr_latch_offset_type {
 typedef struct st_wr_latch_offset {
     wr_latch_offset_type_e type;
     union {
-        uint32 unique_id;
+        uint32_t unique_id;
         uint64 shm_offset;
     } offset;
 } wr_latch_offset_t;
 
 typedef struct st_wr_latch_stack {
     wr_latch_offset_t latch_offset_stack[WR_MAX_LATCH_STACK_DEPTH];
-    uint32 stack_top;
-    uint32 stack_top_bak;
+    uint32_t stack_top;
+    uint32_t stack_top_bak;
     wr_latch_shared_op_e op;
 } wr_latch_stack_t;
 
@@ -115,7 +115,7 @@ typedef enum en_wr_session_status {
 
 typedef struct st_wr_session {
     spinlock_t lock;  // for control current rw of the same session in server
-    uint32 id;
+    uint32_t id;
     bool32 is_closed;
     bool32 is_used;
     bool32 connected;
@@ -134,9 +134,9 @@ typedef struct st_wr_session {
     void *reactor;
     void *workthread_ctx;
     wr_stat_item_t wr_session_stat[WR_EVT_COUNT];
-    uint32 client_version; /* client version */
-    uint32 proto_version;  /* client and server negotiated version */
-    uint32 objectid;
+    uint32_t client_version; /* client version */
+    uint32_t proto_version;  /* client and server negotiated version */
+    uint32_t objectid;
     wr_stat_ctx_t stat_ctx;
     bool8 is_direct;
     bool8 put_log;
@@ -146,7 +146,7 @@ typedef struct st_wr_session {
 
 static inline char *wr_init_sendinfo_buf(char *input)
 {
-    return (input + sizeof(wr_packet_head_t) + sizeof(int32));
+    return (input + sizeof(wr_packet_head_t) + sizeof(int32_t));
 }
 
 static inline void wr_session_end_stat(wr_session_t *session, timeval_t *begin_tv, wr_wait_event_e event)
@@ -159,24 +159,24 @@ static inline void wr_session_end_stat(wr_session_t *session, timeval_t *begin_t
 typedef struct st_wr_session_ctrl {
     spinlock_t lock;
     bool32 is_inited;
-    uint32 used_count;
-    uint32 total;
-    uint32 alloc_sessions;
+    uint32_t used_count;
+    uint32_t total;
+    uint32_t alloc_sessions;
     wr_session_t **sessions;
 } wr_session_ctrl_t;
 
 extern wr_session_ctrl_t g_wr_session_ctrl;
-status_t wr_init_session_pool(uint32 max_session_num);
+status_t wr_init_session_pool(uint32_t max_session_num);
 wr_session_ctrl_t *wr_get_session_ctrl(void);
 status_t wr_create_session(const cs_pipe_t *pipe, wr_session_t **session);
 void wr_destroy_session(wr_session_t *session);
 void wr_destroy_session_inner(wr_session_t *session);
-wr_session_t *wr_get_session(uint32 sid);
+wr_session_t *wr_get_session(uint32_t sid);
 
 status_t wr_lock_shm_meta_s_with_stack(
-    wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch, int32 timeout);
+    wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch, int32_t timeout);
 status_t wr_lock_shm_meta_s_without_stack(
-    wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_force, int32 timeout);
+    wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_force, int32_t timeout);
 status_t wr_cli_lock_shm_meta_s(wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch,
     latch_should_exit should_exit);
 void wr_lock_shm_meta_x(const wr_session_t *session, wr_shared_latch_t *shared_latch);
@@ -187,24 +187,24 @@ void wr_lock_shm_meta_degrade(wr_session_t *session, wr_shared_latch_t *shared_l
 void wr_unlock_shm_meta_without_stack(wr_session_t *session, wr_shared_latch_t *shared_latch);
 // only used by api-client or by clean
 bool32 wr_unlock_shm_meta_s_with_stack(wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_try_lock);
-status_t wr_lock_shm_meta_bucket_s(wr_session_t *session, uint32 id, wr_shared_latch_t *shared_latch);
+status_t wr_lock_shm_meta_bucket_s(wr_session_t *session, uint32_t id, wr_shared_latch_t *shared_latch);
 void wr_lock_shm_meta_bucket_x(wr_session_t *session, wr_shared_latch_t *shared_latch);
 void wr_unlock_shm_meta_bucket(wr_session_t *session, wr_shared_latch_t *shared_latch);
 void wr_clean_session_latch(wr_session_t *session, bool32 is_daemon);
-uint32 wr_get_uwression_startid(void);
-uint32 wr_get_recover_task_idx(void);
-uint32 wr_get_max_total_session_cnt(void);
-uint32 wr_get_delay_clean_task_idx(void);
-uint32 wr_get_hashmap_dynamic_extend_task_idx(void);
-bool32 wr_lock_shm_meta_timed_x(const wr_session_t *session, wr_shared_latch_t *shared_latch, uint32 wait_ticks);
-uint32 wr_get_delay_clean_task_idx(void);
-typedef uint32 (*wr_get_bg_task_idx_func_t)(uint32 idx);
-uint32 wr_get_meta_syn_task_idx(uint32 idx);
-uint32 wr_get_recycle_meta_task_idx(uint32 idx);
-uint32 wr_get_alarm_check_task_idx(void);
+uint32_t wr_get_uwression_startid(void);
+uint32_t wr_get_recover_task_idx(void);
+uint32_t wr_get_max_total_session_cnt(void);
+uint32_t wr_get_delay_clean_task_idx(void);
+uint32_t wr_get_hashmap_dynamic_extend_task_idx(void);
+bool32 wr_lock_shm_meta_timed_x(const wr_session_t *session, wr_shared_latch_t *shared_latch, uint32_t wait_ticks);
+uint32_t wr_get_delay_clean_task_idx(void);
+typedef uint32_t (*wr_get_bg_task_idx_func_t)(uint32_t idx);
+uint32_t wr_get_meta_syn_task_idx(uint32_t idx);
+uint32_t wr_get_recycle_meta_task_idx(uint32_t idx);
+uint32_t wr_get_alarm_check_task_idx(void);
 void wr_server_session_lock(wr_session_t *session);
 void wr_server_session_unlock(wr_session_t *session);
-wr_session_t *wr_get_reserv_session(uint32 idx);
+wr_session_t *wr_get_reserv_session(uint32_t idx);
 
 #ifdef __cplusplus
 }

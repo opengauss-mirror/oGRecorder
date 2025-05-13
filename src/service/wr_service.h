@@ -36,7 +36,7 @@ typedef status_t (*wr_srv_proc)(wr_session_t *session);
 typedef status_t (*wr_srv_proc_err)(wr_session_t *session);
 
 typedef struct st_wr_cmd_hdl {
-    int32 cmd;
+    int32_t cmd;
     wr_srv_proc proc;
     wr_srv_proc_err proc_err;
     bool32 exec_on_active;
@@ -48,7 +48,7 @@ static inline void wr_inc_active_sessions(wr_session_t *session)
     if (session->recv_pack.head->cmd != WR_CMD_SWITCH_LOCK) {
         (void)cm_atomic_inc(&g_wr_instance.active_sessions);
         LOG_DEBUG_INF("session:%u inc active_sessions to:%lld for cmd:%u", session->id, g_wr_instance.active_sessions,
-            (uint32)session->recv_pack.head->cmd);
+            (uint32_t)session->recv_pack.head->cmd);
     }
 }
 
@@ -57,14 +57,14 @@ static inline void wr_dec_active_sessions(wr_session_t *session)
     if (session->recv_pack.head->cmd != WR_CMD_SWITCH_LOCK) {
         (void)cm_atomic_dec(&g_wr_instance.active_sessions);
         LOG_DEBUG_INF("session:%u dec active_sessions to:%lld for cmd:%u", session->id, g_wr_instance.active_sessions,
-            (uint32)session->recv_pack.head->cmd);
+            (uint32_t)session->recv_pack.head->cmd);
     }
 }
 
-status_t wr_get_exec_nodeid(wr_session_t *session, uint32 *currid, uint32 *remoteid);
+status_t wr_get_exec_nodeid(wr_session_t *session, uint32_t *currid, uint32_t *remoteid);
 void wr_wait_session_pause(wr_instance_t *inst);
 void wr_wait_background_pause(wr_instance_t *inst);
-void wr_set_session_running(wr_instance_t *inst, uint32 sid);
+void wr_set_session_running(wr_instance_t *inst, uint32_t sid);
 status_t wr_diag_proto_type(wr_session_t *session);
 status_t wr_process_handshake_cmd(wr_session_t *session, wr_cmd_type_e cmd);
 status_t wr_process_command(wr_session_t *session);

@@ -39,11 +39,11 @@ extern "C" {
 errno_t iret_snprintf = 0;
 
 #define WR_FS_GET_PATH(name) ({ \
-    static char path[WR_FILE_PATH_MAX_LENGTH]; \
-    iret_snprintf = snprintf_s(path, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1, \
+    char _path[WR_FILE_PATH_MAX_LENGTH]; \
+    iret_snprintf = snprintf_s(_path, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1, \
                                "%s/%s", g_inst_cfg->data_dir, (name)); \
     WR_SECUREC_SS_RETURN_IF_ERROR(iret_snprintf, CM_ERROR); \
-    path; \
+    _path; \
 })
 
 status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
@@ -125,22 +125,24 @@ status_t wr_filesystem_rm(const char *name) {
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_write(int64_t handle, int64_t offset, int64_t size, const char *buf) {
-    if (pwrite(handle, buf, size, offset) == -1) {
+int64_t wr_filesystem_pwrite(int64_t handle, int64_t offset, int64_t size, const char *buf) {
+    int64_t res = pwrite(handle, buf, size, offset);
+    if (res == -1) {
         LOG_RUN_ERR("[FS] Failed to write to handle: %ld, offset: %ld, size: %ld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-    return CM_SUCCESS;
+    return res;
 }
 
-status_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char *buf) {
-    if (pread(handle, buf, size, offset) == -1) {
+int64_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char *buf) {
+    int64_t res = pread(handle, buf, size, offset);
+    if (res == -1) {
         LOG_RUN_ERR("[FS] Failed to read from handle: %ld, offset: %ld, size: %ld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-    return CM_SUCCESS;
+    return res;
 }
 
 status_t wr_filesystem_query_file_num(const char *vfs_name, uint32_t *file_num) {
@@ -184,7 +186,7 @@ status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_open(const char *file_path, int flag, int *fd) {
+status_t wr_filesystem_open(const char *file_path, int flag, int64_t *fd) {
     *fd = open(WR_FS_GET_PATH(file_path), flag, 0);
     if (*fd == -1) {
         LOG_RUN_ERR("[FS] Failed to open file: %s", file_path);

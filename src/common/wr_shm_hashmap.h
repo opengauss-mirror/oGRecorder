@@ -49,19 +49,19 @@ extern "C" {
 #define WR_EXTEND_BATCH (128)
 #define WR_HASH_FILL_FACTOR ((float)0.75)
 typedef struct st_shm_oamap_bucket {
-    uint32 hash : 30;
-    uint32 state : 2;
+    uint32_t hash : 30;
+    uint32_t state : 2;
 } shm_oamap_bucket_t;
 
 typedef struct st_shm_oamap {
     sh_mem_p buckets_offset; /* ptr offset */
     sh_mem_p key_offset;     /* ptr offset */
     sh_mem_p value_offset;   /* ptr offset */
-    uint32 num;
-    uint32 used;
-    uint32 deleted;
-    uint32 not_extend : 1;
-    uint32 shm_id : 31;
+    uint32_t num;
+    uint32_t used;
+    uint32_t deleted;
+    uint32_t not_extend : 1;
+    uint32_t shm_id : 31;
     uint64 reserve;
 } shm_oamap_t;
 
@@ -69,39 +69,39 @@ typedef struct st_shm_hashmap_bucket {
     wr_shared_latch_t enque_lock;
     sh_mem_p first;
     bool32 has_next;
-    uint32 entry_num;
+    uint32_t entry_num;
 } shm_hashmap_bucket_t;
 
 typedef shm_hashmap_bucket_t *shm_hashmap_segment;
 typedef struct st_shm_hash_ctrl {
     sh_mem_p dirs;
-    uint32 bucket_limits;
-    uint32 bucket_num;
-    uint32 max_bucket;
-    uint32 low_mask;
-    uint32 high_mask;
-    uint32 nsegments;
+    uint32_t bucket_limits;
+    uint32_t bucket_num;
+    uint32_t max_bucket;
+    uint32_t low_mask;
+    uint32_t high_mask;
+    uint32_t nsegments;
     cm_oamap_compare_t func;
 } shm_hash_ctrl_t;
 typedef struct st_shm_hashmap {
     shm_hash_ctrl_t hash_ctrl;
-    uint32 not_extend : 1;
-    uint32 shm_id : 31;
+    uint32_t not_extend : 1;
+    uint32_t shm_id : 31;
 } shm_hashmap_t;
 
 typedef struct st_shm_oamap_param {
-    uint32 hash;
+    uint32_t hash;
     shm_oamap_t *map;
     void *key_acl;
     cm_oamap_compare_t compare_func;
 } shm_oamap_param_t;
 
-int32 shm_hashmap_init(shm_hashmap_t *map, uint32 id, cm_oamap_compare_t compare_func);
-void shm_hashmap_destroy(shm_hashmap_t *map, uint32 id);
-shm_hashmap_bucket_t *shm_hashmap_get_bucket(shm_hash_ctrl_t *hash_ctrl, uint32 bucket_idx, uint32 *segment_objid);
+int32_t shm_hashmap_init(shm_hashmap_t *map, uint32_t id, cm_oamap_compare_t compare_func);
+void shm_hashmap_destroy(shm_hashmap_t *map, uint32_t id);
+shm_hashmap_bucket_t *shm_hashmap_get_bucket(shm_hash_ctrl_t *hash_ctrl, uint32_t bucket_idx, uint32_t *segment_objid);
 status_t shm_hashmap_extend_segment(shm_hash_ctrl_t *hash_ctrl);
 bool32 shm_hashmap_need_extend_and_redistribute(shm_hash_ctrl_t *hash_ctrl);
-uint32 shm_hashmap_calc_bucket_idx(shm_hash_ctrl_t *hash_ctrl, uint32 hash);
+uint32_t shm_hashmap_calc_bucket_idx(shm_hash_ctrl_t *hash_ctrl, uint32_t hash);
 
 #define SHM_HASH_BUCKET_INSERT(bucket, item, item_ctrl, first_ctrl) \
     do {                                                            \

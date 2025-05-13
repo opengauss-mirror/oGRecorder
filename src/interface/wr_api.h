@@ -174,8 +174,8 @@ WR_DECLARE int wr_file_delete(wr_vfs_handle vfs_handle, const char *name);
 WR_DECLARE int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, int *fd);
 WR_DECLARE int wr_file_close(wr_vfs_handle vfs_handle, int fd);
 WR_DECLARE int wr_file_truncate(wr_vfs_handle vfs_handle, int fd, int truncateType, long long offset);
-WR_DECLARE int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned long long count, long long offset);
-WR_DECLARE int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long long count, long long offset);
+WR_DECLARE long long int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned long long count, long long offset);
+WR_DECLARE long long int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long long count, long long offset);
 WR_DECLARE int wr_file_stat(wr_vfs_handle vfs_handle, const char *fileName, long long *offset, unsigned long long *count);
 WR_DECLARE int wr_file_performance();
 

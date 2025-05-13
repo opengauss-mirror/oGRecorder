@@ -17,10 +17,10 @@ extern "C" {
 #define WR_META_BLOCK_SIZE 512
 
 typedef struct wr_meta {
-    uint32 magic;
-    uint32 version;
-    uint32 checksum;
-    uint32 reserved;
+    uint32_t magic;
+    uint32_t version;
+    uint32_t checksum;
+    uint32_t reserved;
 } wr_meta_t;
 
 

@@ -119,7 +119,7 @@ status_t wr_check_disk_latch_remain_inner(
     return CM_SUCCESS;
 }
 
-status_t wr_check_lock_remain(wr_vg_info_t *vg_info, int32 wr_mode, int64 inst_id)
+status_t wr_check_lock_remain(wr_vg_info_t *vg_info, int32_t wr_mode, int64 inst_id)
 {
     return CM_SUCCESS;
 }

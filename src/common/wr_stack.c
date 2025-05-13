@@ -27,7 +27,7 @@
 #include "wr_defs.h"
 #include "wr_log.h"
 
-char *wr_get_stack_pos(wr_stack *stack, uint32 depth)
+char *wr_get_stack_pos(wr_stack *stack, uint32_t depth)
 {
     CM_ASSERT(stack != NULL);
 
@@ -38,7 +38,7 @@ char *wr_get_stack_pos(wr_stack *stack, uint32 depth)
     return (stack->buff + stack->indicator[depth]);
 }
 
-void wr_pop_ex(wr_stack *stack, uint32 depth)
+void wr_pop_ex(wr_stack *stack, uint32_t depth)
 {
     CM_ASSERT(stack != NULL);
 

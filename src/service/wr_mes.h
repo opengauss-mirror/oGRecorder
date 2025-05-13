@@ -89,11 +89,11 @@ typedef struct st_wr_mes_actnode {
     bool8 is_active;
     uint8 node_id;
     uint16 rsvd;
-    uint32 node_rsn;
+    uint32_t node_rsn;
 } wr_mes_actnode_t;
 
 typedef struct st_wr_mes_actlist {
-    uint32 count;
+    uint32_t count;
     wr_mes_actnode_t node[0];
 } wr_mes_actlist_t;
 // clang-format off
@@ -120,7 +120,7 @@ typedef struct st_wr_bcast_req {
 typedef struct st_wr_recv_msg {
     bool32 handle_recv_msg;
     bool32 cmd_ack;
-    uint32 broadcast_proto_ver;
+    uint32_t broadcast_proto_ver;
     uint64 version_not_match_inst;
     uint64 succ_inst;
     bool32 ignore_ack;
@@ -128,15 +128,15 @@ typedef struct st_wr_recv_msg {
 } wr_recv_msg_t;
 
 typedef struct st_wr_message_head {
-    uint32 msg_proto_ver;
-    uint32 sw_proto_ver;
+    uint32_t msg_proto_ver;
+    uint32_t sw_proto_ver;
     uint16 src_inst;
     uint16 dst_inst;
-    uint32 wr_cmd;
-    uint32 size;
-    uint32 flags;
+    uint32_t wr_cmd;
+    uint32_t size;
+    uint32_t flags;
     ruid_type ruid;
-    int32 result;
+    int32_t result;
     uint8 reserve[64];
 } wr_message_head_t;
 
@@ -150,13 +150,13 @@ typedef struct st_wr_notify_req_msg {
 typedef struct st_wr_notify_req_msg_ex {
     wr_message_head_t wr_head;
     wr_bcast_req_cmd_t type;
-    uint32 data_size;
+    uint32_t data_size;
     char data[WR_MAX_META_BLOCK_SIZE];
 } wr_notify_req_msg_ex_t;
 typedef struct st_wr_notify_ack_msg {
     wr_message_head_t wr_head;
     wr_bcast_ack_cmd_t type;
-    int32 result;
+    int32_t result;
     bool32 cmd_ack;
 } wr_notify_ack_msg_t;
 
@@ -167,15 +167,15 @@ typedef struct st_wr_remote_exec_succ_ack {
 
 typedef struct st_wr_remote_exec_fail_ack {
     wr_message_head_t ack_head;
-    int32 err_code;
+    int32_t err_code;
     char err_msg[4];
 } wr_remote_exec_fail_ack_t;
 
 typedef struct st_big_packets_ctrl {
     wr_message_head_t wr_head;
-    uint32 offset;
-    uint32 cursize;
-    uint32 totalsize;
+    uint32_t offset;
+    uint32_t cursize;
+    uint32_t totalsize;
     uint16 seq;
     uint8 endflag;
     uint8 reseved;
@@ -183,15 +183,15 @@ typedef struct st_big_packets_ctrl {
 
 typedef struct st_loaddisk_req {
     wr_message_head_t wr_head;
-    uint32 volumeid;
-    uint32 size;
+    uint32_t volumeid;
+    uint32_t size;
     uint64 offset;
     char vg_name[WR_MAX_NAME_LEN];
 } wr_loaddisk_req_t;
 
 typedef struct st_join_cluster_req {
     wr_message_head_t wr_head;
-    uint32 reg_id;
+    uint32_t reg_id;
 } wr_join_cluster_req_t;
 
 typedef struct st_join_cluster_ack {
@@ -202,7 +202,7 @@ typedef struct st_join_cluster_ack {
 typedef struct st_refresh_ft_req {
     wr_message_head_t wr_head;
     wr_block_id_t blockid;
-    uint32 vgid;
+    uint32_t vgid;
     char vg_name[WR_MAX_NAME_LEN];
 } wr_refresh_ft_req_t;
 
@@ -227,24 +227,24 @@ typedef struct st_get_ft_block_ack {
 } wr_get_ft_block_ack_t;
 
 #define WR_MES_MSG_HEAD_SIZE (sizeof(wr_message_head_t))
-uint32 wr_get_broadcast_proto_ver(uint64 succ_inst);
-status_t wr_notify_sync(char *buffer, uint32 size, wr_recv_msg_t *recv_msg);
-status_t wr_notify_sync_ex(char *buffer, uint32 size, wr_recv_msg_t *recv_msg);
+uint32_t wr_get_broadcast_proto_ver(uint64 succ_inst);
+status_t wr_notify_sync(char *buffer, uint32_t size, wr_recv_msg_t *recv_msg);
+status_t wr_notify_sync_ex(char *buffer, uint32_t size, wr_recv_msg_t *recv_msg);
 
-status_t wr_exec_sync(wr_session_t *session, uint32 remoteid, uint32 currtid, status_t *remote_result);
+status_t wr_exec_sync(wr_session_t *session, uint32_t remoteid, uint32_t currtid, status_t *remote_result);
 status_t wr_notify_expect_bool_ack(wr_vg_info_item_t *vg_item, wr_bcast_req_cmd_t cmd, uint64 ftid, bool32 *cmd_ack);
 status_t wr_notify_data_expect_bool_ack(
-    wr_vg_info_item_t *vg_item, wr_bcast_req_cmd_t cmd, char *data, uint32 size, bool32 *cmd_ack);
+    wr_vg_info_item_t *vg_item, wr_bcast_req_cmd_t cmd, char *data, uint32_t size, bool32 *cmd_ack);
 
 status_t wr_invalidate_other_nodes(
-    wr_vg_info_item_t *vg_item, char *meta_info, uint32 meta_info_size, bool32 *cmd_ack);
+    wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
 status_t wr_broadcast_check_file_open(wr_vg_info_item_t *vg_item, uint64 ftid, bool32 *cmd_ack);
-status_t wr_syn_data2other_nodes(wr_vg_info_item_t *vg_item, char *meta_syn, uint32 meta_syn_size, bool32 *cmd_ack);
+status_t wr_syn_data2other_nodes(wr_vg_info_item_t *vg_item, char *meta_syn, uint32_t meta_syn_size, bool32 *cmd_ack);
 
 void wr_check_mes_conn(uint64 cur_inst_map);
 status_t wr_startup_mes(void);
 void wr_stop_mes(void);
-int32 wr_process_broadcast_ack(wr_notify_ack_msg_t *ack, wr_recv_msg_t *recv_msg_output);
+int32_t wr_process_broadcast_ack(wr_notify_ack_msg_t *ack, wr_recv_msg_t *recv_msg_output);
 void wr_proc_broadcast_req(wr_session_t *session, mes_msg_t *msg);
 void wr_proc_syb2active_req(wr_session_t *session, mes_msg_t *msg);
 void wr_proc_loaddisk_req(wr_session_t *session, mes_msg_t *msg);

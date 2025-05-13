@@ -54,7 +54,7 @@ typedef enum tag_wr_thv_run_ctx_item {
 } wr_thv_run_ctx_item_e;
 
 typedef struct tag_wr_thv_run_ctx {
-    uint32 thread_id;
+    uint32_t thread_id;
     void *item_addr[WR_THV_RUN_CTX_ITEM_MAX];
 } wr_thv_run_ctx_t;
 
@@ -93,9 +93,9 @@ void cm_init_thv(void);
 
 status_t cm_get_thv(thv_type_e var_type, bool32 is_create, pointer_t *result, const char *addr);
 
-status_t cm_launch_thv(thv_ctrl_t *thv_ctrls, uint32 thv_ctrl_cnt);
+status_t cm_launch_thv(thv_ctrl_t *thv_ctrls, uint32_t thv_ctrl_cnt);
 
-uint32 wr_get_current_thread_id();
+uint32_t wr_get_current_thread_id();
 void wr_set_thv_run_ctx_item(wr_thv_run_ctx_item_e item, void *item_addr);
 void *wr_get_thv_run_ctx_item(wr_thv_run_ctx_item_e item);
 

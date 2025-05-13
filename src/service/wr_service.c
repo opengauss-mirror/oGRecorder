@@ -33,6 +33,7 @@
 #include "wr_mes.h"
 #include "wr_api.h"
 #include "wr_thv.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,18 +42,18 @@ extern "C" {
 static inline bool32 wr_need_exec_remote(bool32 exec_on_active, bool32 local_req)
 {
     wr_config_t *cfg = wr_get_inst_cfg();
-    uint32 master_id = wr_get_master_id();
-    uint32 curr_id = (uint32)(cfg->params.inst_id);
+    uint32_t master_id = wr_get_master_id();
+    uint32_t curr_id = (uint32_t)(cfg->params.inst_id);
     return ((curr_id != master_id) && (exec_on_active) && (local_req == CM_TRUE));
 }
 
-static uint32 wr_get_master_proto_ver(void)
+static uint32_t wr_get_master_proto_ver(void)
 {
-    uint32 master_id = wr_get_master_id();
+    uint32_t master_id = wr_get_master_id();
     if (master_id >= WR_MAX_INSTANCES) {
         return WR_PROTO_VERSION;
     }
-    uint32 master_proto_ver = (uint32)cm_atomic32_get((atomic32_t *)&g_wr_instance.cluster_proto_vers[master_id]);
+    uint32_t master_proto_ver = (uint32_t)cm_atomic32_get((atomic32_t *)&g_wr_instance.cluster_proto_vers[master_id]);
     if (master_proto_ver == WR_INVALID_VERSION) {
         return WR_PROTO_VERSION;
     }
@@ -60,10 +61,10 @@ static uint32 wr_get_master_proto_ver(void)
     return master_proto_ver;
 }
 
-status_t wr_get_exec_nodeid(wr_session_t *session, uint32 *currid, uint32 *remoteid)
+status_t wr_get_exec_nodeid(wr_session_t *session, uint32_t *currid, uint32_t *remoteid)
 {
     wr_config_t *cfg = wr_get_inst_cfg();
-    *currid = (uint32)(cfg->params.inst_id);
+    *currid = (uint32_t)(cfg->params.inst_id);
     *remoteid = wr_get_master_id();
     while (*remoteid == WR_INVALID_ID32) {
         if (get_instance_status_proc() == WR_STATUS_RECOVERY) {
@@ -82,8 +83,8 @@ status_t wr_get_exec_nodeid(wr_session_t *session, uint32 *currid, uint32 *remot
 #define WR_PROCESS_REMOTE_INTERVAL 50
 static status_t wr_process_remote(wr_session_t *session)
 {
-    uint32 remoteid = WR_INVALID_ID32;
-    uint32 currid = WR_INVALID_ID32;
+    uint32_t remoteid = WR_INVALID_ID32;
+    uint32_t currid = WR_INVALID_ID32;
     status_t ret = CM_ERROR;
     WR_RETURN_IF_ERROR(wr_get_exec_nodeid(session, &currid, &remoteid));
 
@@ -124,8 +125,8 @@ static status_t wr_process_remote(wr_session_t *session)
 status_t wr_diag_proto_type(wr_session_t *session)
 {
     link_ready_ack_t ack;
-    uint32 proto_code = 0;
-    int32 size;
+    uint32_t proto_code = 0;
+    int32_t size;
     char buffer[sizeof(version_proto_code_t)] = {0};
     version_proto_code_t version_proto_code = {0};
 
@@ -136,7 +137,7 @@ status_t wr_diag_proto_type(wr_session_t *session)
         version_proto_code = *(version_proto_code_t*)buffer;
         proto_code = version_proto_code.proto_code;
     } else if (size == sizeof(proto_code)) {
-        proto_code = *(uint32 *)buffer;
+        proto_code = *(uint32_t *)buffer;
     } else {
         LOG_RUN_ERR("wr_diag_proto_type invalid size[%u].", size);
     }
@@ -192,7 +193,7 @@ status_t wr_process_single_cmd(wr_session_t **session)
 
 static void wr_return_error(wr_session_t *session)
 {
-    int32 code;
+    int32_t code;
     const char *message = NULL;
     wr_packet_t *send_pack = NULL;
 
@@ -209,7 +210,7 @@ static void wr_return_error(wr_session_t *session)
         cm_fync_logfile();
         wr_exit_error();
     }
-    (void)wr_put_int32(send_pack, (uint32)code);
+    (void)wr_put_int32(send_pack, (uint32_t)code);
     (void)wr_put_str_with_cutoff(send_pack, message);
     status_t status = wr_write(&session->pipe, send_pack);
     if (status != CM_SUCCESS) {
@@ -236,14 +237,14 @@ static void wr_return_success(wr_session_t *session)
     }
 }
 
-static status_t wr_set_audit_resource(char *resource, uint32 audit_type, const char *format, ...)
+static status_t wr_set_audit_resource(char *resource, uint32_t audit_type, const char *format, ...)
 {
     if ((cm_log_param_instance()->audit_level & audit_type) == 0) {
         return CM_SUCCESS;
     }
     va_list args;
     va_start(args, format);
-    int32 ret =
+    int32_t ret =
         vsnprintf_s(resource, (size_t)WR_MAX_AUDIT_PATH_LENGTH, (size_t)(WR_MAX_AUDIT_PATH_LENGTH - 1), format, args);
     WR_SECUREC_SS_RETURN_IF_ERROR(ret, CM_ERROR);
     va_end(args);
@@ -288,7 +289,7 @@ static status_t wr_process_rmdir(wr_session_t *session)
 static status_t wr_process_query_file_num(wr_session_t *session)
 {
     char *vfs_name = NULL;
-    uint32 file_num = 0;
+    uint32_t file_num = 0;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vfs_name));
     if (wr_filesystem_query_file_num(vfs_name, &file_num) != CM_SUCCESS) {
@@ -304,7 +305,7 @@ static status_t wr_process_create_file(wr_session_t *session)
     char *file_ptr = NULL;
     text_t text;
     text_t sub = CM_NULL_TEXT;
-    int32 flag;
+    int32_t flag;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &file_ptr));
@@ -364,15 +365,15 @@ static status_t wr_process_exist(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_QUERY, "%s", name));
     WR_RETURN_IF_ERROR(wr_exist_item(session, (const char *)name, &result, &type));
 
-    WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, (uint32)result));
-    WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, (uint32)type));
+    WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, (uint32_t)result));
+    WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, (uint32_t)type));
     return CM_SUCCESS;
 }
 
 static status_t wr_process_open_file(wr_session_t *session)
 {
     char *name = NULL;
-    int32 flag;
+    int32_t flag;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &flag));
@@ -389,7 +390,7 @@ static status_t wr_process_close_file(wr_session_t *session)
 {
     int64_t fd;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fd));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&fd));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%ld", fd));
 
     WR_LOG_DEBUG_OP("Begin to close file, fd:%ld", fd);
@@ -401,7 +402,7 @@ static status_t wr_process_close_file(wr_session_t *session)
 static status_t wr_process_open_dir(wr_session_t *session)
 {
     char *name = NULL;
-    int32 refresh_recursive;
+    int64_t refresh_recursive;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &refresh_recursive));
@@ -425,9 +426,9 @@ static status_t wr_process_close_dir(wr_session_t *session)
     uint32_t vgid;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&ftid));
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vg_name));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&vgid));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&vgid));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(
         session->audit_info.resource, WR_AUDIT_MODIFY, "vg_name:%s, ftid:%llu", vg_name, *(uint64 *)&ftid));
     WR_LOG_DEBUG_OP("Begin to close dir, ftid:%llu, vg:%s.", ftid, vg_name);
@@ -451,14 +452,20 @@ static status_t wr_process_write_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_set_audit_resource(
         session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%ld, offset:%ld, size:%ld", handle, offset, file_size));
 
-    return wr_filesystem_write(handle, offset, file_size, buf);
+    int64_t res = wr_filesystem_pwrite(handle, offset, file_size, buf);
+    if (res == -1) {
+        LOG_RUN_ERR("Failed to write to handle: %ld, offset: %ld, size: %ld", handle, offset, file_size);
+        return CM_ERROR;
+    }
+    WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, res));
+    return CM_SUCCESS;
 }
 
 static status_t wr_process_read_file(wr_session_t *session)
 {
-    int64 offset;
-    int64 size;
-    int64 handle;
+    int64_t offset;
+    int64_t size;
+    int64_t handle;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
@@ -466,21 +473,24 @@ static status_t wr_process_read_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &size));
 
     // Allocate one extra byte for the null terminator
-    char *buf = (char *)malloc(size + 1);
+    char *buf = (char *)malloc(size);
     if (buf == NULL) {
-        LOG_DEBUG_ERR("Failed to malloc buffer for read file.");
+        LOG_RUN_ERR("Failed to malloc buffer for read file.");
+        return CM_ERROR;
+    }
+    memset(buf, 0, size);
+
+    // Read the file content into the buffer
+    int64_t res = wr_filesystem_pread(handle, offset, size, buf);
+    if (res == -1) {
+        LOG_RUN_ERR("Failed to read from handle: %ld, offset: %ld, size: %ld", handle, offset, size);
         return CM_ERROR;
     }
 
-    // Initialize the buffer and ensure it is null-terminated
-    memset(buf, 0, size + 1);
-
-    // Read the file content into the buffer
-    WR_RETURN_IF_ERROR(wr_filesystem_pread(handle, offset, size, buf));
-
     // Convert the buffer to a text_t structure
     text_t data;
-    cm_str2text(buf, &data);
+    data.str = buf;
+    data.len = res;
 
     // Send the data
     WR_RETURN_IF_ERROR(wr_put_text(&session->send_pack, &data));
@@ -496,12 +506,12 @@ static status_t wr_process_extending_file(wr_session_t *session)
     wr_node_data_t node_data;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.fid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.ftid));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.offset));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.size));
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &node_data.vg_name));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&node_data.vgid));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&node_data.vgid));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
         "extend vg_name:%s, fid:%llu, ftid:%llu, offset:%lld, size:%lld", node_data.vg_name, node_data.fid,
         *(uint64 *)&node_data.ftid, node_data.offset, node_data.size));
@@ -514,12 +524,12 @@ static status_t wr_process_fallocate_file(wr_session_t *session)
     wr_node_data_t node_data;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.fid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.ftid));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.offset));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.size));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&node_data.vgid));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&node_data.mode));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&node_data.vgid));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&node_data.mode));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
         "fallocate vg_id:%u, fid:%llu, ftid:%llu, offset:%lld, size:%lld, mode:%d", node_data.vgid, node_data.fid,
         *(uint64 *)&node_data.ftid, node_data.offset, node_data.size, node_data.mode));
@@ -532,25 +542,25 @@ static status_t wr_process_fallocate_file(wr_session_t *session)
 
 static status_t wr_process_truncate_file(wr_session_t *session)
 {
-    int64 length;
-    int64 handle;
-    int64 truncateType;
+    int64_t length;
+    int64_t handle;
+    int64_t truncateType;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &length));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &truncateType));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "handle:%ld, length:%lld", handle, length));
-    LOG_DEBUG_INF("Truncate file handle:%ld, length:%lld", handle, length);
+        "handle:%ld, length:%ld", handle, length));
+    LOG_DEBUG_INF("Truncate file handle:%ld, length:%ld", handle, length);
     return wr_filesystem_truncate(handle, length);
 }
 
 static status_t wr_process_stat_file(wr_session_t *session)
 {
     char *name = NULL;
-    int64 offset;
-    int64 size;
+    int64_t offset;
+    int64_t size;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_filesystem_stat(name, &offset, &size));
@@ -564,7 +574,7 @@ static status_t wr_process_handshake(wr_session_t *session)
 {
     wr_init_get(&session->recv_pack);
     session->client_version = wr_get_version(&session->recv_pack);
-    uint32 current_proto_ver = wr_get_master_proto_ver();
+    uint32_t current_proto_ver = wr_get_master_proto_ver();
     session->proto_version = MIN(session->client_version, current_proto_ver);
     wr_cli_info_t *cli_info;
     WR_RETURN_IF_ERROR(wr_get_data(&session->recv_pack, sizeof(wr_cli_info_t), (void **)&cli_info));
@@ -580,7 +590,7 @@ static status_t wr_process_handshake(wr_session_t *session)
     char *server_home = wr_get_cfg_dir(ZFS_CFG);
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_QUERY, "%s", server_home));
     LOG_RUN_INF("[WR_CONNECT]Server home is %s, when get home.", server_home);
-    uint32 server_pid = getpid();
+    uint32_t server_pid = getpid();
     text_t data;
     cm_str2text(server_home, &data);
     data.len++;  // for keeping the '\0'
@@ -606,30 +616,30 @@ static status_t wr_process_rename(wr_session_t *session)
 status_t wr_process_update_file_written_size(wr_session_t *session)
 {
     uint64 fid;
-    int64 offset;
-    int64 size;
+    int64_t offset;
+    int64_t size;
     wr_block_id_t ftid;
-    uint32 vg_id;
+    uint32_t vg_id;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32 *)&vg_id));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&offset));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&size));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&fid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&ftid));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&vg_id));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&offset));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&size));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
         "vg_id:%u, fid:%llu, ftid:%llu, offset:%lld, size:%lld", vg_id, fid, *(uint64 *)&ftid, offset, size));
     return wr_update_file_written_size(session, vg_id, offset, size, ftid, fid);
 }
 
-#define WR_SERVER_STATUS_OFFSET(i) ((uint32)(i) - (uint32)WR_STATUS_NORMAL)
+#define WR_SERVER_STATUS_OFFSET(i) ((uint32_t)(i) - (uint32_t)WR_STATUS_NORMAL)
 static char *g_wr_instance_rdwr_type[WR_SERVER_STATUS_OFFSET(WR_SERVER_STATUS_END)] = {
     [WR_SERVER_STATUS_OFFSET(WR_STATUS_NORMAL)] = "NORMAL",
     [WR_SERVER_STATUS_OFFSET(WR_STATUS_READONLY)] = "READONLY",
     [WR_SERVER_STATUS_OFFSET(WR_STATUS_READWRITE)] = "READWRITE",
 };
 
-char *wr_get_wr_server_status(int32 server_status)
+char *wr_get_wr_server_status(int32_t server_status)
 {
     if (server_status < WR_STATUS_NORMAL || server_status > WR_STATUS_READWRITE) {
         return "unknown";
@@ -637,7 +647,7 @@ char *wr_get_wr_server_status(int32 server_status)
     return g_wr_instance_rdwr_type[WR_SERVER_STATUS_OFFSET(server_status)];
 }
 
-#define WR_INSTANCE_STATUS_OFFSET(i) ((uint32)(i) - (uint32)WR_STATUS_PREPARE)
+#define WR_INSTANCE_STATUS_OFFSET(i) ((uint32_t)(i) - (uint32_t)WR_STATUS_PREPARE)
 static char *g_wr_instance_status_desc[WR_INSTANCE_STATUS_OFFSET(WR_INSTANCE_STATUS_END)] = {
     [WR_INSTANCE_STATUS_OFFSET(WR_STATUS_PREPARE)] = "prepare",
     [WR_INSTANCE_STATUS_OFFSET(WR_STATUS_RECOVERY)] = "recovery",
@@ -645,7 +655,7 @@ static char *g_wr_instance_status_desc[WR_INSTANCE_STATUS_OFFSET(WR_INSTANCE_STA
     [WR_INSTANCE_STATUS_OFFSET(WR_STATUS_OPEN)] = "open",
 };
 
-char *wr_get_wr_instance_status(int32 instance_status)
+char *wr_get_wr_instance_status(int32_t instance_status)
 {
     if (instance_status < WR_STATUS_PREPARE || instance_status > WR_STATUS_OPEN) {
         return "unknown";
@@ -658,7 +668,7 @@ static status_t wr_process_get_inst_status(wr_session_t *session)
 {
     wr_server_status_t *wr_status = NULL;
     WR_RETURN_IF_ERROR(
-        wr_reserv_text_buf(&session->send_pack, (uint32)sizeof(wr_server_status_t), (char **)&wr_status));
+        wr_reserv_text_buf(&session->send_pack, (uint32_t)sizeof(wr_server_status_t), (char **)&wr_status));
 
     wr_status->instance_status_id = g_wr_instance.status;
     wr_status->server_status_id = wr_get_server_status_flag();
@@ -682,24 +692,24 @@ static status_t wr_process_get_time_stat(wr_session_t *session)
 {
     uint64 size = sizeof(wr_stat_item_t) * WR_EVT_COUNT;
     wr_stat_item_t *time_stat = NULL;
-    WR_RETURN_IF_ERROR(wr_reserv_text_buf(&session->send_pack, (uint32)size, (char **)&time_stat));
+    WR_RETURN_IF_ERROR(wr_reserv_text_buf(&session->send_pack, (uint32_t)size, (char **)&time_stat));
 
     errno_t errcode = memset_s(time_stat, (size_t)size, 0, (size_t)size);
     securec_check_ret(errcode);
     wr_session_ctrl_t *session_ctrl = wr_get_session_ctrl();
     wr_session_t *tmp_session = NULL;
     cm_spin_lock(&session_ctrl->lock, NULL);
-    for (uint32 i = 0; i < session_ctrl->alloc_sessions; i++) {
+    for (uint32_t i = 0; i < session_ctrl->alloc_sessions; i++) {
         tmp_session = session_ctrl->sessions[i];
         if (tmp_session->is_used && !tmp_session->is_closed) {
-            for (uint32 j = 0; j < WR_EVT_COUNT; j++) {
-                int64 count = (int64)tmp_session->wr_session_stat[j].wait_count;
-                int64 total_time = (int64)tmp_session->wr_session_stat[j].total_wait_time;
-                int64 max_sgl_time = (int64)tmp_session->wr_session_stat[j].max_single_time;
+            for (uint32_t j = 0; j < WR_EVT_COUNT; j++) {
+                int64_t count = (int64_t)tmp_session->wr_session_stat[j].wait_count;
+                int64_t total_time = (int64_t)tmp_session->wr_session_stat[j].total_wait_time;
+                int64_t max_sgl_time = (int64_t)tmp_session->wr_session_stat[j].max_single_time;
 
                 time_stat[j].wait_count += count;
                 time_stat[j].total_wait_time += total_time;
-                time_stat[j].max_single_time = (atomic_t)MAX((int64)time_stat[j].max_single_time, max_sgl_time);
+                time_stat[j].max_single_time = (atomic_t)MAX((int64_t)time_stat[j].max_single_time, max_sgl_time);
 
                 (void)cm_atomic_add(&tmp_session->wr_session_stat[j].wait_count, -count);
                 (void)cm_atomic_add(&tmp_session->wr_session_stat[j].total_wait_time, -total_time);
@@ -733,7 +743,7 @@ void wr_wait_background_pause(wr_instance_t *inst)
     LOG_DEBUG_INF("Succeed to pause background task.");
 }
 
-void wr_set_session_running(wr_instance_t *inst, uint32 sid)
+void wr_set_session_running(wr_instance_t *inst, uint32_t sid)
 {
     LOG_DEBUG_INF("Begin to set session running.");
     cm_latch_x(&inst->tcp_lsnr_latch, sid, NULL);
@@ -796,12 +806,12 @@ static status_t wr_process_stop_server(wr_session_t *session)
 }
 
 // process switch lock,just master id can do
-static status_t wr_process_switch_lock_inner(wr_session_t *session, uint32 switch_id)
+static status_t wr_process_switch_lock_inner(wr_session_t *session, uint32_t switch_id)
 {
     wr_config_t *inst_cfg = wr_get_inst_cfg();
-    uint32 curr_id = (uint32)inst_cfg->params.inst_id;
-    uint32 master_id = wr_get_master_id();
-    if ((uint32)switch_id == master_id) {
+    uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
+    uint32_t master_id = wr_get_master_id();
+    if ((uint32_t)switch_id == master_id) {
         LOG_RUN_INF("[SWITCH]switchid is equal to current master_id, which is %u.", master_id);
         return CM_SUCCESS;
     }
@@ -815,7 +825,7 @@ static status_t wr_process_switch_lock_inner(wr_session_t *session, uint32 switc
 #ifdef ENABLE_WRTEST
     wr_set_server_status_flag(WR_STATUS_READONLY);
     LOG_RUN_INF("[SWITCH]inst %u set status flag %u when trans lock.", curr_id, WR_STATUS_READONLY);
-    wr_set_master_id((uint32)switch_id);
+    wr_set_master_id((uint32_t)switch_id);
     wr_set_session_running(&g_wr_instance, session->id);
     g_wr_instance.status = WR_STATUS_OPEN;
 #endif
@@ -824,7 +834,7 @@ static status_t wr_process_switch_lock_inner(wr_session_t *session, uint32 switc
     if (g_wr_instance.cm_res.is_valid) {
         wr_set_server_status_flag(WR_STATUS_READONLY);
         LOG_RUN_INF("[SWITCH]inst %u set status flag %u when trans lock.", curr_id, WR_STATUS_READONLY);
-        ret = cm_res_trans_lock(&g_wr_instance.cm_res.mgr, WR_CM_LOCK, (uint32)switch_id);
+        ret = cm_res_trans_lock(&g_wr_instance.cm_res.mgr, WR_CM_LOCK, (uint32_t)switch_id);
         if (ret != CM_SUCCESS) {
             wr_set_session_running(&g_wr_instance, session->id);
             wr_set_server_status_flag(WR_STATUS_READWRITE);
@@ -833,7 +843,7 @@ static status_t wr_process_switch_lock_inner(wr_session_t *session, uint32 switc
             LOG_RUN_ERR("[SWITCH]cm do switch lock failed from %u to %u.", curr_id, master_id);
             return ret;
         }
-        wr_set_master_id((uint32)switch_id);
+        wr_set_master_id((uint32_t)switch_id);
         wr_set_session_running(&g_wr_instance, session->id);
         g_wr_instance.status = WR_STATUS_OPEN;
     } else {
@@ -843,13 +853,13 @@ static status_t wr_process_switch_lock_inner(wr_session_t *session, uint32 switc
         return CM_ERROR;
     }
     LOG_RUN_INF(
-        "[SWITCH]Old main server %u switch lock to new main server %u successfully.", curr_id, (uint32)switch_id);
+        "[SWITCH]Old main server %u switch lock to new main server %u successfully.", curr_id, (uint32_t)switch_id);
     return CM_SUCCESS;
 }
 
 static status_t wr_process_switch_lock(wr_session_t *session)
 {
-    int32 switch_id;
+    int32_t switch_id;
     wr_init_get(&session->recv_pack);
     if (wr_get_int32(&session->recv_pack, &switch_id) != CM_SUCCESS) {
         return CM_ERROR;
@@ -857,7 +867,7 @@ static status_t wr_process_switch_lock(wr_session_t *session)
     cm_unlatch(&g_wr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));  // when mes process req, will latch s
     cm_latch_x(&g_wr_instance.switch_latch, session->id, LATCH_STAT(LATCH_SWITCH));
     wr_set_recover_thread_id(wr_get_current_thread_id());
-    status_t ret = wr_process_switch_lock_inner(session, (uint32)switch_id);
+    status_t ret = wr_process_switch_lock_inner(session, (uint32_t)switch_id);
     wr_set_recover_thread_id(0);
     // no need to unlatch, for wr_process_message will
     return ret;
@@ -870,11 +880,11 @@ static status_t wr_process_switch_lock(wr_session_t *session)
     (2) lsnr pause
     (3) trans lock
 */
-static status_t wr_process_remote_switch_lock(wr_session_t *session, uint32 curr_id, uint32 master_id)
+static status_t wr_process_remote_switch_lock(wr_session_t *session, uint32_t curr_id, uint32_t master_id)
 {
     wr_instance_status_e old_status = g_wr_instance.status;
     g_wr_instance.status = WR_STATUS_SWITCH;
-    uint32 current_proto_ver = wr_get_master_proto_ver();
+    uint32_t current_proto_ver = wr_get_master_proto_ver();
     wr_init_set(&session->recv_pack, current_proto_ver);
     session->recv_pack.head->cmd = WR_CMD_SWITCH_LOCK;
     session->recv_pack.head->flags = 0;
@@ -892,8 +902,8 @@ static status_t wr_process_set_main_inst(wr_session_t *session)
 {
     status_t status = CM_ERROR;
     wr_config_t *cfg = wr_get_inst_cfg();
-    uint32 curr_id = (uint32)(cfg->params.inst_id);
-    uint32 master_id;
+    uint32_t curr_id = (uint32_t)(cfg->params.inst_id);
+    uint32_t master_id;
     WR_RETURN_IF_ERROR(
         wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "set %u as master", curr_id));
     while (CM_TRUE) {
@@ -982,7 +992,7 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
 
 wr_cmd_hdl_t g_wr_remote_handle = {WR_CMD_EXEC_REMOTE, wr_process_remote, NULL, CM_FALSE};
 
-static wr_cmd_hdl_t *wr_get_cmd_handle(int32 cmd)
+static wr_cmd_hdl_t *wr_get_cmd_handle(int32_t cmd)
 {
     if (cmd >= WR_CMD_BEGIN && cmd < WR_CMD_END) {
         return &g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(cmd)];
@@ -993,7 +1003,7 @@ static wr_cmd_hdl_t *wr_get_cmd_handle(int32 cmd)
 static status_t wr_check_proto_version(wr_session_t *session)
 {
     session->client_version = wr_get_client_version(&session->recv_pack);
-    uint32 current_proto_ver = wr_get_master_proto_ver();
+    uint32_t current_proto_ver = wr_get_master_proto_ver();
     current_proto_ver = MIN(current_proto_ver, session->client_version);
     session->proto_version = current_proto_ver;
     if (session->proto_version != wr_get_version(&session->recv_pack)) {
@@ -1009,7 +1019,7 @@ static status_t wr_check_proto_version(wr_session_t *session)
 static status_t wr_exec_cmd(wr_session_t *session, bool32 local_req)
 {
     WR_LOG_DEBUG_OP(
-        "Receive command:%d, server status is %d.", session->recv_pack.head->cmd, (int32)g_wr_instance.status);
+        "Receive command:%d, server status is %d.", session->recv_pack.head->cmd, (int32_t)g_wr_instance.status);
     // remote req need process for proto_version
     session->proto_version = wr_get_version(&session->recv_pack);
     wr_cmd_hdl_t *handle = wr_get_cmd_handle(session->recv_pack.head->cmd);
@@ -1028,7 +1038,7 @@ static status_t wr_exec_cmd(wr_session_t *session, bool32 local_req)
         } else if (!wr_need_exec_remote(handle->exec_on_active, local_req)) {
             // if cur node is standby, may reset it to recovery to do recovery
             if (g_wr_instance.status != WR_STATUS_OPEN && g_wr_instance.status != WR_STATUS_PREPARE) {
-                LOG_RUN_INF("Req forbided by recovery for cmd:%u", (uint32)session->recv_pack.head->cmd);
+                LOG_RUN_INF("Req forbided by recovery for cmd:%u", (uint32_t)session->recv_pack.head->cmd);
                 wr_dec_active_sessions(session);
                 cm_sleep(WR_PROCESS_REMOTE_INTERVAL);
                 continue;
@@ -1059,7 +1069,7 @@ void wr_process_cmd_wait_be_open(wr_session_t *session)
 {
     while (g_wr_instance.status != WR_STATUS_OPEN) {
         WR_GET_CM_LOCK_LONG_SLEEP;
-        LOG_RUN_INF("The status %d of instance %lld is not open, just wait.\n", (int32)g_wr_instance.status,
+        LOG_RUN_INF("The status %d of instance %lld is not open, just wait.\n", (int32_t)g_wr_instance.status,
             wr_get_inst_cfg()->params.inst_id);
     }
 }
@@ -1110,7 +1120,7 @@ status_t wr_proc_standby_req(wr_session_t *session)
 {
     if (wr_is_readonly() == CM_TRUE && !wr_need_exec_local()) {
         wr_config_t *cfg = wr_get_inst_cfg();
-        uint32 id = (uint32)(cfg->params.inst_id);
+        uint32_t id = (uint32_t)(cfg->params.inst_id);
         LOG_RUN_ERR("The local node(%u) is in readonly state and cannot execute remote requests.", id);
         return CM_ERROR;
     }

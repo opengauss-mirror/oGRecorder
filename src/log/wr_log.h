@@ -54,9 +54,9 @@ typedef struct st_wr_audit_assist {
     text_t session_id;
     text_t return_code;
 
-    int32 sid;
-    int32 code;
-    int32 tz;
+    int32_t sid;
+    int32_t code;
+    int32_t tz;
 } wr_audit_assist_t;
 
 typedef struct st_wr_audit_info {
@@ -71,7 +71,7 @@ typedef struct st_wr_audit_info {
 
 static inline void wr_print_detail_error()
 {
-    int32 errcode_print;
+    int32_t errcode_print;
     const char *errmsg_print = NULL;
     cm_get_error(&errcode_print, &errmsg_print);
     if (errcode_print != 0) {
@@ -84,7 +84,7 @@ static inline void wr_print_detail_error()
     do {                                                                             \
         (void)printf(fmt, ##__VA_ARGS__);                                            \
         LOG_DEBUG_ERR(fmt, ##__VA_ARGS__);                                           \
-        int32 errcode_print;                                                         \
+        int32_t errcode_print;                                                         \
         const char *errmsg_print = NULL;                                             \
         cm_get_error(&errcode_print, &errmsg_print);                                 \
         if (errcode_print != 0) {                                                    \
@@ -98,7 +98,7 @@ static inline void wr_print_detail_error()
     do {                                                                             \
         (void)printf(fmt, ##__VA_ARGS__);                                            \
         LOG_RUN_ERR(fmt, ##__VA_ARGS__);                                             \
-        int32 errcode_print;                                                         \
+        int32_t errcode_print;                                                         \
         const char *errmsg_print = NULL;                                             \
         cm_get_error(&errcode_print, &errmsg_print);                                 \
         if (errcode_print != 0) {                                                    \
@@ -119,16 +119,16 @@ static inline void wr_print_detail_error()
 #define WR_THROW_ERROR(error_no, ...)                                                                                 \
     do {                                                                                                               \
         if (g_wr_error_desc[error_no] != NULL)                                                                        \
-            cm_set_error((char *)__FILE_NAME__, (uint32)__LINE__, (cm_errno_t)error_no, g_wr_error_desc[error_no],    \
+            cm_set_error((char *)__FILE_NAME__, (uint32_t)__LINE__, (cm_errno_t)error_no, g_wr_error_desc[error_no],    \
                 ##__VA_ARGS__);                                                                                        \
         else                                                                                                           \
             cm_set_error(                                                                                              \
-                (char *)__FILE_NAME__, (uint32)__LINE__, (cm_errno_t)error_no, g_error_desc[error_no], ##__VA_ARGS__); \
+                (char *)__FILE_NAME__, (uint32_t)__LINE__, (cm_errno_t)error_no, g_error_desc[error_no], ##__VA_ARGS__); \
     } while (0)
 
 #define WR_THROW_ERROR_EX(error_no, format, ...)                                                           \
     do {                                                                                                    \
-        cm_set_error((char *)__FILE_NAME__, (uint32)__LINE__, (cm_errno_t)error_no, format, ##__VA_ARGS__); \
+        cm_set_error((char *)__FILE_NAME__, (uint32_t)__LINE__, (cm_errno_t)error_no, format, ##__VA_ARGS__); \
     } while (0)
 
 /*
@@ -158,13 +158,13 @@ typedef enum { WR_VG_SPACE_ALARM_INIT, WR_VG_SPACE_ALARM_HWM, WR_VG_SPACE_ALARM_
 #define WR_ERROR_COUNT 3000
 extern const char *g_wr_error_desc[WR_ERROR_COUNT];
 extern char *g_wr_warn_desc[];
-extern uint32 g_wr_warn_id[];
-status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32 log_def_count, char *name);
+extern uint32_t g_wr_warn_id[];
+status_t wr_init_loggers(wr_config_t *inst_cfg, wr_log_def_t *log_def, uint32_t log_def_count, char *name);
 void sql_record_audit_log(void *sess, status_t status, uint8 cmd_type);
 wr_log_def_t *wr_get_instance_log_def();
 wr_log_def_t *wr_get_cmd_log_def();
-uint32 wr_get_instance_log_def_count();
-uint32 wr_get_cmd_log_def_count();
+uint32_t wr_get_instance_log_def_count();
+uint32_t wr_get_cmd_log_def_count();
 
 char *wr_get_print_tab(uint8 level);
 

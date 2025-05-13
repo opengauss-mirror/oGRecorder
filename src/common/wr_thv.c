@@ -49,8 +49,6 @@ static thv_ctrl_t g_thv_ctrl_func[MAX_THV_TYPE];
 
 // Thread variant address, it will be created in function create_var_func and released in function release_var_func.
 static __thread pointer_t g_thv_addr[MAX_THV_TYPE] = {0};
-// Thread variant is call pthread_setspcific
-static __thread bool32 g_thv_spec = CM_FALSE;
 static pthread_key_t g_thv_key;
 
 void wr_exit_error()
@@ -65,7 +63,7 @@ static void cm_destroy_thv(pointer_t thread_var)
         return;
     }
     pointer_t *curr_thread_var = (pointer_t *)thread_var;
-    for (uint32 i = 0; i < MAX_THV_TYPE; i++) {
+    for (uint32_t i = 0; i < MAX_THV_TYPE; i++) {
         if (curr_thread_var[i] != NULL) {
             if (g_thv_ctrl_func[i].release != NULL) {
                 g_thv_ctrl_func[i].release(curr_thread_var[i]);
@@ -82,7 +80,7 @@ void wr_destroy_thv(thv_type_e type)
 
 status_t cm_create_thv_ctrl(void)
 {
-    int32 ret = pthread_key_create(&g_thv_key, cm_destroy_thv);
+    int32_t ret = pthread_key_create(&g_thv_key, cm_destroy_thv);
     if (ret != EOK) {
         LOG_RUN_ERR("call pthread_key_create failed");
         return CM_ERROR;
@@ -97,7 +95,7 @@ status_t cm_set_thv_args_by_id(
     thv_type_e var_type, init_thv_func init, create_thv_func create, release_thv_func release)
 {
     if (var_type >= MAX_THV_TYPE) {
-        LOG_RUN_ERR("invalid var type %u", (uint32)var_type);
+        LOG_RUN_ERR("invalid var type %u", (uint32_t)var_type);
         return CM_ERROR;
     }
 
@@ -115,7 +113,7 @@ status_t cm_set_thv_args_by_id(
 
 void cm_init_thv(void)
 {
-    for (uint32 var_type = 0; var_type < MAX_THV_TYPE; var_type++) {
+    for (uint32_t var_type = 0; var_type < MAX_THV_TYPE; var_type++) {
         if (g_thv_ctrl_func[var_type].init != NULL) {
             g_thv_ctrl_func[var_type].init();
         }
@@ -125,23 +123,23 @@ void cm_init_thv(void)
 status_t cm_get_thv(thv_type_e var_type, bool32 is_create, pointer_t *result, const char* addr)
 {
     if (is_create) {
-        int32 ret = g_thv_ctrl_func[var_type].create(result, addr);
+        int32_t ret = g_thv_ctrl_func[var_type].create(result, addr);
         if (ret != EOK) {
-            LOG_RUN_ERR("create thread variable failed, var_type %u", (uint32)var_type);
+            LOG_RUN_ERR("create thread variable failed, var_type %u", (uint32_t)var_type);
             return CM_ERROR;
         }
     }
     return CM_SUCCESS;
 }
 
-status_t cm_launch_thv(thv_ctrl_t *thv_ctrls, uint32 thv_ctrl_cnt)
+status_t cm_launch_thv(thv_ctrl_t *thv_ctrls, uint32_t thv_ctrl_cnt)
 {
     // now begin init thread variant
     if (cm_create_thv_ctrl() != CM_SUCCESS) {
         return CM_ERROR;
     }
 
-    for (uint32 i = 0; i < thv_ctrl_cnt; i++) {
+    for (uint32_t i = 0; i < thv_ctrl_cnt; i++) {
         if (cm_set_thv_args_by_id(i, thv_ctrls[i].init, thv_ctrls[i].create, thv_ctrls[i].release) != CM_SUCCESS) {
             return CM_ERROR;
         }
@@ -174,14 +172,14 @@ status_t cm_get_thv(thv_type_e var_type, bool32 is_create, pointer_t *result, co
     return CM_ERROR;
 }
 
-status_t cm_launch_thv(thv_ctrl_t *thv_ctrls, uint32 thv_ctrl_cnt)
+status_t cm_launch_thv(thv_ctrl_t *thv_ctrls, uint32_t thv_ctrl_cnt)
 {
     return CM_SUCCESS;
 }
 
 #endif
 
-uint32 wr_get_current_thread_id()
+uint32_t wr_get_current_thread_id()
 {
     if (wr_thv_run_ctx.thread_id != 0) {
         return wr_thv_run_ctx.thread_id;

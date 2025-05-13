@@ -36,15 +36,15 @@ extern "C" {
 
 uint64 g_log_offset = WR_INVALID_ID64;
 #ifdef WIN32
-int32 device_os_error_array[] = {
+int32_t device_os_error_array[] = {
     EOPNOTSUPP, ETIMEDOUT, ENOSPC, ENOLINK, ENODATA, EILSEQ, ENOMEM, EBUSY, EAGAIN, ENODEV, EOVERFLOW, EIO};
 };
 #else
-int32 device_os_error_array[] = {EOPNOTSUPP, ETIMEDOUT, ENOSPC, ENOLINK, EBADE, ENODATA, EILSEQ, ENOMEM, EBUSY, EAGAIN,
+int32_t device_os_error_array[] = {EOPNOTSUPP, ETIMEDOUT, ENOSPC, ENOLINK, EBADE, ENODATA, EILSEQ, ENOMEM, EBUSY, EAGAIN,
     ENODEV, EREMCHG, ETOOMANYREFS, EOVERFLOW, EIO};
 #endif
 
-bool32 wr_is_device_os_error(int32 os_err)
+bool32 wr_is_device_os_error(int32_t os_err)
 {
     uint8 size = (uint8)sizeof(device_os_error_array) / sizeof(device_os_error_array[0]);
     for (uint8 i = 0; i < size; i++) {
@@ -151,9 +151,9 @@ uint64 wr_get_volume_size_raw(wr_volume_t *volume)
     return (uint64)size;
 }
 
-static status_t wr_try_pread_volume_raw(wr_volume_t *volume, int64 offset, char *buffer, int32 size, int32 *read_size)
+static status_t wr_try_pread_volume_raw(wr_volume_t *volume, int64 offset, char *buffer, int32_t size, int32_t *read_size)
 {
-    *read_size = (int32)pread(volume->handle, buffer, size, (off_t)offset);
+    *read_size = (int32_t)pread(volume->handle, buffer, size, (off_t)offset);
     if (*read_size == -1) {
         if (wr_is_device_os_error(cm_get_os_error())) {
             WR_THROW_ERROR(ERR_WR_VOLUME_SYSTEM_IO, volume->name_p);
@@ -170,13 +170,13 @@ static status_t wr_try_pread_volume_raw(wr_volume_t *volume, int64 offset, char 
     return CM_SUCCESS;
 }
 
-static int32 wr_try_pwrite_volume_raw(
-    wr_volume_t *volume, int64 offset, char *buffer, int32 size, int32 *written_size)
+static int32_t wr_try_pwrite_volume_raw(
+    wr_volume_t *volume, int64 offset, char *buffer, int32_t size, int32_t *written_size)
 {
     bool8 aligned_pwrite =
         offset % WR_DISK_UNIT_SIZE == 0 && size % WR_DISK_UNIT_SIZE == 0 && (uint64)buffer % WR_DISK_UNIT_SIZE == 0;
     if (aligned_pwrite) {
-        *written_size = (int32)pwrite(volume->handle, buffer, size, (off_t)offset);
+        *written_size = (int32_t)pwrite(volume->handle, buffer, size, (off_t)offset);
         if (*written_size == -1) {
             if (wr_is_device_os_error(cm_get_os_error())) {
                 WR_THROW_ERROR(ERR_WR_VOLUME_SYSTEM_IO, volume->name_p);
@@ -190,7 +190,7 @@ static int32 wr_try_pwrite_volume_raw(
             return CM_ERROR;
         }
     } else {
-        *written_size = (int32)pwrite(volume->unaligned_handle, buffer, size, (off_t)offset);
+        *written_size = (int32_t)pwrite(volume->unaligned_handle, buffer, size, (off_t)offset);
         if (*written_size == -1) {
             if (wr_is_device_os_error(cm_get_os_error())) {
                 WR_THROW_ERROR(ERR_WR_VOLUME_SYSTEM_IO, volume->name_p);
@@ -214,8 +214,8 @@ typedef struct wr_file_mgr {
     void (*close_volume)(wr_volume_t *volume);
     void (*close_simple_volume)(wr_simple_volume_t *simple_volume);
     uint64 (*get_volume_size)(wr_volume_t *volume);
-    status_t (*try_pread_volume)(wr_volume_t *volume, int64 offset, char *buffer, int32 size, int32 *read_size);
-    int32 (*try_pwrite_volume)(wr_volume_t *volume, int64 offset, char *buffer, int32 size, int32 *written_size);
+    status_t (*try_pread_volume)(wr_volume_t *volume, int64 offset, char *buffer, int32_t size, int32_t *read_size);
+    int32_t (*try_pwrite_volume)(wr_volume_t *volume, int64 offset, char *buffer, int32_t size, int32_t *written_size);
 } file_mgr;
 
 static const file_mgr file_mgr_funcs[] = {
@@ -255,20 +255,20 @@ uint64 wr_get_volume_size(wr_volume_t *volume)
     return (*(file_mgr_funcs[volume->vg_type].get_volume_size))(volume);
 }
 
-static status_t wr_try_pread_volume(wr_volume_t *volume, int64 offset, char *buffer, int32 size, int32 *read_size)
+static status_t wr_try_pread_volume(wr_volume_t *volume, int64 offset, char *buffer, int32_t size, int32_t *read_size)
 {
     return (*(file_mgr_funcs[volume->vg_type].try_pread_volume))(volume, offset, buffer, size, read_size);
 }
 
-static int32 wr_try_pwrite_volume(wr_volume_t *volume, int64 offset, char *buffer, int32 size, int32 *written_size)
+static int32_t wr_try_pwrite_volume(wr_volume_t *volume, int64 offset, char *buffer, int32_t size, int32_t *written_size)
 {
     return (*(file_mgr_funcs[volume->vg_type].try_pwrite_volume))(volume, offset, buffer, size, written_size);
 }
 
-status_t wr_read_volume(wr_volume_t *volume, int64 offset, void *buf, int32 size)
+status_t wr_read_volume(wr_volume_t *volume, int64 offset, void *buf, int32_t size)
 {
     status_t ret;
-    int32 curr_size, total_size;
+    int32_t curr_size, total_size;
 #ifdef WIN32
     if (wr_seek_volume(volume, offset) != CM_SUCCESS) {
         return CM_ERROR;
@@ -302,10 +302,10 @@ status_t wr_read_volume(wr_volume_t *volume, int64 offset, void *buf, int32 size
     return CM_SUCCESS;
 }
 
-status_t wr_write_volume(wr_volume_t *volume, int64 offset, const void *buf, int32 size)
+status_t wr_write_volume(wr_volume_t *volume, int64 offset, const void *buf, int32_t size)
 {
     status_t ret;
-    int32 curr_size, total_size;
+    int32_t curr_size, total_size;
 #ifdef WIN32
     if (wr_seek_volume(volume, offset) != CM_SUCCESS) {
         LOG_RUN_ERR("failed to seek volume %s , volume id:%u", volume->name_p, volume->id);

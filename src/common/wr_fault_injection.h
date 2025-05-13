@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-#define WR_FI_MAX_PROBABILTY (uint32)100
+#define WR_FI_MAX_PROBABILTY (uint32_t)100
 
 typedef enum en_wr_fi_point_name {
     WR_FI_ENTRY_BEGIN = 4000,

@@ -12,8 +12,8 @@
 int errorcode = 0;
 const char *errormsg = NULL;    
 
-#define uint32 unsigned int
-#define int32 int
+#define uint32_t unsigned int
+#define int32_t int
 #define uint8 unsigned char
 #define uint16 unsigned short
 #define bool32 unsigned int
@@ -31,22 +31,22 @@ typedef int socket_t;
 #define int64 long long 
 
 typedef struct st_wr_packet_head {
-    uint32 version;
-    uint32 client_version;
-    uint32 size;
+    uint32_t version;
+    uint32_t client_version;
+    uint32_t size;
     uint8 cmd;    /* command in request packet */
     uint8 result; /* code in response packet, success(0) or error(1) */
     uint16 flags;
-    uint32 serial_number;
+    uint32_t serial_number;
     uint8 reserve[60];
 } wr_packet_head_t;
 
 typedef struct st_wr_packet {
-    uint32 offset;   // for reading
-    uint32 options;  // options
+    uint32_t offset;   // for reading
+    uint32_t options;  // options
     wr_packet_head_t *head;
-    uint32 max_buf_size;  // MAX_ALLOWED_PACKET
-    uint32 buf_size;
+    uint32_t max_buf_size;  // MAX_ALLOWED_PACKET
+    uint32_t buf_size;
     char *buf;
     char init_buf[10240];
 } wr_packet_t;
@@ -91,19 +91,19 @@ typedef union un_cs_link {
 typedef struct st_cs_pipe {
     cs_pipe_type_t type;
     cs_link_t link;
-    uint32 options;
-    uint32 version;
-    int32 connect_timeout; // ms
-    int32 socket_timeout;  // ms
-    int32 l_onoff;
-    int32 l_linger;
+    uint32_t options;
+    uint32_t version;
+    int32_t connect_timeout; // ms
+    int32_t socket_timeout;  // ms
+    int32_t l_onoff;
+    int32_t l_linger;
 } cs_pipe_t;
 
 typedef struct wr_cli_info {
     uint64 cli_pid;
     int64 start_time;
     char process_name[256];
-    uint32 thread_id;
+    uint32_t thread_id;
     uint64 connect_time;
 } wr_cli_info_t;
 
@@ -113,8 +113,8 @@ typedef struct st_wr_conn {
     void *cli_vg_handles;
     bool32 flag;
     void *session;
-    uint32 server_version;
-    uint32 proto_version;
+    uint32_t server_version;
+    uint32_t proto_version;
 #ifdef ENABLE_WRTEST
     pid_t conn_pid;
 #endif

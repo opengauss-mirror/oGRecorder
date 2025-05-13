@@ -28,9 +28,9 @@
 #include "wr_defs.h"
 #include "wr_interaction.h"
 
-int32 execute_help_cmd(int argc, char **argv, uint32_t *idx, bool8 *go_ahead);
+int32_t execute_help_cmd(int argc, char **argv, uint32_t *idx, bool8 *go_ahead);
 
-status_t execute_cmd(int argc, char **argv, uint32 idx);
+status_t execute_cmd(int argc, char **argv, uint32_t idx);
 
 void clean_cmd();
 

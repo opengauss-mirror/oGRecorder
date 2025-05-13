@@ -36,7 +36,7 @@ extern "C" {
 #define HASH_MASK 0x3fffffff
 
 // clang-format off
-static uint32 const cm_primes[] = {
+static uint32_t const cm_primes[] = {
     7,
     13,
     31,
@@ -71,24 +71,24 @@ static uint32 const cm_primes[] = {
 };
 
 // clang-format on
-uint32 cm_hash_int64(int64 i64)
+uint32_t cm_hash_int64(int64 i64)
 {
-    uint32 u32l = (uint32)i64;
-    uint32 u32h = (uint32)((uint64)i64 >> 32);
+    uint32_t u32l = (uint32_t)i64;
+    uint32_t u32h = (uint32_t)((uint64)i64 >> 32);
 
     u32l ^= (i64 >= 0) ? u32h : ~u32h;
 
     return cm_hash_uint32_shard(u32l);
 }
 
-uint32 cm_hash_text(const text_t *text, uint32 range)
+uint32_t cm_hash_text(const text_t *text, uint32_t range)
 {
     return cm_hash_bytes((uint8 *)text->str, text->len, range);
 }
 
-uint32 cm_hash_string(const char *str, uint32 range)
+uint32_t cm_hash_string(const char *str, uint32_t range)
 {
-    return cm_hash_bytes((uint8 *)str, (uint32)strlen(str), range);
+    return cm_hash_bytes((uint8 *)str, (uint32_t)strlen(str), range);
 }
 
 bool32 cm_oamap_ptr_compare(void *key1, void *key2)
@@ -107,7 +107,7 @@ bool32 cm_oamap_uint32_compare(void *key1, void *key2)
 {
     CM_ASSERT(key1 != NULL);
     CM_ASSERT(key2 != NULL);
-    return (*(uint32 *)key1 == *(uint32 *)key2);
+    return (*(uint32_t *)key1 == *(uint32_t *)key2);
 }
 
 bool32 cm_oamap_string_compare(void *key1, void *key2)
@@ -117,11 +117,11 @@ bool32 cm_oamap_string_compare(void *key1, void *key2)
     return (strcmp((char *)key1, (char *)key2) == 0);
 }
 
-static uint32 oamap_get_near_prime(unsigned long n)
+static uint32_t oamap_get_near_prime(unsigned long n)
 {
-    uint32 low = 0;
-    uint32 cnt = (uint32)(sizeof(cm_primes) / sizeof(uint32));
-    uint32 high = cnt;
+    uint32_t low = 0;
+    uint32_t cnt = (uint32_t)(sizeof(cm_primes) / sizeof(uint32_t));
+    uint32_t high = cnt;
 
     while (low != high) {
         unsigned int mid = low + (high - low) / 2;
@@ -134,14 +134,14 @@ static uint32 oamap_get_near_prime(unsigned long n)
     if (low < cnt) {
         return cm_primes[low];
     } else {
-        return (uint32)n;
+        return (uint32_t)n;
     }
 }
 
-static void oamap_rehash_core(cm_oamap_t *map, uint32 new_capacity, cm_oamap_bucket_t *new_buckets, uint32 *used)
+static void oamap_rehash_core(cm_oamap_t *map, uint32_t new_capacity, cm_oamap_bucket_t *new_buckets, uint32_t *used)
 {
     bool32 found;
-    uint32 i, j, start;
+    uint32_t i, j, start;
     cm_oamap_bucket_t *src_bucket, *dst_bucket;
 
     if (new_capacity == 0) {
@@ -151,14 +151,14 @@ static void oamap_rehash_core(cm_oamap_t *map, uint32 new_capacity, cm_oamap_buc
     void **new_value = (void **)(new_key + new_capacity);
     for (i = 0; i < map->num; i++) {
         src_bucket = &(map->buckets[i]);
-        if (src_bucket->state != (uint32)USED) {
+        if (src_bucket->state != (uint32_t)USED) {
             continue;
         }
         start = src_bucket->hash % new_capacity;
         found = CM_FALSE;
         for (j = start; j < new_capacity; j++) {
             dst_bucket = &new_buckets[j];
-            if (dst_bucket->state != (uint32)USED) {
+            if (dst_bucket->state != (uint32_t)USED) {
                 *dst_bucket = *src_bucket;
                 new_key[j] = map->key[i];
                 new_value[j] = map->value[i];
@@ -173,7 +173,7 @@ static void oamap_rehash_core(cm_oamap_t *map, uint32 new_capacity, cm_oamap_buc
         while (start > 0) {
             start--;
             dst_bucket = &new_buckets[start];
-            if (dst_bucket->state != (uint32)USED) {
+            if (dst_bucket->state != (uint32_t)USED) {
                 *dst_bucket = *src_bucket;
                 new_key[start] = map->key[i];
                 new_value[start] = map->value[i];
@@ -185,10 +185,10 @@ static void oamap_rehash_core(cm_oamap_t *map, uint32 new_capacity, cm_oamap_buc
     }
 }
 
-static int32 oamap_rehash(cm_oamap_t *map, uint32 new_capacity)
+static int32_t oamap_rehash(cm_oamap_t *map, uint32_t new_capacity)
 {
     CM_ASSERT(map != NULL);
-    uint32 used = 0;
+    uint32_t used = 0;
     if (new_capacity == 0) {
         return ERR_WR_INVALID_PARAM;
     }
@@ -199,7 +199,7 @@ static int32 oamap_rehash(cm_oamap_t *map, uint32 new_capacity)
         return ERR_WR_INVALID_PARAM;
     }
 
-    cm_oamap_bucket_t *new_buckets = (cm_oamap_bucket_t *)cm_malloc((uint32)size);
+    cm_oamap_bucket_t *new_buckets = (cm_oamap_bucket_t *)cm_malloc((uint32_t)size);
     if (new_buckets == NULL) {
         LOG_DEBUG_ERR("Malloc failed");
         return CM_ERROR;
@@ -207,8 +207,8 @@ static int32 oamap_rehash(cm_oamap_t *map, uint32 new_capacity)
     void **new_key = (void **)(new_buckets + new_capacity);
     void **new_value = (void **)(new_key + new_capacity);
 
-    for (uint32 i = 0; i < new_capacity; i++) {
-        new_buckets[i].state = (uint32)FREE;
+    for (uint32_t i = 0; i < new_capacity; i++) {
+        new_buckets[i].state = (uint32_t)FREE;
         new_key[i] = NULL;
         new_value[i] = NULL;
     }
@@ -240,11 +240,11 @@ void cm_oamap_init_mem(cm_oamap_t *map)
     map->compare_func = NULL;
 }
 
-int32 cm_oamap_init(
-    cm_oamap_t *map, uint32 init_capacity, cm_oamap_compare_t compare_func /* , memory_context_t *mem_ctx */)
+int32_t cm_oamap_init(
+    cm_oamap_t *map, uint32_t init_capacity, cm_oamap_compare_t compare_func /* , memory_context_t *mem_ctx */)
 {
     uint64 size;
-    uint32 i;
+    uint32_t i;
     if (map == NULL || compare_func == NULL) {
         LOG_DEBUG_ERR("Null pointer specified");
         return ERR_WR_INVALID_PARAM;
@@ -256,13 +256,13 @@ int32 cm_oamap_init(
         return ERR_WR_INVALID_PARAM;
     }
     map->used = 0;
-    size = map->num * (uint32)(sizeof(cm_oamap_bucket_t) + sizeof(void *) + sizeof(void *));
+    size = map->num * (uint32_t)(sizeof(cm_oamap_bucket_t) + sizeof(void *) + sizeof(void *));
     if (size >= CM_INVALID_ID32) {
         LOG_DEBUG_ERR("Invalid map size");
         return ERR_WR_INVALID_PARAM;
     }
     map->compare_func = compare_func;
-    map->buckets = (cm_oamap_bucket_t *)cm_malloc((uint32)size);
+    map->buckets = (cm_oamap_bucket_t *)cm_malloc((uint32_t)size);
     if (map->buckets == NULL) {
         LOG_DEBUG_ERR("Malloc failed");
         return CM_ERROR;
@@ -271,7 +271,7 @@ int32 cm_oamap_init(
     map->value = (void **)(map->key + map->num);
 
     for (i = 0; i < map->num; i++) {
-        map->buckets[i].state = (uint32)FREE;
+        map->buckets[i].state = (uint32_t)FREE;
         map->key[i] = NULL;
         map->value[i] = NULL;
     }
@@ -294,14 +294,14 @@ void cm_oamap_destroy(cm_oamap_t *map)
     map->compare_func = NULL;
 }
 
-static int32 cm_oamap_find_pos_forward(cm_oamap_t *map, uint32 hash, void *key, bool32 *found_pos, uint32 *insert_pos)
+static int32_t cm_oamap_find_pos_forward(cm_oamap_t *map, uint32_t hash, void *key, bool32 *found_pos, uint32_t *insert_pos)
 {
     cm_oamap_bucket_t *cm_oamap_bucket;
-    uint32 start = hash % map->num;
+    uint32_t start = hash % map->num;
     while (start > 0) {
         start--;
         cm_oamap_bucket = &(map->buckets[start]);
-        if (cm_oamap_bucket->state == (uint32)FREE) {
+        if (cm_oamap_bucket->state == (uint32_t)FREE) {
             if (!(*found_pos)) {
                 // find a new free pos to insert. so need to update the used counter
                 map->used++;
@@ -309,7 +309,7 @@ static int32 cm_oamap_find_pos_forward(cm_oamap_t *map, uint32 hash, void *key, 
                 *insert_pos = start;
             }
             break;
-        } else if (cm_oamap_bucket->state == (uint32)DELETED) {
+        } else if (cm_oamap_bucket->state == (uint32_t)DELETED) {
             if (!(*found_pos)) {
                 // find a deleted pos to reuse for insert. so need to update the deleted counter
                 map->deleted--;
@@ -326,17 +326,17 @@ static int32 cm_oamap_find_pos_forward(cm_oamap_t *map, uint32 hash, void *key, 
     return CM_SUCCESS;
 }
 
-static int32 cm_oamap_insert_core(cm_oamap_t *map, uint32 hash, void *key, void *value)
+static int32_t cm_oamap_insert_core(cm_oamap_t *map, uint32_t hash, void *key, void *value)
 {
-    uint32 i;
+    uint32_t i;
     cm_oamap_bucket_t *cm_oamap_bucket;
     bool32 found_free = CM_FALSE;
     bool32 found_pos = CM_FALSE;
-    uint32 insert_pos = 0;
-    uint32 start = hash % map->num;
+    uint32_t insert_pos = 0;
+    uint32_t start = hash % map->num;
     for (i = start; i < map->num; i++) {
         cm_oamap_bucket = &(map->buckets[i]);
-        if (cm_oamap_bucket->state == (uint32)FREE) {
+        if (cm_oamap_bucket->state == (uint32_t)FREE) {
             found_free = CM_TRUE;
             if (!found_pos) {
                 // find a new free pos to insert. so need to update the used counter
@@ -345,7 +345,7 @@ static int32 cm_oamap_insert_core(cm_oamap_t *map, uint32 hash, void *key, void 
                 insert_pos = i;
             }
             break;
-        } else if (cm_oamap_bucket->state == (uint32)DELETED) {
+        } else if (cm_oamap_bucket->state == (uint32_t)DELETED) {
             if (!found_pos) {
                 // find a deleted pos to reuse for insert. so need to udpate the deleted counter
                 map->deleted--;
@@ -366,7 +366,7 @@ static int32 cm_oamap_insert_core(cm_oamap_t *map, uint32 hash, void *key, void 
     if (found_pos) {
         cm_oamap_bucket = &(map->buckets[insert_pos]);
         cm_oamap_bucket->hash = hash;
-        cm_oamap_bucket->state = (uint32)USED;
+        cm_oamap_bucket->state = (uint32_t)USED;
         map->key[insert_pos] = key;
         map->value[insert_pos] = value;
         return CM_SUCCESS;
@@ -375,10 +375,10 @@ static int32 cm_oamap_insert_core(cm_oamap_t *map, uint32 hash, void *key, void 
     return ERR_WR_OAMAP_INSERT;
 }
 
-int32 cm_oamap_insert(cm_oamap_t *map, uint32 hash, void *key, void *value)
+int32_t cm_oamap_insert(cm_oamap_t *map, uint32_t hash, void *key, void *value)
 {
-    int32 ret;
-    uint32 new_size;
+    int32_t ret;
+    uint32_t new_size;
     if (map == NULL) {
         LOG_DEBUG_ERR("Pointer to map is NULL");
         return ERR_WR_INVALID_PARAM;
@@ -399,9 +399,9 @@ int32 cm_oamap_insert(cm_oamap_t *map, uint32 hash, void *key, void *value)
     return cm_oamap_insert_core(map, hash, key, value);
 }
 
-void *cm_oamap_lookup(cm_oamap_t *map, uint32 hash, void *key)
+void *cm_oamap_lookup(cm_oamap_t *map, uint32_t hash, void *key)
 {
-    uint32 i, start;
+    uint32_t i, start;
     cm_oamap_bucket_t *bucket;
 
     if (map == NULL) {
@@ -419,9 +419,9 @@ void *cm_oamap_lookup(cm_oamap_t *map, uint32 hash, void *key)
 
     for (i = start; i < map->num; i++) {
         bucket = &(map->buckets[i]);
-        if (bucket->state == (uint32)FREE) {
+        if (bucket->state == (uint32_t)FREE) {
             return NULL;
-        } else if (bucket->state == (uint32)USED) {
+        } else if (bucket->state == (uint32_t)USED) {
             if (bucket->hash == hash && map->compare_func(map->key[i], key) == CM_TRUE) {
                 return map->value[i];
             }
@@ -433,9 +433,9 @@ void *cm_oamap_lookup(cm_oamap_t *map, uint32 hash, void *key)
     while (start > 0) {
         start--;
         bucket = &(map->buckets[start]);
-        if (bucket->state == (uint32)FREE) {
+        if (bucket->state == (uint32_t)FREE) {
             return NULL;
-        } else if (bucket->state == (uint32)USED) {
+        } else if (bucket->state == (uint32_t)USED) {
             if (bucket->hash == hash && map->compare_func(map->key[start], key) == CM_TRUE) {
                 return map->value[start];
             }
@@ -446,9 +446,9 @@ void *cm_oamap_lookup(cm_oamap_t *map, uint32 hash, void *key)
     return NULL;
 }
 
-void *cm_oamap_remove(cm_oamap_t *map, uint32 hash, void *key)
+void *cm_oamap_remove(cm_oamap_t *map, uint32_t hash, void *key)
 {
-    uint32 i, start;
+    uint32_t i, start;
     cm_oamap_bucket_t *bucket;
     void *value = NULL;
     if (map == NULL) {
@@ -460,12 +460,12 @@ void *cm_oamap_remove(cm_oamap_t *map, uint32 hash, void *key)
     start = hash % map->num;
     for (i = start; i < map->num; i++) {
         bucket = &(map->buckets[i]);
-        if (bucket->state == (uint32)FREE) {
+        if (bucket->state == (uint32_t)FREE) {
             return NULL;
-        } else if (bucket->state == (uint32)USED) {
+        } else if (bucket->state == (uint32_t)USED) {
             if (bucket->hash == hash && map->compare_func(map->key[i], key) == CM_TRUE) {
                 bucket->hash = 0;
-                bucket->state = (uint32)DELETED;
+                bucket->state = (uint32_t)DELETED;
                 map->deleted++;
                 value = map->value[i];
                 map->key[i] = NULL;
@@ -480,12 +480,12 @@ void *cm_oamap_remove(cm_oamap_t *map, uint32 hash, void *key)
     while (start > 0) {
         start--;
         bucket = &(map->buckets[start]);
-        if (bucket->state == (uint32)FREE) {
+        if (bucket->state == (uint32_t)FREE) {
             return NULL;
-        } else if (bucket->state == (uint32)USED) {
+        } else if (bucket->state == (uint32_t)USED) {
             if (bucket->hash == hash && map->compare_func(map->key[start], key) == CM_TRUE) {
                 bucket->hash = 0;
-                bucket->state = (uint32)DELETED;
+                bucket->state = (uint32_t)DELETED;
                 map->deleted++;
                 value = map->value[start];
                 map->key[start] = NULL;
@@ -506,9 +506,9 @@ void cm_oamap_reset_iterator(cm_oamap_iterator_t *iter)
     *iter = 0;
 }
 
-int32 cm_oamap_fetch(cm_oamap_t *map, cm_oamap_iterator_t *iter, void **key, void **value)
+int32_t cm_oamap_fetch(cm_oamap_t *map, cm_oamap_iterator_t *iter, void **key, void **value)
 {
-    uint32 i;
+    uint32_t i;
     cm_oamap_bucket_t *bucket;
 
     CM_ASSERT(map != NULL);
@@ -518,7 +518,7 @@ int32 cm_oamap_fetch(cm_oamap_t *map, cm_oamap_iterator_t *iter, void **key, voi
 
     for (i = *iter; i < map->num; i++) {
         bucket = &(map->buckets[i]);
-        if (bucket->state == (uint32)USED) {
+        if (bucket->state == (uint32_t)USED) {
             *key = map->key[i];
             *value = map->value[i];
             *iter = i + 1;
@@ -532,7 +532,7 @@ int32 cm_oamap_fetch(cm_oamap_t *map, cm_oamap_iterator_t *iter, void **key, voi
     return ERR_WR_OAMAP_FETCH;
 }
 
-uint32 cm_oamap_size(cm_oamap_t *map)
+uint32_t cm_oamap_size(cm_oamap_t *map)
 {
     CM_ASSERT(map != NULL);
     return map->num;

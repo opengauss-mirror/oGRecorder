@@ -38,7 +38,7 @@ void wr_latch_x(latch_t *latch)
     cm_latch_x(latch, WR_DEFAULT_SESSIONID, NULL);
 }
 
-bool32 wr_latch_timed_x(latch_t *latch, uint32 wait_ticks)
+bool32 wr_latch_timed_x(latch_t *latch, uint32_t wait_ticks)
 {
     return cm_latch_timed_x(latch, WR_DEFAULT_SESSIONID, wait_ticks, NULL);
 }
@@ -48,27 +48,27 @@ void wr_unlatch(latch_t *latch)
     cm_unlatch(latch, NULL);
 }
 
-void wr_latch_x2(latch_t *latch, uint32 sid)
+void wr_latch_x2(latch_t *latch, uint32_t sid)
 {
     cm_latch_x(latch, sid, NULL);
 }
 
-void wr_latch_s2(latch_t *latch, uint32 sid, bool32 is_force, latch_statis_t *stat)
+void wr_latch_s2(latch_t *latch, uint32_t sid, bool32 is_force, latch_statis_t *stat)
 {
     cm_latch_s(latch, sid, is_force, stat);
 }
 
-void wr_latch_x2ix(latch_t *latch, uint32 sid, latch_statis_t *stat)
+void wr_latch_x2ix(latch_t *latch, uint32_t sid, latch_statis_t *stat)
 {
     (void)cm_latch_x2ix(latch, sid, stat);
 }
 
-void wr_latch_ix2x(latch_t *latch, uint32 sid, latch_statis_t *stat)
+void wr_latch_ix2x(latch_t *latch, uint32_t sid, latch_statis_t *stat)
 {
     cm_latch_ix2x(latch, sid, stat);
 }
 
-void wr_latch_degrade(latch_t *latch, uint32 sid, latch_statis_t *stat)
+void wr_latch_degrade(latch_t *latch, uint32_t sid, latch_statis_t *stat)
 {
     cm_latch_degrade(latch, sid, stat);
 }

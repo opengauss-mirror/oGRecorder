@@ -71,7 +71,7 @@ typedef enum en_zft_item_type {
 } gft_item_type_t;
 
 typedef struct st_zft_list {
-    uint32 count;
+    uint32_t count;
     ftid_t first;
     ftid_t last;
 } gft_list_t;
@@ -82,8 +82,8 @@ typedef union st_gft_node {
         gft_item_type_t type;
         time_t create_time;
         time_t update_time;
-        uint32 software_version;
-        uint32 flags;
+        uint32_t software_version;
+        uint32_t flags;
         atomic_t size;  // Actually uint64, use atomic_get for client read and atomic_set for server modify.
         union {
             wr_block_id_t entry;  // for file and link
@@ -214,17 +214,17 @@ typedef enum en_wr_file_mode {
 typedef struct st_wr_file_context {
     latch_t latch;
     gft_node_t *node;
-    uint32 next;
-    uint32 flag : 2;  // WR_FILE_CONTEXT_FLAG_USED,WR_FILE_CONTEXT_FLAG_FREE
-    uint32 tid : 22;  // 64-bit OS: pid_max [0, 2^22]
-    uint32 reserve : 8;
+    uint32_t next;
+    uint32_t flag : 2;  // WR_FILE_CONTEXT_FLAG_USED,WR_FILE_CONTEXT_FLAG_FREE
+    uint32_t tid : 22;  // 64-bit OS: pid_max [0, 2^22]
+    uint32_t reserve : 8;
     int64 offset;
     int64 vol_offset;
     wr_vg_info_item_t *vg_item;
     uint64 fid;
     char file_path[WR_MAX_NAME_LEN];
-    uint32 vgid;
-    uint32 id;
+    uint32_t vgid;
+    uint32_t id;
     wr_file_mode_e mode;
 } wr_file_context_t;
 
@@ -239,18 +239,18 @@ typedef struct st_wr_ft_au_list_t {
 } wr_ft_au_list_t;
 
 typedef struct st_wr_file_run_ctx {
-    uint32 max_open_file;
-    uint32 has_opened_files;
-    uint32 file_free_first;  // the first free file context.
+    uint32_t max_open_file;
+    uint32_t has_opened_files;
+    uint32_t file_free_first;  // the first free file context.
     wr_file_context_group_t files;
 } wr_file_run_ctx_t;
 
 typedef struct st_wr_env {
     latch_t latch;
     bool32 initialized;
-    uint32 instance_id;
+    uint32_t instance_id;
     latch_t conn_latch;
-    uint32 conn_count;
+    uint32_t conn_count;
     thread_t thread_heartbeat;
     wr_config_t inst_cfg;
 #ifdef ENABLE_WRTEST
