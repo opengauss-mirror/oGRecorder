@@ -61,7 +61,7 @@ status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_rmdir(const char *name, uint64_t flag) {
+status_t wr_filesystem_rmdir(const char *name, uint64 flag) {
     if (flag != 0) {
         DIR *dir = opendir(WR_FS_GET_PATH(name));
         if (!dir) {
@@ -125,20 +125,20 @@ status_t wr_filesystem_rm(const char *name) {
     return CM_SUCCESS;
 }
 
-int64_t wr_filesystem_pwrite(int64_t handle, int64_t offset, int64_t size, const char *buf) {
-    int64_t res = pwrite(handle, buf, size, offset);
+int64 wr_filesystem_pwrite(int64 handle, int64 offset, int64 size, const char *buf) {
+    int64 res = pwrite(handle, buf, size, offset);
     if (res == -1) {
-        LOG_RUN_ERR("[FS] Failed to write to handle: %ld, offset: %ld, size: %ld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to write to handle: %lld, offset: %lld, size: %lld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
     return res;
 }
 
-int64_t wr_filesystem_pread(int64_t handle, int64_t offset, int64_t size, char *buf) {
-    int64_t res = pread(handle, buf, size, offset);
+int64 wr_filesystem_pread(int64 handle, int64 offset, int64 size, char *buf) {
+    int64 res = pread(handle, buf, size, offset);
     if (res == -1) {
-        LOG_RUN_ERR("[FS] Failed to read from handle: %ld, offset: %ld, size: %ld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to read from handle: %lld, offset: %lld, size: %lld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -186,7 +186,7 @@ status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_open(const char *file_path, int flag, int64_t *fd) {
+status_t wr_filesystem_open(const char *file_path, int flag, int64 *fd) {
     *fd = open(WR_FS_GET_PATH(file_path), flag, 0);
     if (*fd == -1) {
         LOG_RUN_ERR("[FS] Failed to open file: %s", file_path);
@@ -205,16 +205,16 @@ status_t wr_filesystem_close(int fd) {
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_truncate(int64_t fd, int64_t length) {
+status_t wr_filesystem_truncate(int64 fd, int64 length) {
     if (ftruncate(fd, length) == -1) {
-        LOG_RUN_ERR("[FS] Failed to truncate file: %ld, length: %ld", fd, length);
+        LOG_RUN_ERR("[FS] Failed to truncate file: %lld, length: %lld", fd, length);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_stat(const char *name, int64_t *offset, int64_t *size) {
+status_t wr_filesystem_stat(const char *name, int64 *offset, int64 *size) {
     struct stat file_stat;
     if (stat(WR_FS_GET_PATH(name), &file_stat) != 0) {
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);

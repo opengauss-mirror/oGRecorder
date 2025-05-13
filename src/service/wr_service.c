@@ -271,7 +271,7 @@ static status_t wr_process_mkdir(wr_session_t *session)
 static status_t wr_process_rmdir(wr_session_t *session)
 {
     char *dir = NULL;
-    uint64_t flag = 0;
+    int64 flag = 0;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &dir));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &flag));
@@ -378,7 +378,7 @@ static status_t wr_process_open_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
-    int64_t fd = 0;
+    int64 fd = 0;
     status_t status = wr_open_file(session, (const char *)name, flag, &fd);
     if (status == CM_SUCCESS) {
         WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, fd));
@@ -388,21 +388,21 @@ static status_t wr_process_open_file(wr_session_t *session)
 
 static status_t wr_process_close_file(wr_session_t *session)
 {
-    int64_t fd;
+    int64 fd;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&fd));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fd));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%ld", fd));
 
-    WR_LOG_DEBUG_OP("Begin to close file, fd:%ld", fd);
+    WR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
     WR_RETURN_IF_ERROR(wr_filesystem_close(fd));
-    LOG_DEBUG_INF("Succeed to close file, fd:%ld", fd);
+    LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
     return CM_SUCCESS;
 }
 
 static status_t wr_process_open_dir(wr_session_t *session)
 {
     char *name = NULL;
-    int64_t refresh_recursive;
+    int32 refresh_recursive;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &refresh_recursive));
@@ -421,12 +421,12 @@ static status_t wr_process_open_dir(wr_session_t *session)
 
 static status_t wr_process_close_dir(wr_session_t *session)
 {
-    uint64_t ftid;
+    uint64 ftid;
     char *vg_name = NULL;
     uint32_t vgid;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vg_name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&vgid));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(
@@ -438,9 +438,9 @@ static status_t wr_process_close_dir(wr_session_t *session)
 
 static status_t wr_process_write_file(wr_session_t *session)
 {
-    int64_t offset = 0;
-    int64_t file_size = 0;
-    int64_t handle = 0;
+    int64 offset = 0;
+    int64 file_size = 0;
+    int64 handle = 0;
     char *buf = NULL;
 
     wr_init_get(&session->recv_pack);
@@ -450,11 +450,11 @@ static status_t wr_process_write_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_data(&session->recv_pack, file_size, (void**)&buf));
 
     WR_RETURN_IF_ERROR(wr_set_audit_resource(
-        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%ld, offset:%ld, size:%ld", handle, offset, file_size));
+        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%lld, offset:%lld, size:%lld", handle, offset, file_size));
 
-    int64_t res = wr_filesystem_pwrite(handle, offset, file_size, buf);
+    int64 res = wr_filesystem_pwrite(handle, offset, file_size, buf);
     if (res == -1) {
-        LOG_RUN_ERR("Failed to write to handle: %ld, offset: %ld, size: %ld", handle, offset, file_size);
+        LOG_RUN_ERR("Failed to write to handle: %lld, offset: %lld, size: %lld", handle, offset, file_size);
         return CM_ERROR;
     }
     WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, res));
@@ -463,9 +463,9 @@ static status_t wr_process_write_file(wr_session_t *session)
 
 static status_t wr_process_read_file(wr_session_t *session)
 {
-    int64_t offset;
-    int64_t size;
-    int64_t handle;
+    int64 offset;
+    int64 size;
+    int64 handle;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
@@ -481,9 +481,9 @@ static status_t wr_process_read_file(wr_session_t *session)
     memset(buf, 0, size);
 
     // Read the file content into the buffer
-    int64_t res = wr_filesystem_pread(handle, offset, size, buf);
+    int64 res = wr_filesystem_pread(handle, offset, size, buf);
     if (res == -1) {
-        LOG_RUN_ERR("Failed to read from handle: %ld, offset: %ld, size: %ld", handle, offset, size);
+        LOG_RUN_ERR("Failed to read from handle: %lld, offset: %lld, size: %lld", handle, offset, size);
         return CM_ERROR;
     }
 
@@ -506,8 +506,8 @@ static status_t wr_process_extending_file(wr_session_t *session)
     wr_node_data_t node_data;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.fid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.ftid));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.offset));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.size));
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &node_data.vg_name));
@@ -524,8 +524,8 @@ static status_t wr_process_fallocate_file(wr_session_t *session)
     wr_node_data_t node_data;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&node_data.ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.fid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.ftid));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.offset));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.size));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&node_data.vgid));
@@ -542,9 +542,9 @@ static status_t wr_process_fallocate_file(wr_session_t *session)
 
 static status_t wr_process_truncate_file(wr_session_t *session)
 {
-    int64_t length;
-    int64_t handle;
-    int64_t truncateType;
+    int64 length;
+    int64 handle;
+    int64 truncateType;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &length));
@@ -552,21 +552,21 @@ static status_t wr_process_truncate_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &truncateType));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
         "handle:%ld, length:%ld", handle, length));
-    LOG_DEBUG_INF("Truncate file handle:%ld, length:%ld", handle, length);
+    LOG_DEBUG_INF("Truncate file handle:%lld, length:%lld", handle, length);
     return wr_filesystem_truncate(handle, length);
 }
 
 static status_t wr_process_stat_file(wr_session_t *session)
 {
     char *name = NULL;
-    int64_t offset;
-    int64_t size;
+    int64 offset;
+    int64 size;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_filesystem_stat(name, &offset, &size));
     wr_put_int64(&session->send_pack, offset);
     wr_put_int64(&session->send_pack, size);
-    LOG_DEBUG_INF("Stat file name:%s, offset:%ld, size:%ld", name, offset, size);
+    LOG_DEBUG_INF("Stat file name:%s, offset:%lld, size:%lld", name, offset, size);
     return CM_SUCCESS;
 }
 
@@ -616,17 +616,17 @@ static status_t wr_process_rename(wr_session_t *session)
 status_t wr_process_update_file_written_size(wr_session_t *session)
 {
     uint64 fid;
-    int64_t offset;
-    int64_t size;
+    int64 offset;
+    int64 size;
     wr_block_id_t ftid;
     uint32_t vg_id;
 
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&ftid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fid));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&vg_id));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&offset));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64_t *)&size));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&offset));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&size));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
         "vg_id:%u, fid:%llu, ftid:%llu, offset:%lld, size:%lld", vg_id, fid, *(uint64 *)&ftid, offset, size));
     return wr_update_file_written_size(session, vg_id, offset, size, ftid, fid);
@@ -703,13 +703,13 @@ static status_t wr_process_get_time_stat(wr_session_t *session)
         tmp_session = session_ctrl->sessions[i];
         if (tmp_session->is_used && !tmp_session->is_closed) {
             for (uint32_t j = 0; j < WR_EVT_COUNT; j++) {
-                int64_t count = (int64_t)tmp_session->wr_session_stat[j].wait_count;
-                int64_t total_time = (int64_t)tmp_session->wr_session_stat[j].total_wait_time;
-                int64_t max_sgl_time = (int64_t)tmp_session->wr_session_stat[j].max_single_time;
+                int64 count = (int64)tmp_session->wr_session_stat[j].wait_count;
+                int64 total_time = (int64)tmp_session->wr_session_stat[j].total_wait_time;
+                int64 max_sgl_time = (int64)tmp_session->wr_session_stat[j].max_single_time;
 
                 time_stat[j].wait_count += count;
                 time_stat[j].total_wait_time += total_time;
-                time_stat[j].max_single_time = (atomic_t)MAX((int64_t)time_stat[j].max_single_time, max_sgl_time);
+                time_stat[j].max_single_time = (atomic_t)MAX((int64)time_stat[j].max_single_time, max_sgl_time);
 
                 (void)cm_atomic_add(&tmp_session->wr_session_stat[j].wait_count, -count);
                 (void)cm_atomic_add(&tmp_session->wr_session_stat[j].total_wait_time, -total_time);

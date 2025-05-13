@@ -176,7 +176,7 @@ uint32_t wr_get_cmd_log_def_count()
 
 static status_t wr_init_log_file(log_param_t *log_param, wr_config_t *inst_cfg)
 {
-    int64_t val_int64;
+    int64 val_int64;
     uint16 val_uint16;
     char *value = NULL;
 
