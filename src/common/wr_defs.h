@@ -191,9 +191,9 @@ extern "C" {
 #define WR_ALIGN_SIZE (uint32_t)512
 #define WR_MIN_PORT (uint32_t)1024
 #define CM_ALIGN_512(size) (((size) + 0x000001FF) & 0xFFFFFE00)
-#define WR_DEFAULT_NULL_VALUE (uint32_t)0xFFFFFFFF
-#define WR_TCP_CONNECT_TIMEOUT (int32_t)(30000) /* 30 seconds */
-#define WR_TCP_SOCKET_TIMEOUT (int32_t)0x4FFFFFFF
+#define WR_DEFAULT_NULL_VALUE (uint32_t)(60000) /* 60 seconds */
+#define WR_TCP_CONNECT_TIMEOUT (int32_t)(5000) /* 5 seconds */
+#define WR_TCP_SOCKET_TIMEOUT (int32_t)(10000) /* 10 seconds */
 #define WR_SEEK_MAXWR 3 /* Used for seek actual file size for openGauss */
 
 #define WR_MIN_IOTHREADS_CFG 1

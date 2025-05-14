@@ -169,10 +169,10 @@ int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_ha
     return WR_SUCCESS;
 }
 
-int wr_vfs_unmount(wr_vfs_handle vfs_handle)
+int wr_vfs_unmount(wr_vfs_handle *vfs_handle)
 {
-    vfs_handle.handle = NULL;
-    vfs_handle.vfs_name[0] = '\0';
+    vfs_handle->handle = NULL;
+    vfs_handle->vfs_name[0] = '\0';
     return WR_SUCCESS; 
 }
 

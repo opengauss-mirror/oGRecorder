@@ -153,7 +153,7 @@ TEST_F(WrApiTest, TestWrVfsForceDelete) {
 }
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {
-    EXPECT_EQ(wr_vfs_unmount(g_vfs_handle), WR_SUCCESS);
+    EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle), WR_SUCCESS);
 }
 
 int main(int argc, char **argv) {
