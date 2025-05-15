@@ -54,17 +54,17 @@ typedef struct str_files_rw_ctx {
     int32_t handle;
     int32_t size;
     bool32 read;
-    int64_t offset;
+    int64 offset;
 } files_rw_ctx_t;
 
-status_t wr_kick_host_sync(wr_conn_t *conn, int64_t kick_hostid)
+status_t wr_kick_host_sync(wr_conn_t *conn, int64 kick_hostid)
 {
     return wr_msg_interact(conn, WR_CMD_KICKH, (void *)&kick_hostid, NULL);
 }
 
 status_t wr_apply_refresh_volume(wr_conn_t *conn, wr_file_context_t *context, auid_t auid);
 
-status_t wr_apply_extending_file(wr_conn_t *conn, int32_t handle, int64_t size, int64_t offset)
+status_t wr_apply_extending_file(wr_conn_t *conn, int32_t handle, int64 size, int64 offset)
 {
     wr_env_t *wr_env = wr_get_env();
     wr_file_run_ctx_t *file_run_ctx = &wr_env->file_run_ctx;
@@ -88,7 +88,7 @@ status_t wr_apply_extending_file(wr_conn_t *conn, int32_t handle, int64_t size, 
     return wr_msg_interact_with_stat(conn, WR_CMD_EXTEND_FILE, (void *)&send_info, NULL);
 }
 
-status_t wr_apply_fallocate_file(wr_conn_t *conn, int32_t handle, int32_t mode, int64_t offset, int64_t size)
+status_t wr_apply_fallocate_file(wr_conn_t *conn, int32_t handle, int32_t mode, int64 offset, int64 size)
 {
     wr_env_t *wr_env = wr_get_env();
     wr_file_run_ctx_t *file_run_ctx = &wr_env->file_run_ctx;
@@ -114,12 +114,12 @@ status_t wr_apply_fallocate_file(wr_conn_t *conn, int32_t handle, int32_t mode, 
     return wr_msg_interact(conn, WR_CMD_FALLOCATE_FILE, (void *)&send_info, NULL);
 }
 
-status_t wr_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *context, int64_t offset)
+status_t wr_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *context, int64 offset)
 {
     return CM_SUCCESS;
 }
 
-static status_t wr_check_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *context, int64_t offset)
+static status_t wr_check_apply_refresh_file(wr_conn_t *conn, wr_file_context_t *context, int64 offset)
 {
     bool32 is_valid = CM_FALSE;
     do {
@@ -434,7 +434,7 @@ status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint3
     LOG_DEBUG_INF("wr query file num entry, vfs_name:%s", vfs_name);
     wr_query_file_num_info_t send_info;
     send_info.vfs_name = vfs_name;
-    send_info.file_num = file_num;
+    send_info.file_num = *file_num;
     status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_NUM, (void *)&send_info, (void *)&send_info);
     if (status != CM_SUCCESS) {
         LOG_DEBUG_ERR("wr query file num error");
@@ -621,7 +621,7 @@ status_t wr_extend_files_context(wr_file_run_ctx_t *file_run_ctx)
     return CM_SUCCESS;
 }
 
-status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag, int64_t *fd)
+status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag, int *fd)
 {
     wr_open_file_info_t send_info;
     send_info.file_path = file_path;
@@ -677,8 +677,6 @@ status_t wr_latch_context_by_handle(
 
 status_t wr_close_file_impl(wr_conn_t *conn, int handle)
 {
-    char *fname = NULL;
-
     LOG_DEBUG_INF("wr close file entry, handle:%d", handle);
     status_t ret = wr_close_file_on_server(conn, handle);
     if (ret != CM_SUCCESS) {
@@ -701,17 +699,17 @@ status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_it
     return CM_SUCCESS;
 }
 
-static status_t wr_validate_seek_origin(int origin, int64_t offset, wr_file_context_t *context, int64_t *new_offset)
+static status_t wr_validate_seek_origin(int origin, int64 offset, wr_file_context_t *context, int64 *new_offset)
 {
     if (origin == SEEK_SET) {
-        if (offset > (int64_t)WR_MAX_FILE_SIZE) {
+        if (offset > (int64)WR_MAX_FILE_SIZE) {
             LOG_DEBUG_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
             return CM_ERROR;
         }
         *new_offset = offset;
     } else if (origin == SEEK_CUR) {
-        if (offset > (int64_t)WR_MAX_FILE_SIZE || context->offset > (int64_t)WR_MAX_FILE_SIZE ||
-            offset + context->offset > (int64_t)WR_MAX_FILE_SIZE) {
+        if (offset > (int64)WR_MAX_FILE_SIZE || context->offset > (int64)WR_MAX_FILE_SIZE ||
+            offset + context->offset > (int64)WR_MAX_FILE_SIZE) {
             LOG_DEBUG_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
             return CM_ERROR;
         }
@@ -728,11 +726,11 @@ static status_t wr_validate_seek_origin(int origin, int64_t offset, wr_file_cont
     return CM_SUCCESS;
 }
 
-int64_t wr_seek_file_impl_core(wr_rw_param_t *param, int64_t offset, int origin)
+int64 wr_seek_file_impl_core(wr_rw_param_t *param, int64 offset, int origin)
 {
     status_t status;
-    int64_t new_offset = 0;
-    int64_t size;
+    int64 new_offset = 0;
+    int64 size;
     bool32 need_refresh = ((origin == SEEK_END) || (origin == WR_SEEK_MAXWR));
 
     wr_conn_t *conn = param->conn;
@@ -763,9 +761,9 @@ int64_t wr_seek_file_impl_core(wr_rw_param_t *param, int64_t offset, int origin)
         }
         LOG_DEBUG_INF("Apply to refresh file, offset:%lld, size:%lld, need_refresh:%d.", offset, size, need_refresh);
         if (origin == SEEK_END) {
-            new_offset = (int64_t)context->node->written_size + offset;
+            new_offset = (int64)context->node->written_size + offset;
         } else if (origin == WR_SEEK_MAXWR) {
-            new_offset = (int64_t)context->node->written_size;
+            new_offset = (int64)context->node->written_size;
         }
     }
     if (new_offset < 0) {
@@ -783,7 +781,7 @@ int64_t wr_seek_file_impl_core(wr_rw_param_t *param, int64_t offset, int origin)
 }
 
 void wr_init_rw_param(
-    wr_rw_param_t *param, wr_conn_t *conn, int handle, wr_file_context_t *ctx, int64_t offset, bool32 atomic)
+    wr_rw_param_t *param, wr_conn_t *conn, int handle, wr_file_context_t *ctx, int64 offset, bool32 atomic)
 {
     param->conn = conn;
     param->handle = handle;
@@ -794,11 +792,11 @@ void wr_init_rw_param(
     param->is_read = WR_FALSE;
 }
 
-static int64_t wr_seek_file_prepare(
-    wr_conn_t *conn, wr_file_context_t *context, wr_rw_param_t *param, int64_t offset, int origin)
+static int64 wr_seek_file_prepare(
+    wr_conn_t *conn, wr_file_context_t *context, wr_rw_param_t *param, int64 offset, int origin)
 {
     WR_LOCK_VG_META_S_RETURN_ERROR(context->vg_item, conn->session);
-    int64_t ret = wr_seek_file_impl_core(param, offset, origin);
+    int64 ret = wr_seek_file_impl_core(param, offset, origin);
     if (ret == CM_ERROR) {
         return CM_ERROR;
     }
@@ -806,7 +804,7 @@ static int64_t wr_seek_file_prepare(
     return ret;
 }
 
-int64_t wr_seek_file_impl(wr_conn_t *conn, int handle, int64_t offset, int origin)
+int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin)
 {
     LOG_DEBUG_INF("wr seek file entry, handle:%d, offset:%lld, origin:%d", handle, offset, origin);
 
@@ -815,14 +813,14 @@ int64_t wr_seek_file_impl(wr_conn_t *conn, int handle, int64_t offset, int origi
 
     wr_rw_param_t param;
     wr_init_rw_param(&param, conn, handle, context, context->offset, WR_FALSE);
-    int64_t new_offset = wr_seek_file_prepare(conn, context, &param, offset, origin);
+    int64 new_offset = wr_seek_file_prepare(conn, context, &param, offset, origin);
     wr_unlatch(&context->latch);
 
     LOG_DEBUG_INF("wr seek file leave, new_offset:%lld", new_offset);
     return new_offset;
 }
 
-status_t wr_read_write_file_core(wr_conn_t *conn, int64_t offset, void *buf, int32_t size, int64_t handle) 
+status_t wr_read_write_file_core(wr_conn_t *conn, int64 offset, void *buf, int32_t size, int64 handle) 
 {
     LOG_DEBUG_INF("wr write file entry, handle:%lld, size:%d", handle, size);   
     wr_write_file_info_t send_info;
@@ -836,42 +834,28 @@ status_t wr_read_write_file_core(wr_conn_t *conn, int64_t offset, void *buf, int
     return status;
 }
 
-status_t wr_read_write_file(wr_conn_t *conn, int32_t handle, void *buf, int32_t size, int64_t offset, bool32 is_read)
+status_t wr_read_write_file(wr_conn_t *conn, int32_t handle, void *buf, int32_t size, int64 offset, bool32 is_read)
 {
     status_t status;
-    wr_file_context_t *context = NULL;
-    wr_rw_param_t param;
 
     if (size < 0) {
         LOG_DEBUG_ERR("File size is invalid: %d.", size);
         return CM_ERROR;
     }
     LOG_DEBUG_INF("wr read write file entry, handle:%d, is_read:%u", handle, is_read);
-
-    /* WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_EXCLUSIVE));
-    bool mode_match = is_read ? (context->mode & WR_FILE_MODE_READ) : (context->mode & WR_FILE_MODE_WRITE);
-    if (!mode_match) {
-        wr_unlatch(&context->latch);
-        WR_THROW_ERROR(ERR_WR_FILE_RDWR_INSUFF_PER, is_read ? "read" : "write", context->mode);
-        return CM_ERROR;
-    }
-    */
-    // wr_init_rw_param(&param, conn, handle, context, context->offset, WR_FALSE);
-    // param.is_read = is_read;
     status = wr_read_write_file_core(conn, offset, buf, size, handle);
-    // wr_unlatch(&context->latch);
     LOG_DEBUG_INF("wr read write file leave");
 
     return status;
 }
 
-int64_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
+int64 wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
-        LOG_DEBUG_ERR("File size is invalid: %d.", size);
+        LOG_DEBUG_ERR("File size is invalid: %lld.", size);
         return CM_ERROR;
     }
-    LOG_DEBUG_INF("wr pwrite file entry, handle:%lld, size:%d, offset:%lld", handle, size, offset);
+    LOG_DEBUG_INF("wr pwrite file entry, handle:%d, size:%lld, offset:%lld", handle, size, offset);
 
     wr_write_file_info_t send_info;
     send_info.handle = handle;
@@ -879,23 +863,23 @@ int64_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsign
     status_t status;
     unsigned long long total_size = 0;
     unsigned long long curr_size;
-    int remaining_size = size;
+    unsigned long long remaining_size = size;
     long long int rel_size;
 
     while (total_size < size) {
         curr_size = (remaining_size > WR_RW_STEP_SIZE) ? WR_RW_STEP_SIZE : remaining_size;
         send_info.offset = offset + total_size;
         send_info.size = curr_size;
-        send_info.buf = (const char *)buf + total_size;
+        send_info.buf = (char *)buf + total_size;
 
         status = wr_msg_interact(conn, WR_CMD_WRITE_FILE, (void *)&send_info, (void *)&rel_size);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to write file, total_size:%d, size:%d, offset:%lld, errmsg:%s.",
+            LOG_RUN_ERR("Failed to write file, total_size:%lld, size:%lld, offset:%lld, errmsg:%s.",
                 total_size, size - total_size, offset, strerror(errno));
             return CM_ERROR;
         }
         if (rel_size != curr_size) {
-            LOG_RUN_WAR("Failed to write file, total_size:%d, size:%d, offset:%lld, rel_size:%d, errmsg:%s.",
+            LOG_RUN_WAR("Failed to write file, total_size:%lld, size:%lld, offset:%lld, rel_size:%lld, errmsg:%s.",
                 total_size, size - total_size, offset, rel_size, strerror(errno));
             total_size += rel_size;
             break;
@@ -909,21 +893,21 @@ int64_t wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsign
     return total_size;
 }
 
-int64_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
+int64 wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
-        LOG_DEBUG_ERR("File size is invalid: %d.", size);
+        LOG_DEBUG_ERR("File size is invalid: %lld.", size);
         return CM_ERROR;
     }
-    LOG_DEBUG_INF("wr pread file entry, handle:%lld, size:%d, offset:%lld", handle, size, offset);
+    LOG_DEBUG_INF("wr pread file entry, handle:%d, size:%lld, offset:%lld", handle, size, offset);
 
     wr_read_file_info_t send_info;
     send_info.handle = handle;
 
     status_t status;
-    int64_t total_size = 0;
-    int64_t curr_size = 0;
-    int64_t remaining_size = size;
+    int64 total_size = 0;
+    int64 curr_size = 0;
+    int64 remaining_size = size;
 
     while (total_size < size) {
         curr_size = (remaining_size > WR_RW_STEP_SIZE) ? WR_RW_STEP_SIZE : remaining_size;
@@ -933,13 +917,13 @@ int64_t wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigne
 
         status = wr_msg_interact(conn, WR_CMD_READ_FILE, (void *)&send_info, (void *)&send_info);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to read file, total_size:%ld, size:%ld, offset:%ld, errmsg:%s.",
+            LOG_RUN_ERR("Failed to read file, total_size:%lld, size:%lld, offset:%lld, errmsg:%s.",
                 total_size, size - total_size, offset, strerror(errno));
             return CM_ERROR;
         }
 
         if (send_info.rel_size != curr_size) {
-            LOG_RUN_WAR("Failed to read file, total_size:%ld, size:%ld, offset:%lld, rel_size:%ld, errmsg:%s.",
+            LOG_RUN_WAR("Failed to read file, total_size:%lld, size:%lld, offset:%lld, rel_size:%lld, errmsg:%s.",
                 total_size, size - total_size, offset, send_info.rel_size, strerror(errno));
             total_size += send_info.rel_size;
             break;
@@ -964,7 +948,7 @@ status_t wr_fallocate_impl(wr_conn_t *conn, int handle, int mode, long long int 
         return CM_ERROR;
     }
 
-    if (offset > (int64_t)WR_MAX_FILE_SIZE) {
+    if (offset > (int64)WR_MAX_FILE_SIZE) {
         LOG_DEBUG_ERR("Offset is invalid:%lld.", offset);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
@@ -976,7 +960,7 @@ status_t wr_fallocate_impl(wr_conn_t *conn, int handle, int mode, long long int 
         return CM_ERROR;
     }
 
-    if (length > (int64_t)WR_MAX_FILE_SIZE) {
+    if (length > (int64)WR_MAX_FILE_SIZE) {
         LOG_DEBUG_ERR("File length is invalid:%lld.", length);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "length must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
@@ -1018,7 +1002,7 @@ status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int tru
         return CM_ERROR;
     }
 
-    if (length > (int64_t)WR_MAX_FILE_SIZE) {
+    if (length > (int64)WR_MAX_FILE_SIZE) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "length must less than WR_MAX_FILE_SIZE");
         LOG_DEBUG_ERR("File length is invalid:%lld.", length);
         return CM_ERROR;
@@ -1284,7 +1268,7 @@ status_t wr_set_main_inst_on_server(wr_conn_t *conn)
     return wr_msg_interact(conn, WR_CMD_SET_MAIN_INST, NULL, NULL);
 }
 
-status_t wr_close_file_on_server(wr_conn_t *conn, int64_t fd)
+status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd)
 {
     wr_close_file_info_t send_info;
     send_info.fd = fd;
@@ -1373,13 +1357,13 @@ static status_t wr_decode_stat_file(wr_packet_t *ack_pack, void *ack)
 static status_t wr_decode_query_file_num(wr_packet_t *ack_pack, void *ack)
 {
     wr_query_file_num_info_t *info = (wr_query_file_num_info_t *)ack;
-    CM_RETURN_IFERR(wr_get_int32(ack_pack, &(info->file_num)));
+    CM_RETURN_IFERR(wr_get_int32(ack_pack, (int32_t *)&(info->file_num)));
     return CM_SUCCESS;
 }
 
 static status_t wr_decode_write_file(wr_packet_t *ack_pack, void *ack)
 {
-    int64_t *info = (int64_t*)ack;
+    int64 *info = (int64*)ack;
     CM_RETURN_IFERR(wr_get_int64(ack_pack, info));
     return CM_SUCCESS;
 }
@@ -1620,7 +1604,7 @@ static status_t wr_encode_delete_file(wr_conn_t *conn, wr_packet_t *pack, void *
 
 static status_t wr_decode_open_file(wr_packet_t *ack_pack, void *ack)
 {
-    CM_RETURN_IFERR(wr_get_int64(ack_pack, (int64_t *)ack));
+    CM_RETURN_IFERR(wr_get_int64(ack_pack, (int64 *)ack));
     return CM_SUCCESS;
 }
 

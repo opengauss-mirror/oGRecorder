@@ -169,10 +169,10 @@ int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_ha
     return WR_SUCCESS;
 }
 
-int wr_vfs_unmount(wr_vfs_handle vfs_handle)
+int wr_vfs_unmount(wr_vfs_handle *vfs_handle)
 {
-    vfs_handle.handle = NULL;
-    vfs_handle.vfs_name[0] = '\0';
+    vfs_handle->handle = NULL;
+    vfs_handle->vfs_name[0] = '\0';
     return WR_SUCCESS; 
 }
 
@@ -226,7 +226,7 @@ int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, 
         return WR_ERROR;
     }
 
-    status_t ret = wr_vfs_query_file_num_impl(hdl->conn, vfs_name, file_num);
+    status_t ret = wr_vfs_query_file_num_impl(hdl->conn, vfs_name, (uint32_t *)file_num);
     if (ret != WR_SUCCESS) {
         *file_num = 0;
         LOG_DEBUG_INF("vfs query file num :%s error", vfs_name);
@@ -375,7 +375,7 @@ long long int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, 
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
     if (count < 0) {
-        LOG_DEBUG_ERR("File size is invalid:%d.", count);
+        LOG_DEBUG_ERR("File size is invalid:%lld.", count);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "size must be a positive integer");
         return CM_ERROR;
     }
@@ -407,7 +407,7 @@ long long int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigne
     wr_begin_stat(&begin_tv);
 
     if (count < 0) {
-        LOG_DEBUG_ERR("File size is invalid:%d.", count);
+        LOG_DEBUG_ERR("File size is invalid:%lld.", count);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "size must be a positive integer");
         return CM_ERROR;
     }
@@ -485,6 +485,7 @@ int wr_file_performance()
     return WR_SUCCESS;
 }
 
+/*
 static void wr_fsize_with_options(const char *fname, long long *fsize, int origin, wr_instance_handle inst_handle)
 {
     int32_t handle;
@@ -518,6 +519,7 @@ static void wr_fsize_with_options(const char *fname, long long *fsize, int origi
 
     (void)wr_close_file_impl(hdl->conn, handle);
 }
+*/
 
 int wr_fsize_physical(int handle, long long *fsize, wr_instance_handle inst_handle)
 {

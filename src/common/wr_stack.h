@@ -32,16 +32,16 @@ extern "C" {
 
 #define WR_MAX_STACK_DEPTH 32
 typedef struct tagknl_stack {
-    uint32_t depth;
-    uint32_t buff_pos;
-    uint32_t indicator[WR_MAX_STACK_DEPTH];
-    uint32_t size;
-    uint32_t reserve;
+    uint32 depth;
+    uint32 buff_pos;
+    uint32 indicator[WR_MAX_STACK_DEPTH];
+    uint32 size;
+    uint32 reserve;
     char *buff;
 } wr_stack;
 
-char *wr_get_stack_pos(wr_stack *stack, uint32_t depth);
-void wr_pop_ex(wr_stack *stack, uint32_t depth);
+char *wr_get_stack_pos(wr_stack *stack, uint32 depth);
+void wr_pop_ex(wr_stack *stack, uint32 depth);
 
 #ifdef __cplusplus
 }

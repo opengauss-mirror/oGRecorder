@@ -137,7 +137,7 @@ status_t wr_check_name(const char *name)
     return wr_check_name_is_valid(name, WR_MAX_NAME_LEN);
 }
 
-status_t wr_check_attr_flag(uint64_t attrFlag)
+status_t wr_check_attr_flag(uint64 attrFlag)
 {
     return CM_SUCCESS;
 }
@@ -357,7 +357,7 @@ status_t wr_open_file_check_s(
     return CM_SUCCESS;
 }
 
-status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64_t *fd)
+status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64 *fd)
 {
     status_t status;
     WR_LOG_DEBUG_OP("Begin to open file:%s, session id:%u.", file, session->id);
@@ -366,7 +366,7 @@ status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int
         LOG_RUN_ERR("[FS]Failed to open file:%s.", file);
         return CM_ERROR;
     }
-    WR_LOG_DEBUG_OP("Succeed to open file:%s, fd:%ld, session:%u.", file, *fd, session->id);
+    WR_LOG_DEBUG_OP("Succeed to open file:%s, fd:%lld, session:%u.", file, *fd, session->id);
     return CM_SUCCESS;
 }
 
@@ -424,8 +424,8 @@ status_t wr_update_au_disk(
     status_t status;
     char *buf;
     CM_ASSERT(vg_item->volume_handle[auid.volume].handle != WR_INVALID_HANDLE);
-    int64_t offset = wr_get_au_offset(vg_item, auid);
-    int64_t block_offset = offset;
+    int64 offset = wr_get_au_offset(vg_item, auid);
+    int64 block_offset = offset;
     uint32_t obj_id = first;
     for (uint32_t i = 0; i < count; i++) {
         buf = wr_buffer_get_meta_addr(pool_id, obj_id);
@@ -497,7 +497,7 @@ status_t wr_refresh_root_ft_inner(wr_vg_info_item_t *vg_item)
     bool32 remote = CM_TRUE;
     wr_ctrl_t *wr_ctrl = vg_item->wr_ctrl;
     char *root = wr_ctrl->root;
-    status_t status = wr_load_vg_ctrl_part(vg_item, (int64_t)WR_CTRL_ROOT_OFFSET, root, (int32_t)WR_BLOCK_SIZE, &remote);
+    status_t status = wr_load_vg_ctrl_part(vg_item, (int64)WR_CTRL_ROOT_OFFSET, root, (int32_t)WR_BLOCK_SIZE, &remote);
     WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to get the whole root."));
     if (remote == CM_FALSE) {
         uint32_t checksum = wr_get_checksum(root, WR_BLOCK_SIZE);
@@ -551,8 +551,8 @@ static void wr_init_ft_root_core(char *root, wr_root_ft_block_t *ft_block, gft_r
     wr_set_blockid(&gft->last, 0);
 
     gft->items.count = 0;
-    *(uint64_t *)(&gft->items.first) = WR_INVALID_64;
-    *(uint64_t *)(&gft->items.last) = WR_INVALID_64;
+    *(uint64 *)(&gft->items.first) = WR_INVALID_64;
+    *(uint64 *)(&gft->items.last) = WR_INVALID_64;
     gft->free_list.count = 0;
     *(uint64 *)(&gft->free_list.first) = WR_INVALID_64;
     *(uint64 *)(&gft->free_list.last) = WR_INVALID_64;
@@ -570,19 +570,19 @@ static void wr_init_ft_root_core(char *root, wr_root_ft_block_t *ft_block, gft_r
         node->id.item = i;
 
         if (i == 1) {
-            *(uint64_t *)(&node->prev) = WR_INVALID_64;
+            *(uint64 *)(&node->prev) = WR_INVALID_64;
             gft->free_list.first = node->id;
         } else {
-            *(uint64_t *)(&node->prev) = 0;
+            *(uint64 *)(&node->prev) = 0;
             node->prev.block = 0;
             node->prev.item = (uint16)i - 1;
         }
 
         if (i == item_count - 1) {
-            *(uint64_t *)(&node->next) = WR_INVALID_64;
+            *(uint64 *)(&node->next) = WR_INVALID_64;
             gft->free_list.last = node->id;
         } else {
-            *(uint64_t *)(&node->next) = 0;
+            *(uint64 *)(&node->next) = 0;
             node->next.block = 0;
             node->next.item = (uint16)i + 1;
         }
@@ -641,11 +641,11 @@ status_t wr_update_ft_root(wr_vg_info_item_t *vg_item)
     WR_LOG_DEBUG_OP("Update node table root, version:%llu, checksum:%u.", block->ft_block.common.version,
         block->ft_block.common.checksum);
     status = wr_write_volume_inst(
-        vg_item, &vg_item->volume_handle[0], (int64_t)WR_CTRL_ROOT_OFFSET, wr_ctrl->root, WR_BLOCK_SIZE);
+        vg_item, &vg_item->volume_handle[0], (int64)WR_CTRL_ROOT_OFFSET, wr_ctrl->root, WR_BLOCK_SIZE);
     if (status == CM_SUCCESS) {
         // write to backup area
         status = wr_write_volume_inst(
-            vg_item, &vg_item->volume_handle[0], (int64_t)WR_CTRL_BAK_ROOT_OFFSET, wr_ctrl->root, WR_BLOCK_SIZE);
+            vg_item, &vg_item->volume_handle[0], (int64)WR_CTRL_BAK_ROOT_OFFSET, wr_ctrl->root, WR_BLOCK_SIZE);
     }
     return status;
 }
@@ -661,7 +661,7 @@ status_t wr_get_root_version(wr_vg_info_item_t *vg_item, uint64 *version)
     char temp[WR_DISK_UNIT_SIZE];
 #endif
     bool32 remote = CM_FALSE;
-    status_t status = wr_load_vg_ctrl_part(vg_item, (int64_t)WR_CTRL_ROOT_OFFSET, temp, WR_DISK_UNIT_SIZE, &remote);
+    status_t status = wr_load_vg_ctrl_part(vg_item, (int64)WR_CTRL_ROOT_OFFSET, temp, WR_DISK_UNIT_SIZE, &remote);
     if (status != CM_SUCCESS) {
         LOG_DEBUG_ERR("Failed to load vg core version %s.", vg_item->entry_path);
         return status;
@@ -687,7 +687,7 @@ status_t wr_check_refresh_ft(wr_vg_info_item_t *vg_item)
     wr_root_ft_block_t *ft_block_m = WR_GET_ROOT_BLOCK(vg_item->wr_ctrl);
     if (wr_compare_version(disk_version, ft_block_m->ft_block.common.version)) {
         status = wr_load_vg_ctrl_part(
-            vg_item, (int64_t)WR_CTRL_ROOT_OFFSET, vg_item->wr_ctrl->root, (int32_t)WR_BLOCK_SIZE, &remote);
+            vg_item, (int64)WR_CTRL_ROOT_OFFSET, vg_item->wr_ctrl->root, (int32_t)WR_BLOCK_SIZE, &remote);
         WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to load vg core part %s.", vg_item->entry_path));
     }
     WR_LOG_DEBUG_OP(
@@ -759,7 +759,7 @@ status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data)
 }
 
 /* validate params, lock VG and process recovery for truncate */
-static status_t wr_prepare_truncate(wr_session_t *session, wr_vg_info_item_t *vg_item, int64_t length)
+static status_t wr_prepare_truncate(wr_session_t *session, wr_vg_info_item_t *vg_item, int64 length)
 {
     wr_lock_vg_mem_and_shm_x(session, vg_item);
 
@@ -771,11 +771,11 @@ static status_t wr_prepare_truncate(wr_session_t *session, wr_vg_info_item_t *vg
     return CM_SUCCESS;
 }
 
-static void wr_truncate_set_size(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64_t length)
+static void wr_truncate_set_size(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 length)
 {
     uint64 old_size = (uint64)node->size;
     uint64 align_length = CM_CALC_ALIGN((uint64)length, wr_get_vg_au_size(vg_item->wr_ctrl));
-    (void)cm_atomic_set(&node->size, (int64_t)align_length);
+    (void)cm_atomic_set(&node->size, (int64)align_length);
     node->written_size = (uint64)length < node->written_size ? (uint64)length : node->written_size;
     node->min_inited_size = (uint64)align_length < node->min_inited_size ? (uint64)align_length : node->min_inited_size;
     wr_redo_set_file_size_t redo_size;
@@ -785,7 +785,7 @@ static void wr_truncate_set_size(wr_session_t *session, wr_vg_info_item_t *vg_it
     wr_put_log(session, vg_item, WR_RT_SET_FILE_SIZE, &redo_size, sizeof(redo_size));
 }
 
-status_t truncate_to_extend(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64_t size)
+status_t truncate_to_extend(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 size)
 {
     wr_node_data_t node_data;
     node_data.fid = node->fid;
@@ -861,16 +861,16 @@ status_t wr_truncate_small_init_tail(wr_session_t *session, wr_vg_info_item_t *v
             node->name, node->fid, wr_display_metaid(node->id), (uint64)node->size, node->written_size);
         return CM_SUCCESS;
     }
-    return wr_try_write_zero_one_au("truncate small", session, vg_item, node, (int64_t)node->written_size);
+    return wr_try_write_zero_one_au("truncate small", session, vg_item, node, (int64)node->written_size);
 }
 
 static status_t wr_truncate_to_recycle(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, wr_fs_block_t *entry_block, int64_t length)
+    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, wr_fs_block_t *entry_block, int64 length)
 {
     return CM_SUCCESS;
 }
 
-status_t wr_truncate_inner(wr_session_t *session, uint64 fid, ftid_t ftid, int64_t length, wr_vg_info_item_t *vg_item)
+status_t wr_truncate_inner(wr_session_t *session, uint64 fid, ftid_t ftid, int64 length, wr_vg_info_item_t *vg_item)
 {
     CM_RETURN_IFERR(wr_prepare_truncate(session, vg_item, length));
 
@@ -960,7 +960,7 @@ status_t wr_truncate_inner(wr_session_t *session, uint64 fid, ftid_t ftid, int64
     return CM_SUCCESS;
 }
 
-status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64_t length, char *vg_name)
+status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64 length, char *vg_name)
 {
     wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
     if (vg_item == NULL) {
@@ -985,7 +985,7 @@ bool32 wr_try_revalidate_file(wr_session_t *session, wr_vg_info_item_t *vg_item,
     return CM_FALSE;
 }
 
-status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64_t offset)
+status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64 offset)
 {
     return CM_SUCCESS;
 }
@@ -1029,7 +1029,7 @@ status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, u
 }
 
 status_t wr_update_file_written_size(
-    wr_session_t *session, uint32_t vg_id, int64_t offset, int64_t size, wr_block_id_t ftid, uint64 fid)
+    wr_session_t *session, uint32_t vg_id, int64 offset, int64 size, wr_block_id_t ftid, uint64 fid)
 {
     status_t status = CM_SUCCESS;
     wr_vg_info_item_t *vg_item = wr_find_vg_item_by_id(vg_id);
@@ -1100,7 +1100,7 @@ status_t wr_update_file_written_size(
 void wr_clean_all_sessions_latch()
 {
     uint64 cli_pid = 0;
-    int64_t start_time = 0;
+    int64 start_time = 0;
     bool32 cli_pid_alived = 0;
     uint32_t sid = 0;
     wr_session_t *session = NULL;
@@ -1173,7 +1173,7 @@ status_t wr_block_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *v
         vg_item->volume_handle[block_id.volume] = volume;
     }
 
-    int64_t vol_offset = wr_get_au_offset(vg_item, block_id) + (uint32_t)offset;
+    int64 vol_offset = wr_get_au_offset(vg_item, block_id) + (uint32_t)offset;
     if (is_write) {
         status = wr_write_volume(&volume, vol_offset, data_buf, size);
     } else {
@@ -1219,7 +1219,7 @@ status_t wr_write_zero2au(char *op_desc, wr_vg_info_item_t *vg_item, uint64 fid,
 }
 
 status_t wr_try_write_zero_one_au(
-    char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64_t offset)
+    char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 offset)
 {
     return CM_SUCCESS;
 }

@@ -39,8 +39,8 @@ extern "C" {
 typedef struct st_wr_node_data {
     uint64 fid;
     ftid_t ftid;
-    int64_t offset;
-    int64_t size;
+    int64 offset;
+    int64 size;
     int32_t mode;
     uint32_t vgid;
     char *vg_name;
@@ -58,14 +58,14 @@ void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item)
 
 status_t wr_create_file(wr_session_t *session, const char *parent, const char *name, int32_t flag);
 status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type);
-status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64_t *fd);
+status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64 *fd);
 status_t wr_close_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid);
 status_t wr_extend(wr_session_t *session, wr_node_data_t *node_data);
 status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data);
-status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64_t length, char *vg_name);
-status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64_t offset);
+status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64 length, char *vg_name);
+status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64 offset);
 status_t wr_update_file_written_size(
-    wr_session_t *session, uint32_t vg_id, int64_t offset, int64_t size, wr_block_id_t ftid, uint64 fid);
+    wr_session_t *session, uint32_t vg_id, int64 offset, int64 size, wr_block_id_t ftid, uint64 fid);
 void wr_check_ft_node_free(gft_node_t *node);
 
 status_t wr_format_ft_node(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t auid);
@@ -102,7 +102,7 @@ wr_env_t *wr_get_env(void);
 wr_config_t *wr_get_inst_cfg(void);
 status_t wr_get_root_version(wr_vg_info_item_t *vg_item, uint64 *version);
 status_t wr_check_name(const char *name);
-status_t wr_check_attr_flag(uint64_t attrFlag);
+status_t wr_check_attr_flag(uint64 attrFlag);
 status_t wr_check_path(const char *path);
 status_t wr_check_volume_path(const char *path);
 status_t wr_check_device_path(const char *path);
@@ -265,7 +265,7 @@ status_t wr_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *vg_item
     char *data_buf, int32_t size);
 status_t wr_write_zero2au(char *op_desc, wr_vg_info_item_t *vg_item, uint64 fid, auid_t auid, uint32_t au_offset);
 status_t wr_try_write_zero_one_au(
-    char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64_t offset);
+    char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 offset);
 void wr_alarm_check_vg_usage(wr_session_t *session);
 #ifdef __cplusplus
 }

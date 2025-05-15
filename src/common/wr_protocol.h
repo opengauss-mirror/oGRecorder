@@ -268,12 +268,12 @@ static inline status_t wr_pack_check_len(wr_packet_t *pack, uint32_t inc)
 
 static inline status_t wr_get_data(wr_packet_t *pack, uint32_t size, void **buf)
 {
-    int64_t len;
+    int64 len;
     char *temp_buf = NULL;
     CM_ASSERT(pack != NULL);
 
-    len = (int64_t)CM_ALIGN4(size);
-    TO_UINT32_OVERFLOW_CHECK(len, int64_t);
+    len = (int64)CM_ALIGN4(size);
+    TO_UINT32_OVERFLOW_CHECK(len, int64);
     CM_RETURN_IFERR(wr_pack_check_len(pack, len));
     temp_buf = WR_READ_ADDR(pack);
     pack->offset += CM_ALIGN4(size);
@@ -299,15 +299,15 @@ static inline status_t wr_get_packet_strlen(wr_packet_t *pack, char *str, size_t
 static inline status_t wr_get_str(wr_packet_t *pack, char **buf)
 {
     char *str = NULL;
-    int64_t len;
+    int64 len;
     size_t str_len = 0;
     CM_ASSERT(pack != NULL);
 
     CM_RETURN_IFERR(wr_pack_check_len(pack, 1));
     str = WR_READ_ADDR(pack);
     CM_RETURN_IFERR(wr_get_packet_strlen(pack, str, &str_len));
-    len = (int64_t)CM_ALIGN4(str_len);
-    TO_UINT32_OVERFLOW_CHECK(len, int64_t);
+    len = (int64)CM_ALIGN4(str_len);
+    TO_UINT32_OVERFLOW_CHECK(len, int64);
     pack->offset += (uint32_t)len;
     if (buf != NULL) {
         *buf = str;
@@ -315,16 +315,16 @@ static inline status_t wr_get_str(wr_packet_t *pack, char **buf)
     return CM_SUCCESS;
 }
 
-static inline status_t wr_get_int64(wr_packet_t *pack, int64_t *value)
+static inline status_t wr_get_int64(wr_packet_t *pack, int64 *value)
 {
-    int64_t temp_value;
+    int64 temp_value;
     CM_ASSERT(pack != NULL);
 
-    CM_RETURN_IFERR(wr_pack_check_len(pack, sizeof(int64_t)));
+    CM_RETURN_IFERR(wr_pack_check_len(pack, sizeof(int64)));
 
-    temp_value = *(int64_t *)WR_READ_ADDR(pack);
-    temp_value = (CS_DIFFERENT_ENDIAN(pack->options) != 0) ? (int64_t)cs_reverse_int64((uint64)temp_value) : temp_value;
-    pack->offset += (uint32_t)sizeof(int64_t);
+    temp_value = *(int64 *)WR_READ_ADDR(pack);
+    temp_value = (CS_DIFFERENT_ENDIAN(pack->options) != 0) ? (int64)cs_reverse_int64((uint64)temp_value) : temp_value;
+    pack->offset += (uint32_t)sizeof(int64);
     if (value != NULL) {
         *value = temp_value;
     }
