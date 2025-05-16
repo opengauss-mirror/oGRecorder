@@ -454,6 +454,14 @@ int wr_file_stat(wr_vfs_handle vfs_handle, const char *fileName, long long *offs
         LOG_RUN_ERR("instance handle is NULL.");
         return WR_ERROR;
     }
+    if (fileName == NULL || strlen(fileName) == 0) {
+        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "fileName is NULL or empty");
+        return WR_ERROR;
+    }
+    if (strpbrk(fileName, "\\:*?\"<>|") != NULL) {
+        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "fileName contains invalid characters.");
+        return WR_ERROR;
+    }
     st_wr_instance_handle *hdl = (st_wr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fcreate get conn error.");

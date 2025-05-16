@@ -59,11 +59,11 @@ protected:
 };
 
 void writeData(int handle, wr_vfs_handle vfs_handle, const char* data, size_t size, int64_t offset) {
-    EXPECT_EQ(wr_file_pwrite(vfs_handle, handle, data, size, offset), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pwrite(vfs_handle, handle, data, size, offset), size);
 }
 
 void readData(int handle, wr_vfs_handle vfs_handle, char* buffer, size_t size, int64_t offset) {
-    EXPECT_EQ(wr_file_pread(vfs_handle, handle, buffer, size, offset), WR_SUCCESS);
+    EXPECT_EQ(wr_file_pread(vfs_handle, handle, buffer, size, offset), size);
 }
 
 TEST_F(ComplexWrApiTest, TestConcurrentReadWrite) {

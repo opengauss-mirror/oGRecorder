@@ -63,7 +63,7 @@ TEST_F(WrApiPerformanceTest, TestWritePerformance) {
     int result = wr_file_pwrite(g_vfs_handle, handle, data, data_size, 0);
     auto end = std::chrono::high_resolution_clock::now();
 
-    ASSERT_EQ(result, WR_SUCCESS) << "Failed to write data";
+    ASSERT_EQ(result, data_size) << "Failed to write data";
 
     std::chrono::duration<double, std::milli> duration = end - start; // 以毫秒为单位
     double milliseconds = duration.count();
@@ -91,7 +91,7 @@ TEST_F(WrApiPerformanceTest, TestWritePerformanceWith8KSteps) {
         result = wr_file_pwrite(g_vfs_handle, handle, data, step_size, offset);
         auto end = std::chrono::high_resolution_clock::now();
 
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to write data at offset " << offset;
+        ASSERT_EQ(result, step_size) << "Failed to write data at offset " << offset;
 
         std::chrono::duration<double, std::milli> latency = end - start; // 以毫秒为单位
         total_latency += latency.count();
