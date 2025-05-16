@@ -72,7 +72,7 @@ void writeToFileWithPerformance(wr_vfs_handle vfs_handle, const std::string& fil
         result = wr_file_pwrite(vfs_handle, handle, data, step_size, offset);
         auto end = std::chrono::high_resolution_clock::now();
 
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to write data at offset " << offset;
+        ASSERT_EQ(result, step_size) << "Failed to write data at offset " << offset;
 
         std::chrono::duration<double, std::milli> latency = end - start;
         total_latency += latency.count();

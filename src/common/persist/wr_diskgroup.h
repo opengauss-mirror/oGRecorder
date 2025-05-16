@@ -94,8 +94,6 @@ void wr_lock_vg_mem_s_force(wr_vg_info_item_t *vg_item);
 void wr_unlock_vg_mem(wr_vg_info_item_t *vg_item);
 
 status_t wr_file_lock_vg_w(wr_config_t *inst_cfg);
-void wr_file_unlock_vg(void);
-
 status_t wr_lock_disk_vg(const char *entry_path, wr_config_t *inst_cfg);
 status_t wr_lock_share_disk_vg(const char *entry_path, wr_config_t *inst_cfg);
 

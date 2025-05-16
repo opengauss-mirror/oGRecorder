@@ -46,8 +46,6 @@ wr_config_t *wr_get_g_inst_cfg()
 }
 
 static config_item_t g_wr_params[] = {
-    /* name, isdefault, attr, default_value, value, runtime_value, description, range, datatype, comment,
-    id, effect, scale, verify, notify, notify_pfile, alias */
     {"SSL_CERT_NOTIFY_TIME", CM_TRUE, ATTR_READONLY, "30", NULL, NULL, "-", "[7,180]", "GS_TYPE_INTEGER", NULL, 0,
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"WR_CM_SO_NAME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 1, EFFECT_REBOOT,
@@ -60,15 +58,9 @@ static config_item_t g_wr_params[] = {
         EFFECT_REBOOT, CFG_INS, wr_verify_log_file_size, wr_notify_log_file_size, NULL, NULL},
     {"INST_ID", CM_TRUE, ATTR_READONLY, "0", NULL, NULL, "-", "[0,64)", "GS_TYPE_INTEGER", NULL, 6, EFFECT_REBOOT,
         CFG_INS, NULL, NULL, NULL, NULL},
-    {"STORAGE_MODE", CM_TRUE, ATTR_READONLY, "DISK", NULL, NULL, "-", "CLUSTER_RAID,RAID,DISK", "GS_TYPE_VARCHAR", NULL,
-        7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"_LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER", NULL, 8,
         EFFECT_IMMEDIATELY, CFG_INS, wr_verify_log_level, wr_notify_log_level, NULL, NULL},
     {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER", NULL, 9,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"DISK_LOCK_INTERVAL", CM_TRUE, ATTR_READONLY, "100", NULL, NULL, "-", "[1,600000]", "GS_TYPE_INTEGER", NULL, 10,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"DLOCK_RETRY_COUNT", CM_TRUE, ATTR_READONLY, "50", NULL, NULL, "-", "[1,500000]", "GS_TYPE_INTEGER", NULL, 11,
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"_AUDIT_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER", NULL, 12,
         EFFECT_REBOOT, CFG_INS, wr_verify_audit_backup_file_count, wr_notify_audit_backup_file_count, NULL, NULL},
@@ -94,8 +86,6 @@ static config_item_t g_wr_params[] = {
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"MES_ELAPSED_SWITCH", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN", NULL, 23,
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_DISK_LOCK_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 24,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 25, EFFECT_REBOOT, CFG_INS,
         NULL, NULL, NULL, NULL},
     {"SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 26, EFFECT_REBOOT, CFG_INS,
@@ -109,8 +99,6 @@ static config_item_t g_wr_params[] = {
     {"POOL_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 30, EFFECT_REBOOT,
         CFG_INS, NULL, NULL, NULL, NULL},
     {"IMAGE_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 31, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"VOLUME_TYPES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 33, EFFECT_REBOOT,
         CFG_INS, NULL, NULL, NULL, NULL},
     {"_AUDIT_LEVEL", CM_TRUE, ATTR_NONE, "1", NULL, NULL, "-", "[0,255]", "GS_TYPE_INTEGER", NULL, 34,
         EFFECT_IMMEDIATELY, CFG_INS, wr_verify_audit_level, wr_notify_audit_level, NULL, NULL},
@@ -126,10 +114,6 @@ static config_item_t g_wr_params[] = {
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"_BLACKBOX_DETAIL_ON", CM_TRUE, ATTR_NONE, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN", NULL, 40,
         EFFECT_IMMEDIATELY, CFG_INS, wr_verify_blackbox_detail_on, wr_notify_blackbox_detail_on, NULL, NULL},
-    {"CLUSTER_RUN_MODE", CM_TRUE, ATTR_NONE, "cluster_primary", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 41,
-        EFFECT_REBOOT, CFG_INS, wr_verify_cluster_run_mode, wr_notify_cluster_run_mode, NULL, NULL},
-    {"XLOG_VG_ID", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER", NULL, 42, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
     {"MES_WAIT_TIMEOUT", CM_TRUE, ATTR_NONE, "10000", NULL, NULL, "-", "[500,30000]", "GS_TYPE_INTEGER", NULL, 43,
         EFFECT_IMMEDIATELY, CFG_INS, wr_verify_mes_wait_timeout, wr_notify_mes_wait_timeout, NULL, NULL},
     {"_ENABLE_CORE_STATE_COLLECT", CM_TRUE, ATTR_NONE, "TRUE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
@@ -141,10 +125,6 @@ static config_item_t g_wr_params[] = {
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_ALARM_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 59, EFFECT_REBOOT,
         CFG_INS, NULL, NULL, NULL, NULL},
-    {"VG_SPACE_USAGE_HWM", CM_TRUE, ATTR_READONLY, "80", NULL, NULL, "-", "[0, 100]", "GS_TYPE_INTEGER", NULL, 60,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"VG_SPACE_USAGE_LWM", CM_TRUE, ATTR_READONLY, "75", NULL, NULL, "-", "[0, 100]", "GS_TYPE_INTEGER", NULL, 61,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 62, EFFECT_REBOOT,
         CFG_INS, NULL, NULL, NULL, NULL},
 };
@@ -189,40 +169,6 @@ static status_t wr_load_session_cfg(wr_config_t *inst_cfg)
     }
 
     inst_cfg->params.cfg_session_num = (uint32_t)sessions;
-    return CM_SUCCESS;
-}
-
-static status_t wr_load_disk_lock_file_path(wr_config_t *inst_cfg)
-{
-    int32_t ret;
-    char *value = cm_get_config_value(&inst_cfg->config, "_DISK_LOCK_FILE_PATH");
-    status_t status = wr_verify_lock_file_path(value);
-    WR_RETURN_IFERR2(
-        status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load params, invalid _DISK_LOCK_FILE_PATH"));
-    ret = snprintf_s(inst_cfg->params.disk_lock_file_path, WR_UNIX_PATH_MAX, WR_UNIX_PATH_MAX - 1, "%s", value);
-    if (ret == -1) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load params, invalid _DISK_LOCK_FILE_PATH"));
-    }
-
-    return CM_SUCCESS;
-}
-
-static status_t wr_load_storage_mode(wr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "STORAGE_MODE");
-    if (cm_str_equal_ins(value, "CLUSTER_RAID")) {
-        inst_cfg->params.wr_mode = WR_MODE_CLUSTER_RAID;
-    } else if (cm_str_equal_ins(value, "SHARE_DISK")) {
-        inst_cfg->params.wr_mode = WR_MODE_SHARE_DISK;
-    } else if (cm_str_equal_ins(value, "DISK")) {
-        inst_cfg->params.wr_mode = WR_MODE_DISK;
-    } else {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, value));
-    }
-    // _DISK_LOCK_FILE_PATH is only used when STORAGE_MODE=DISK.
-    // When STORAGE_MODE is SHARE_DISK or CLUSTER_RAID, _DISK_LOCK_FILE_PATH is loaded and verified, but not used.
-    CM_RETURN_IFERR(wr_load_disk_lock_file_path(inst_cfg));
     return CM_SUCCESS;
 }
 
@@ -452,55 +398,6 @@ static status_t wr_load_mes_params(wr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-static status_t wr_load_disk_lock_interval(wr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "DISK_LOCK_INTERVAL");
-    int32_t lock_interval;
-
-    status_t status = cm_str2int(value, &lock_interval);
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "DISK_LOCK_INTERVAL"));
-
-    if (lock_interval < WR_MIN_LOCK_INTERVAL || lock_interval > WR_MAX_LOCK_INTERVAL) {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "DISK_LOCK_INTERVAL"));
-    }
-    inst_cfg->params.lock_interval = lock_interval;
-
-    return CM_SUCCESS;
-}
-
-static status_t wr_load_dlock_retry_count(wr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "DLOCK_RETRY_COUNT");
-    uint32_t dlock_retry_count;
-
-    status_t status = cm_str2uint32(value, &dlock_retry_count);
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "DLOCK_RETRY_COUNT"));
-
-    if (dlock_retry_count < WR_MIN_DLOCK_RETRY_COUNT || dlock_retry_count > WR_MAX_DLOCK_RETRY_COUNT) {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "DLOCK_RETRY_COUNT"));
-    }
-    inst_cfg->params.dlock_retry_count = dlock_retry_count;
-
-    return CM_SUCCESS;
-}
-
-static status_t wr_load_cluster_run_mode(wr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "CLUSTER_RUN_MODE");
-
-    if (strcmp(value, "cluster_standby") == 0) {
-        inst_cfg->params.cluster_run_mode = CLUSTER_STANDBY;
-        LOG_RUN_INF("The cluster_run_mode is cluster_standby.");
-    } else if (strcmp(value, "cluster_primary") == 0) {
-        inst_cfg->params.cluster_run_mode = CLUSTER_PRIMARY;
-        LOG_RUN_INF("The cluster_run_mode is cluster_primary.");
-    } else {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load params, invalid CLUSTER_RUN_MODE"));
-    }
-    return CM_SUCCESS;
-}
-
 static status_t wr_load_listen_addr(wr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "LISTEN_ADDR");
@@ -533,23 +430,6 @@ static status_t wr_load_listen_addr(wr_config_t *inst_cfg)
     inst_cfg->params.listen_addr.host[sizeof(inst_cfg->params.listen_addr.host) - 1] = '\0';
     inst_cfg->params.listen_addr.port = port;
 
-    return CM_SUCCESS;
-}
-
-static status_t wr_load_xlog_vg_id(wr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "XLOG_VG_ID");
-    int32_t xlog_vg_id = 0;
-    status_t status = cm_str2int(value, &xlog_vg_id);
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "XLOG_VG_ID"));
-
-    /* the redo log of metadata in vg0, vg0 can not be synchronous copy disk */
-    if (xlog_vg_id < 1 || xlog_vg_id > 64) {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "XLOG_VG_ID"));
-    }
-
-    inst_cfg->params.xlog_vg_id = (uint32_t)xlog_vg_id;
-    LOG_RUN_INF("The xlog vg id is %d.", inst_cfg->params.xlog_vg_id);
     return CM_SUCCESS;
 }
 
@@ -678,32 +558,6 @@ static status_t wr_load_delay_clean_interval(wr_config_t *inst_cfg)
     return wr_load_delay_clean_interval_core(value, inst_cfg);
 }
 
-static status_t wr_load_space_usage(wr_config_t *inst_cfg)
-{
-    char *hwm_value = cm_get_config_value(&inst_cfg->config, "VG_SPACE_USAGE_HWM");
-    char *lwm_value = cm_get_config_value(&inst_cfg->config, "VG_SPACE_USAGE_LWM");
-    int32_t hwm, lwm;
-    status_t status = cm_str2int(hwm_value, &hwm);
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "VG_SPACE_USAGE_HWM"));
-    status = cm_str2int(lwm_value, &lwm);
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "VG_SPACE_USAGE_LWM"));
-    if (hwm > WR_VG_USAGE_MAX) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "VG_SPACE_USAGE_HWM is greater than maximum 100"));
-    }
-    if (lwm < WR_VG_USAGE_MIN) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "VG_SPACE_USAGE_LWM is less than minimum 0"));
-    }
-    if (lwm > hwm) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "VG_SPACE_USAGE_LWM is greater than VG_SPACE_USAGE_HWM"));
-    }
-    inst_cfg->params.space_usage_hwm = (uint32_t)hwm;
-    inst_cfg->params.space_usage_lwm = (uint32_t)lwm;
-    return CM_SUCCESS;
-}
-
 status_t wr_load_config(wr_config_t *inst_cfg)
 {
     char file_name[WR_FILE_NAME_BUFFER_SIZE];
@@ -729,23 +583,16 @@ status_t wr_load_config(wr_config_t *inst_cfg)
         log_param->log_instance_starting = CM_TRUE;
     }
     CM_RETURN_IFERR(wr_load_instance_id(inst_cfg));
-    CM_RETURN_IFERR(wr_load_storage_mode(inst_cfg));
     CM_RETURN_IFERR(wr_load_session_cfg(inst_cfg));
-    CM_RETURN_IFERR(wr_load_disk_lock_interval(inst_cfg));
-    CM_RETURN_IFERR(wr_load_dlock_retry_count(inst_cfg));
     CM_RETURN_IFERR(wr_load_mes_params(inst_cfg));
     CM_RETURN_IFERR(wr_load_shm_key(inst_cfg));
     CM_RETURN_IFERR(wr_load_mes_with_ip(inst_cfg));
     CM_RETURN_IFERR(wr_load_ip_white_list(inst_cfg));
     CM_RETURN_IFERR(wr_load_threadpool_cfg(inst_cfg));
     CM_RETURN_IFERR(wr_load_blackbox_detail_on(inst_cfg));
-    CM_RETURN_IFERR(wr_load_cluster_run_mode(inst_cfg));
     CM_RETURN_IFERR(wr_load_listen_addr(inst_cfg));
-    CM_RETURN_IFERR(wr_load_xlog_vg_id(inst_cfg));
     CM_RETURN_IFERR(wr_load_enable_core_state_collect(inst_cfg));
     CM_RETURN_IFERR(wr_load_delay_clean_interval(inst_cfg));
-    CM_RETURN_IFERR(wr_load_space_usage(inst_cfg));
-
     return CM_SUCCESS;
 }
 
