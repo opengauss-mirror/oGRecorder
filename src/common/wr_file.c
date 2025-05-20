@@ -281,6 +281,38 @@ void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item)
 static status_t wr_exist_item_core(
     wr_session_t *session, const char *dir_path, bool32 *result, gft_item_type_t *output_type)
 {
+    if (dir_path == NULL || dir_path[0] == '\0') {
+        return CM_ERROR;
+    }
+
+    *result = false;
+    *output_type = -1;
+    struct stat st;
+
+    static char path[WR_FILE_PATH_MAX_LENGTH];
+    int err = snprintf_s(path, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1,
+                               "%s/%s", g_inst_cfg->data_dir, (dir_path));
+    WR_SECUREC_SS_RETURN_IF_ERROR(err, CM_ERROR);
+
+
+    if (lstat(path, &st) != 0) {
+        LOG_DEBUG_ERR("failed to get stat for path %s, errno %d.\n", path, errno);
+        return CM_ERROR;
+    }
+
+    if (S_ISREG(st.st_mode)) {
+        *output_type = GFT_FILE;
+    } else if (S_ISDIR(st.st_mode)) {
+        *output_type = GFT_PATH;
+    } else if (S_ISLNK(st.st_mode)) {
+        *output_type = GFT_LINK;
+    } else {
+        LOG_DEBUG_ERR("file %s type is %o, not supported", path, st.st_mode);
+        *output_type = -1;
+        return CM_ERROR;
+    }
+    *result = true;
+
     return CM_SUCCESS;
 }
 
@@ -305,14 +337,9 @@ status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, 
     CM_ASSERT(item != NULL);
     status_t status;
     *result = CM_FALSE;
-    wr_vg_info_item_t *vg_item = NULL;
-    char name[WR_MAX_NAME_LEN];
-    CM_RETURN_IFERR(wr_find_vg_by_dir(item, name, &vg_item));
-    wr_lock_vg_mem_and_shm_s(session, vg_item);
 
     status = CM_ERROR;
     do {
-        WR_BREAK_IF_ERROR(wr_check_file(vg_item));
         status = wr_exist_item_core(session, item, result, output_type);
         if (status != CM_SUCCESS) {
             if (status == ERR_WR_FILE_NOT_EXIST) {
@@ -325,7 +352,6 @@ status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, 
         status = CM_SUCCESS;
     } while (0);
 
-    wr_unlock_vg_mem_and_shm(session, vg_item);
     return status;
 }
 

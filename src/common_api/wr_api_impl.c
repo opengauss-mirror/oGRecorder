@@ -699,6 +699,26 @@ status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_it
     return CM_SUCCESS;
 }
 
+status_t wr_check_path_exist(wr_conn_t *conn, const char *path)
+{
+    bool32 exist = false;
+    gft_item_type_t type;
+
+    WR_RETURN_IFERR2(
+        wr_exist_impl(conn, path, &exist, &type),
+            WR_THROW_ERROR_EX(ERR_WR_FILE_NOT_EXIST, "Failed to check the path %s exists.\n", path));
+    if (!exist) {
+        WR_THROW_ERROR_EX(ERR_WR_FILE_NOT_EXIST, "%s not exist, please check", path);
+        return CM_ERROR;
+    }
+    if (type != GFT_PATH) {
+        LOG_RUN_ERR("%s is not a directory.\n", path);
+        return CM_ERROR;
+    }
+
+    return CM_SUCCESS;
+}
+
 static status_t wr_validate_seek_origin(int origin, int64 offset, wr_file_context_t *context, int64 *new_offset)
 {
     if (origin == SEEK_SET) {

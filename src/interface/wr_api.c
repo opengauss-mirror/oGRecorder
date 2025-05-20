@@ -154,9 +154,22 @@ int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_ha
         LOG_RUN_ERR("instance handle or vfs_handle is NULL.");
         return WR_ERROR;
     }
+    if (vfs_name == NULL || vfs_name[0] == '\0') {
+        LOG_RUN_ERR("invalid argument vfs_name.");
+        return WR_ERROR;
+    }
     errno_t err = memset_s(vfs_handle, sizeof(wr_vfs_handle), 0, sizeof(wr_vfs_handle));
     if (SECUREC_UNLIKELY(err != EOK)) {
         WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return WR_ERROR;
+    }
+
+    st_wr_instance_handle *hdl = (st_wr_instance_handle *)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("mount get conn error.");
+        return WR_ERROR;
+    }
+    if (wr_check_path_exist(hdl->conn, vfs_name) != WR_SUCCESS) {
         return WR_ERROR;
     }
 
