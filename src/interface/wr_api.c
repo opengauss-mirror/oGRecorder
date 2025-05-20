@@ -699,6 +699,12 @@ int wr_set_conf(wr_instance_handle inst_handle, const char *name, const char *va
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid name or value when set cfg");
         return WR_ERROR;
     }
+
+    if (strlen(name) == 0 || strlen(value) == 0) {
+        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "name or value is empty");
+        return WR_ERROR;
+    }
+
     if (cm_strcmpi(name, "_LOG_LEVEL") != 0 && cm_strcmpi(name, "_LOG_MAX_FILE_SIZE") != 0 &&
         cm_strcmpi(name, "_LOG_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "_AUDIT_MAX_FILE_SIZE") != 0 &&
         cm_strcmpi(name, "_AUDIT_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "_AUDIT_LEVEL") != 0) {
