@@ -134,11 +134,11 @@ status_t wr_cmd_check_path_exist(wr_conn_t *conn, char *path)
     WR_RETURN_IFERR2(
         wr_exist_impl(conn, path, &exist, &type), WR_PRINT_ERROR("Failed to check the path %s exists.\n", path));
     if (!exist) {
-        WR_PRINT_ERROR("The path %s is not exist.\n", path);
+        LOG_RUN_ERR("The path %s is not exist.\n", path);
         return CM_ERROR;
     }
     if (type != GFT_PATH) {
-        WR_PRINT_ERROR("%s is not a directory.\n", path);
+        LOG_RUN_ERR("%s is not a directory.\n", path);
         return CM_ERROR;
     }
 

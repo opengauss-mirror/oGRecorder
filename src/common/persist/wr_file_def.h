@@ -68,6 +68,7 @@
 typedef enum en_zft_item_type {
     GFT_PATH,  // path
     GFT_FILE,
+    GFT_LINK,
 } gft_item_type_t;
 
 typedef struct st_zft_list {
