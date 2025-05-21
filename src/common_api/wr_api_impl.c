@@ -638,6 +638,19 @@ status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int
     return CM_SUCCESS;
 }
 
+status_t wr_postpone_file_time_impl(wr_conn_t *conn, const char *file_name, const char *time)
+{
+    LOG_DEBUG_INF("wr extend file expired time, file name: %s, add time: %s", file_name, time);
+    WR_RETURN_IF_ERROR(wr_check_device_path(file_name));
+    WR_RETURN_IF_ERROR(wr_check_expire_time(file_name, time));
+    wr_postpone_file_time_t send_info;
+    send_info.file_name = file_name;
+    send_info.file_atime = time;
+    status_t status = wr_msg_interact(conn, WR_CMD_POSTPONE_FILE_TIME, (void *)&send_info, NULL);
+    LOG_DEBUG_INF("wr extend file expired time");
+    return status;
+}
+
 status_t wr_latch_context_by_handle(
     wr_conn_t *conn, int32_t handle, wr_file_context_t **context, wr_latch_mode_e latch_mode)
 {
@@ -675,10 +688,10 @@ status_t wr_latch_context_by_handle(
     return CM_SUCCESS;
 }
 
-status_t wr_close_file_impl(wr_conn_t *conn, int handle)
+status_t wr_close_file_impl(wr_conn_t *conn, int handle, bool need_lock)
 {
     LOG_DEBUG_INF("wr close file entry, handle:%d", handle);
-    status_t ret = wr_close_file_on_server(conn, handle);
+    status_t ret = wr_close_file_on_server(conn, handle, need_lock);
     if (ret != CM_SUCCESS) {
         LOG_DEBUG_INF("Failed to fclose, handle:%d.", handle);
         return ret;
@@ -1039,15 +1052,20 @@ status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int tru
     return status;
 }
 
-status_t wr_stat_file_impl(wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *size)
+status_t wr_stat_file_impl(
+    wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *size, int *mode, char **time)
 {
     wr_stat_file_info_t send_info;
     send_info.name = fileName;
     send_info.offset = 0;
     send_info.size = 0;
+    send_info.mode = 0;
+    send_info.expire_time = NULL;
     status_t status = wr_msg_interact(conn, WR_CMD_STAT_FILE, (void *)&send_info, (void *)&send_info);
     *offset = send_info.offset;
     *size = send_info.size;
+    *mode = (int)send_info.mode;
+    *time = send_info.expire_time;
     return status;
 }
 
@@ -1288,10 +1306,11 @@ status_t wr_set_main_inst_on_server(wr_conn_t *conn)
     return wr_msg_interact(conn, WR_CMD_SET_MAIN_INST, NULL, NULL);
 }
 
-status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd)
+status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd, bool need_lock)
 {
     wr_close_file_info_t send_info;
     send_info.fd = fd;
+    send_info.need_lock = (int)need_lock;
     return wr_msg_interact(conn, WR_CMD_CLOSE_FILE, (void *)&send_info, NULL);
 }
 
@@ -1353,6 +1372,14 @@ static status_t wr_encode_setcfg(wr_conn_t *conn, wr_packet_t *pack, void *send_
     return CM_SUCCESS;
 }
 
+static status_t wr_encode_postpone_file_time(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_postpone_file_time_t *info = (wr_postpone_file_time_t *)send_info;
+    CM_RETURN_IFERR(wr_put_str(pack, info->file_name));
+    CM_RETURN_IFERR(wr_put_str(pack, info->file_atime));
+    return CM_SUCCESS;
+}
+
 static status_t wr_encode_handshake(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     CM_RETURN_IFERR(wr_put_data(pack, send_info, sizeof(wr_cli_info_t)));
@@ -1371,6 +1398,8 @@ static status_t wr_decode_stat_file(wr_packet_t *ack_pack, void *ack)
     wr_stat_file_info_t *info = (wr_stat_file_info_t *)ack;
     CM_RETURN_IFERR(wr_get_int64(ack_pack, &(info->offset)));
     CM_RETURN_IFERR(wr_get_int64(ack_pack, &(info->size)));
+    CM_RETURN_IFERR(wr_get_int32(ack_pack, &(info->mode)));
+    CM_RETURN_IFERR(wr_get_str(ack_pack, &(info->expire_time)));
     return CM_SUCCESS;
 }
 
@@ -1605,6 +1634,7 @@ static status_t wr_encode_close_file(wr_conn_t *conn, wr_packet_t *pack, void *s
 {
     wr_close_file_info_t *info = (wr_close_file_info_t *)send_info;
     CM_RETURN_IFERR(wr_put_int64(pack, info->fd));
+    CM_RETURN_IFERR(wr_put_int32(pack, info->need_lock));
     return CM_SUCCESS;
 }
 
@@ -1675,6 +1705,7 @@ wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] =
     [WR_CMD_STOP_SERVER] = {NULL, NULL, "stop server"},
     [WR_CMD_SETCFG] = {wr_encode_setcfg, NULL, "setcfg"},
     [WR_CMD_SET_MAIN_INST] = {NULL, NULL, "set main inst"},
+    [WR_CMD_POSTPONE_FILE_TIME] = {wr_encode_postpone_file_time, NULL, "postpone file expired time"},
     [WR_CMD_HANDSHAKE] = {wr_encode_handshake, wr_decode_handshake, "handshake with server"},
     [WR_CMD_FALLOCATE_FILE] = {wr_encode_fallocate_file, NULL, "fallocate file"},
     [WR_CMD_EXIST] = {wr_encode_exist, wr_decode_exist, "exist"},

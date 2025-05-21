@@ -67,6 +67,7 @@ status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *v
 status_t wr_update_file_written_size(
     wr_session_t *session, uint32_t vg_id, int64 offset, int64 size, wr_block_id_t ftid, uint64 fid);
 void wr_check_ft_node_free(gft_node_t *node);
+status_t wr_postpone_file(wr_session_t *session, const char *file, const char *time);
 
 status_t wr_format_ft_node(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t auid);
 gft_node_t *wr_get_next_node(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node);
@@ -107,6 +108,7 @@ status_t wr_check_path(const char *path);
 status_t wr_check_volume_path(const char *path);
 status_t wr_check_device_path(const char *path);
 status_t wr_check_path_both(const char *path);
+status_t wr_check_expire_time(const char *file_name, const char *new_time);
 
 /* AU is usually NOT serial/continuous within a single file, judged from R/W file behaviors */
 status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, uint64 ftid, bool32 *is_open);

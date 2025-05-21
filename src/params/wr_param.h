@@ -72,6 +72,7 @@ typedef struct st_wr_params {
     char *root_name;  // root volume name
     int64 inst_id;
     char disk_lock_file_path[WR_UNIX_PATH_MAX];
+    char data_file_path[WR_UNIX_PATH_MAX];
     int32_t wr_mode;
     uint32_t cfg_session_num;
     int32_t lock_interval;

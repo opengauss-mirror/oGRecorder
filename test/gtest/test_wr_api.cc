@@ -20,6 +20,12 @@ int handle1 = 0, handle2 = 0, handle3 = 0;
 
 wr_param_t g_wr_param;
 
+typedef enum en_wr_file_status {
+    WR_FILE_INIT,
+    WR_FILE_LOCK,
+    WR_FILE_APPEND,
+    WR_FILE_EXPIRED
+} wr_file_status_t;
 
 class FailureListener : public ::testing::EmptyTestEventListener {
 public:
@@ -120,21 +126,33 @@ TEST_F(WrApiTest, TestWrfileWriteRead) {
 }
 
 TEST_F(WrApiTest, TestWrfileTruncate) {
-    EXPECT_EQ(wr_file_truncate(g_vfs_handle, handle1, 0, ONE_GB), WR_SUCCESS);
+    EXPECT_EQ(wr_file_truncate(g_vfs_handle, handle1, 0, ONE_GB), WR_ERROR);
 }
 
 TEST_F(WrApiTest, TestWrfileStat) {
     long long offset = 0;
     unsigned long long size = 0;
-    EXPECT_EQ(wr_file_stat(g_vfs_handle, TEST_FILE1, &offset, &size), WR_SUCCESS);
+    int mode = 0;
+    char *time = NULL;
+    EXPECT_EQ(wr_file_stat(g_vfs_handle, TEST_FILE1, &offset, &size, &mode, &time), WR_SUCCESS);
     EXPECT_EQ(offset, ONE_GB);
     EXPECT_EQ(size, ONE_GB);
+    EXPECT_EQ(mode, WR_FILE_APPEND);
+}
+
+TEST_F(WrApiTest, TestWrfilePostpone) {
+    const char *time1 = "2025-06-23 10:00:00";
+    const char *time2 = "2025-06-24 11:00:00";
+    const char *time3 = "2025-06-22 23:00:00";
+    EXPECT_EQ(wr_file_postpone(g_vfs_handle, TEST_FILE1, time1), WR_SUCCESS);
+    EXPECT_EQ(wr_file_postpone(g_vfs_handle, TEST_FILE2, time2), WR_SUCCESS);
+    EXPECT_EQ(wr_file_postpone(g_vfs_handle, TEST_FILE3, time3), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileClose) {
-    EXPECT_EQ(wr_file_close(g_vfs_handle, handle1), WR_SUCCESS);
-    EXPECT_EQ(wr_file_close(g_vfs_handle, handle2), WR_SUCCESS);
-    EXPECT_EQ(wr_file_close(g_vfs_handle, handle3), WR_SUCCESS);
+    EXPECT_EQ(wr_file_close(g_vfs_handle, handle1, false), WR_SUCCESS);
+    EXPECT_EQ(wr_file_close(g_vfs_handle, handle2, false), WR_SUCCESS);
+    EXPECT_EQ(wr_file_close(g_vfs_handle, handle3, false), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsQueryFileNum) {
@@ -144,12 +162,12 @@ TEST_F(WrApiTest, TestWrVfsQueryFileNum) {
 }
 
 TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
-    EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE1), WR_SUCCESS);
-    EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE2), WR_SUCCESS);
+    EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE1), WR_ERROR);
+    EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE2), WR_ERROR);
 }
 
 TEST_F(WrApiTest, TestWrVfsForceDelete) {
-    EXPECT_EQ(wr_vfs_delete(g_inst_handle, TEST_DIR, 1), WR_SUCCESS);
+    EXPECT_EQ(wr_vfs_delete(g_inst_handle, TEST_DIR, 1), WR_ERROR);
 }
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {

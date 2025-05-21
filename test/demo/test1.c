@@ -98,7 +98,7 @@ int main() {
     free(read_buffer);
 
     // 关闭文件
-    if (wr_file_close(handle1, g_inst_handle) != WR_SUCCESS) {
+    if (wr_file_close(handle1, g_inst_handle, true) != WR_SUCCESS) {
         wr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error closing file: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
