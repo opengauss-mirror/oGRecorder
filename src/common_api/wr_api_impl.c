@@ -277,6 +277,16 @@ status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file)
     return wr_set_server_info(conn, output_info.home, output_info.objectid, max_open_file);
 }
 
+status_t wr_cli_ssl_connect(wr_conn_t *conn)
+{
+    status_t status = cli_ssl_connect(&conn->pipe);
+    if (status != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Failed to do cli ssl certification.");
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
 // NOTE:just for wrcmd because not support many threads in one process.
 status_t wr_connect_ex(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn)
 {
@@ -1100,6 +1110,16 @@ static status_t wr_init_shm(wr_env_t *wr_env, char *home)
         return wr_init_err_proc(wr_env, CM_FALSE, CM_TRUE, "Failed to attach shared area", status);
     }
     return CM_SUCCESS;
+}
+
+status_t wr_init_ssl()
+{
+    status_t status = wr_load_cli_ssl();
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("Failed to load client ssl config.");
+        return CM_ERROR;
+    }
+    return cli_init_ssl();
 }
 
 static status_t wr_init_files(wr_env_t *wr_env, uint32_t max_open_files)

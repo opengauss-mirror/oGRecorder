@@ -70,7 +70,7 @@ char *wr_get_cmd_desc(wr_cmd_type_e cmd_type)
     return g_wr_cmd_desc[WR_CMD_TYPE_OFFSET(cmd_type)];
 }
 
-typedef status_t (*recv_func_t)(void *link, char *buf, uint32_t size, int32_t *recv_size);
+typedef status_t (*recv_func_t)(void *link, char *buf, uint32_t size, int32_t *recv_size, uint32 *wait_event);
 typedef status_t (*recv_timed_func_t)(void *link, char *buf, uint32_t size, uint32_t timeout);
 typedef status_t (*send_timed_func_t)(void *link, const char *buf, uint32_t size, uint32_t timeout);
 typedef status_t (*wait_func_t)(void *link, uint32_t wait_for, int32_t timeout, bool32 *ready);
@@ -117,7 +117,7 @@ static const vio_t g_vio_list[] = {
 
 #define VIO_SEND_TIMED(pipe, buf, size, timeout) GET_VIO(pipe)->vio_send_timed(&(pipe)->link, buf, size, timeout)
 
-#define VIO_RECV(pipe, buf, size, len) GET_VIO(pipe)->vio_recv(&(pipe)->link, buf, size, len)
+#define VIO_RECV(pipe, buf, size, len, wait_event) GET_VIO(pipe)->vio_recv(&(pipe)->link, buf, size, len, wait_event)
 
 #define VIO_RECV_TIMED(pipe, buf, size, timeout) GET_VIO(pipe)->vio_recv_timed(&(pipe)->link, buf, size, timeout)
 
@@ -194,12 +194,13 @@ static status_t wr_read_packet(cs_pipe_t *pipe, wr_packet_t *pack, bool32 cs_cli
 {
     int32_t remain_size, offset, recv_size;
     bool32 ready = CM_FALSE;
+    uint32 wait_event;
 
     offset = 0;
     status_t status;
     char *cs_mes = cs_client ? "read wait for server response" : "read wait for client request";
     for (;;) {
-        status = VIO_RECV(pipe, pack->buf + offset, (uint32_t)(pack->buf_size - offset), &recv_size);
+        status = VIO_RECV(pipe, pack->buf + offset, (uint32_t)(pack->buf_size - offset), &recv_size, &wait_event);
         WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_TCP_RECV, "uds", cm_get_sock_error()));
         offset += recv_size;
         if (offset >= (int32_t)sizeof(wr_packet_head_t)) {
