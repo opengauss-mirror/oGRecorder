@@ -151,20 +151,20 @@ status_t wr_filesystem_rm(const char *name) {
     return CM_SUCCESS;
 }
 
-int64 wr_filesystem_pwrite(int64 handle, int64 offset, int64 size, const char *buf) {
+int64 wr_filesystem_pwrite(int handle, int64 offset, int64 size, const char *buf) {
     int64 res = pwrite(handle, buf, size, offset);
     if (res == -1) {
-        LOG_RUN_ERR("[FS] Failed to write to handle: %lld, offset: %lld, size: %lld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
     return res;
 }
 
-int64 wr_filesystem_pread(int64 handle, int64 offset, int64 size, char *buf) {
+int64 wr_filesystem_pread(int handle, int64 offset, int64 size, char *buf) {
     int64 res = pread(handle, buf, size, offset);
     if (res == -1) {
-        LOG_RUN_ERR("[FS] Failed to read from handle: %lld, offset: %lld, size: %lld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to read from handle: %d, offset: %lld, size: %lld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -212,7 +212,7 @@ status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_open(const char *file_path, int flag, int64 *fd) {
+status_t wr_filesystem_open(const char *file_path, int flag, int *fd) {
     if (wr_filesystem_append(file_path) != CM_SUCCESS) {
         LOG_RUN_ERR("[FS] Failed to change file %s to append mode", file_path);
         return CM_ERROR;
@@ -252,9 +252,9 @@ status_t wr_filesystem_close(int fd, int need_lock) {
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_truncate(int64 fd, int64 length) {
+status_t wr_filesystem_truncate(int fd, int64 length) {
     if (ftruncate(fd, length) == -1) {
-        LOG_RUN_ERR("[FS] Failed to truncate file: %lld, length: %lld", fd, length);
+        LOG_RUN_ERR("[FS] Failed to truncate file: %d, length: %lld", fd, length);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }

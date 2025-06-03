@@ -19,6 +19,9 @@ wr_vfs_handle g_vfs_handle;
 int handle1 = 0, handle2 = 0, handle3 = 0;
 
 wr_param_t g_wr_param;
+wr_file_handle file_handle1;
+wr_file_handle file_handle2;
+wr_file_handle file_handle3;
 
 typedef enum en_wr_file_status {
     WR_FILE_INIT,
@@ -82,9 +85,9 @@ TEST_F(WrApiTest, TestWrVfsCreateFiles) {
 }
 
 TEST_F(WrApiTest, TestWrfileOpen) {
-    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE1, O_RDWR | O_SYNC, &handle1), WR_SUCCESS);
-    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, O_RDWR | O_SYNC, &handle2), WR_SUCCESS);
-    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE3, O_RDWR | O_SYNC, &handle3), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE3, O_RDWR | O_SYNC, &file_handle3), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileWriteReadLargeData) {
@@ -94,11 +97,11 @@ TEST_F(WrApiTest, TestWrfileWriteReadLargeData) {
     memset(large_data, 'A', large_data_size); // 用'A'填充数据
 
     // 写入大数据块到文件
-    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle1, large_data, large_data_size, 0), large_data_size);
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, &file_handle1, large_data, large_data_size, 0), large_data_size);
 
     // 读取大数据块
     char *read_buffer = new char[large_data_size];
-    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle1, read_buffer, large_data_size, 0), large_data_size);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, file_handle1, read_buffer, large_data_size, 0), large_data_size);
 
     // 验证读取的数据是否与写入的数据一致
     EXPECT_EQ(memcmp(large_data, read_buffer, large_data_size), 0);
@@ -114,19 +117,19 @@ TEST_F(WrApiTest, TestWrfileWriteRead) {
     const char *data3 = "hello world 3";
 
     // Write to files
-    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle1, data1, strlen(data1), 0), strlen(data1));
-    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle2, data2, strlen(data2), 0), strlen(data2));
-    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, handle3, data3, strlen(data3), 0), strlen(data3));
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, &file_handle1, data1, strlen(data1), 0), strlen(data1));
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, &file_handle2, data2, strlen(data2), 0), strlen(data2));
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle, &file_handle3, data3, strlen(data3), 0), strlen(data3));
 
     // Read from files
     char buf1[100] = {0}, buf2[100] = {0}, buf3[100] = {0};
-    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle1, buf1, strlen(data1), 0), strlen(data1));
-    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle2, buf2, strlen(data2), 0), strlen(data2));
-    EXPECT_EQ(wr_file_pread(g_vfs_handle, handle3, buf3, strlen(data3), 0), strlen(data3));
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, file_handle1, buf1, strlen(data1), 0), strlen(data1));
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, file_handle2, buf2, strlen(data2), 0), strlen(data2));
+    EXPECT_EQ(wr_file_pread(g_vfs_handle, file_handle3, buf3, strlen(data3), 0), strlen(data3));
 }
 
 TEST_F(WrApiTest, TestWrfileTruncate) {
-    EXPECT_EQ(wr_file_truncate(g_vfs_handle, handle1, 0, ONE_GB), WR_ERROR);
+    EXPECT_EQ(wr_file_truncate(g_vfs_handle, file_handle1, 0, ONE_GB), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileStat) {
@@ -150,9 +153,9 @@ TEST_F(WrApiTest, TestWrfilePostpone) {
 }
 
 TEST_F(WrApiTest, TestWrfileClose) {
-    EXPECT_EQ(wr_file_close(g_vfs_handle, handle1, false), WR_SUCCESS);
-    EXPECT_EQ(wr_file_close(g_vfs_handle, handle2, false), WR_SUCCESS);
-    EXPECT_EQ(wr_file_close(g_vfs_handle, handle3, false), WR_SUCCESS);
+    EXPECT_EQ(wr_file_close(g_vfs_handle, &file_handle1, false), WR_SUCCESS);
+    EXPECT_EQ(wr_file_close(g_vfs_handle, &file_handle2, false), WR_SUCCESS);
+    EXPECT_EQ(wr_file_close(g_vfs_handle, &file_handle3, false), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrVfsQueryFileNum) {

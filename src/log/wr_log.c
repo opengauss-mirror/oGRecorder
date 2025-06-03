@@ -123,6 +123,7 @@ const char *g_wr_error_desc[WR_ERROR_COUNT] = {
     [ERR_WR_RECOVER_CAUSE_BREAK] = "Req break by recovery.",
     [ERR_WR_FILE_SYSTEM_ERROR] = "File system error, reason %m.",
     [ERR_WR_CONNECTION_CLOSED] = "WR connection is closed",
+    [ERR_WR_MEM_CMP_FAILED] = "failed to memcpy compare"
 };
 
 wr_log_def_t g_wr_cmd_log[] = {

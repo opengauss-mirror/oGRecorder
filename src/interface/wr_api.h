@@ -79,6 +79,7 @@ typedef struct st_wr_param {
 #define WR_HANDLE_BASE 0x20000000
 #define WR_CONN_NEVER_TIMEOUT (-1)
 #define WR_VERSION_MAX_LEN 256
+#define SHA256_DIGEST_LENGTH_H 32
 
 typedef enum en_wr_item_type {
     WR_PATH,
@@ -145,6 +146,13 @@ typedef struct st_wr_stat {
 typedef enum en_wr_conn_opt_key {
     WR_CONN_OPT_TIME_OUT = 0,
 } wr_conn_opt_key_e;
+
+typedef struct st_wr_file_handle {
+    int fd;
+    char file_name[WR_MAX_NAME_LEN];
+    unsigned char hash[SHA256_DIGEST_LENGTH_H];
+} wr_file_handle;
+
 #define WR_LOCAL_MAJOR_VER_WEIGHT 1000000
 #define WR_LOCAL_MINOR_VER_WEIGHT 1000
 #define WR_LOCAL_MAJOR_VERSION 0
@@ -171,11 +179,13 @@ WR_DECLARE int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char 
 // file
 WR_DECLARE int wr_file_create(wr_vfs_handle vfs_handle, const char *name, const FileParameter *param);
 WR_DECLARE int wr_file_delete(wr_vfs_handle vfs_handle, const char *name);
-WR_DECLARE int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, int *fd);
-WR_DECLARE int wr_file_close(wr_vfs_handle vfs_handle, int fd, bool need_lock);
-WR_DECLARE int wr_file_truncate(wr_vfs_handle vfs_handle, int fd, int truncateType, long long offset);
-WR_DECLARE long long int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned long long count, long long offset);
-WR_DECLARE long long int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long long count, long long offset);
+WR_DECLARE int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, wr_file_handle *file_handle);
+WR_DECLARE int wr_file_close(wr_vfs_handle vfs_handle, wr_file_handle *file_handle, bool need_lock);
+WR_DECLARE int wr_file_truncate(wr_vfs_handle vfs_handle, wr_file_handle file_handle, int truncateType, long long offset);
+WR_DECLARE long long int wr_file_pwrite(wr_vfs_handle vfs_handle,
+                                        wr_file_handle *file_handle, const void *buf, unsigned long long count, long long offset);
+WR_DECLARE long long int wr_file_pread(wr_vfs_handle vfs_handle,
+                                        wr_file_handle file_handle, void *buf, unsigned long long count, long long offset);
 WR_DECLARE int wr_file_stat(
     wr_vfs_handle vfs_handle, const char *fileName, long long *offset, unsigned long long *count, int *mode, char **time);
 WR_DECLARE int wr_file_performance();
