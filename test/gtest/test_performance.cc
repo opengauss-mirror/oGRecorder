@@ -15,6 +15,7 @@ extern "C" {
 #define ONE_MB 1024 * 1024
 
 wr_param_t g_wr_param;
+wr_file_handle file_handle;
 
 class WrApiPerformanceTest : public ::testing::Test {
 protected:
@@ -36,21 +37,22 @@ protected:
         result = wr_file_create(g_vfs_handle, TEST_FILE, NULL);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to create test file";
 
-        result = wr_file_open(g_vfs_handle, TEST_FILE, O_RDWR | O_SYNC, &handle);
+        result = wr_file_open(g_vfs_handle, TEST_FILE, O_RDWR | O_SYNC, &file_handle);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to open test file";
 
-        result = wr_file_truncate(g_vfs_handle, handle, 0, ONE_GB);
+        result = wr_file_truncate(g_vfs_handle, file_handle, 0, ONE_GB);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to truncate test file";
     }
 
     void TearDown() override {
-        wr_file_close(g_vfs_handle, handle, true);
+        wr_file_close(g_vfs_handle, &file_handle, true);
         wr_file_delete(g_vfs_handle, TEST_FILE);
         wr_vfs_delete(g_inst_handle, TEST_DIR, 0);
     }
 
     wr_instance_handle g_inst_handle = NULL;
     wr_vfs_handle g_vfs_handle;
+    wr_file_handle file_handle;
     int handle = 0;
 };
 
@@ -60,7 +62,7 @@ TEST_F(WrApiPerformanceTest, TestWritePerformance) {
     memset(data, 'A', data_size);
 
     auto start = std::chrono::high_resolution_clock::now();
-    int result = wr_file_pwrite(g_vfs_handle, handle, data, data_size, 0);
+    int result = wr_file_pwrite(g_vfs_handle, &file_handle, data, data_size, 0);
     auto end = std::chrono::high_resolution_clock::now();
 
     ASSERT_EQ(result, data_size) << "Failed to write data";
@@ -88,7 +90,7 @@ TEST_F(WrApiPerformanceTest, TestWritePerformanceWith8KSteps) {
 
     for (int offset = 0; offset < total_size; offset += step_size) {
         auto start = std::chrono::high_resolution_clock::now();
-        result = wr_file_pwrite(g_vfs_handle, handle, data, step_size, offset);
+        result = wr_file_pwrite(g_vfs_handle, &file_handle, data, step_size, offset);
         auto end = std::chrono::high_resolution_clock::now();
 
         ASSERT_EQ(result, step_size) << "Failed to write data at offset " << offset;

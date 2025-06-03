@@ -33,6 +33,10 @@
 #include "cs_packet.h"
 #include "cs_pipe.h"
 #include "wr_defs.h"
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#include "wr_errno.h"
+#include "wr_log.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,10 +83,14 @@ typedef enum {
     WR_CMD_EXEC_REMOTE,
     WR_CMD_QUERY_HOTPATCH,
     WR_CMD_QUERY_END,
+    WR_CMD_EXCHANGE_KEY,
     WR_CMD_END  // must be the last item
 } wr_cmd_type_e;
 
 #define WR_CMD_TYPE_OFFSET(cmd_id) ((uint32_t)(cmd_id) - (uint32_t)WR_CMD_BEGIN)
+
+#define SHA256_DIGEST_LENGTH 32
+#define SHA256_DIGEST_BITS   256
 
 char *wr_get_cmd_desc(wr_cmd_type_e cmd_type);
 
@@ -100,7 +108,8 @@ typedef struct st_wr_packet_head {
     uint8 result; /* code in response packet, success(0) or error(1) */
     uint16 flags;
     uint32_t serial_number;
-    uint8 reserve[60];
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    uint8 reserve[28];
 } wr_packet_head_t;
 
 typedef enum en_wr_packet_version {
@@ -126,6 +135,22 @@ typedef struct st_wr_packet {
     char *buf;
     char init_buf[WR_MAX_PACKET_SIZE];
 } wr_packet_t;
+
+// file hash struct
+typedef struct st_file_hash_info {
+    uint32_t file_handle;
+    uint8_t curr_hash[SHA256_DIGEST_LENGTH];
+    uint8_t prev_hash[SHA256_DIGEST_LENGTH];
+    uint64_t last_update_time;
+} file_hash_info_t;
+
+// hash manager struct
+typedef struct st_session_hash_mgr {
+    spinlock_t lock;
+    uint32_t hash_count;
+    uint32_t hash_capacity;
+    file_hash_info_t *hash_items;
+} session_hash_mgr_t;
 
 static inline void wr_init_packet(wr_packet_t *pack, uint32_t options)
 {
@@ -206,6 +231,28 @@ static inline status_t wr_put_str(wr_packet_t *pack, const char *str)
     return CM_SUCCESS;
 }
 
+static inline status_t wr_put_sha256(wr_packet_t *pack, const unsigned char *sha256_value)
+{
+    char *addr = NULL;
+    errno_t errcode = 0;
+    CM_ASSERT(pack != NULL);
+    CM_ASSERT(sha256_value != NULL);
+
+    addr = WR_WRITE_ADDR(pack);
+    uint32_t estimated_size = pack->head->size + SHA256_DIGEST_LENGTH;
+    if (estimated_size > pack->buf_size) {
+        CM_THROW_ERROR(ERR_BUFFER_OVERFLOW, estimated_size, pack->buf_size);
+        return CM_ERROR;
+    }
+
+    errcode = memcpy_s(addr, WR_REMAIN_SIZE(pack), sha256_value, SHA256_DIGEST_LENGTH);
+    WR_SECUREC_RETURN_IF_ERROR(errcode, CM_ERROR);
+
+    pack->head->size += SHA256_DIGEST_LENGTH;
+
+    return CM_SUCCESS;
+}
+
 static inline status_t wr_put_data(wr_packet_t *pack, const void *data, uint32_t size)
 {
     errno_t errcode = 0;
@@ -262,6 +309,66 @@ static inline status_t wr_pack_check_len(wr_packet_t *pack, uint32_t inc)
     if ((pack->offset + inc) > pack->head->size) {
         CM_THROW_ERROR(ERR_BUFFER_OVERFLOW, (pack->offset + inc), pack->head->size);
         return CM_ERROR;
+    }
+
+    return CM_SUCCESS;
+}
+
+static inline status_t wr_get_sha256(wr_packet_t *pack, unsigned char *buf)
+{
+    errno_t errcode = 0;
+    CM_ASSERT(pack != NULL);
+
+    CM_RETURN_IFERR(wr_pack_check_len(pack, SHA256_DIGEST_LENGTH));
+    if (buf != NULL) {
+        errcode = memcpy_s(buf, SHA256_DIGEST_LENGTH, WR_READ_ADDR(pack), SHA256_DIGEST_LENGTH);
+        WR_SECUREC_RETURN_IF_ERROR(errcode, CM_ERROR);
+    }
+    pack->offset += SHA256_DIGEST_LENGTH;
+    return CM_SUCCESS;
+}
+
+static inline status_t calculate_data_hash(const void *data, size_t size, uint8_t *hash)
+{
+    CM_ASSERT(data != NULL);
+    CM_ASSERT(hash != NULL);
+
+    if (size <=0 || size > WR_PAGE_SIZE) {
+        LOG_RUN_ERR("[hash]: invalid length: %zu.", size);
+        return CM_ERROR;
+    }
+
+    SHA256_CTX sha256;
+    if (SHA256_Init(&sha256) != 1) {
+        LOG_RUN_ERR("[hash]: Failed to init sha256.");
+        return CM_ERROR;
+    }
+
+    if (SHA256_Update(&sha256, data, size) != 1) {
+        LOG_RUN_ERR("[hash]: Failed to update sha256.");
+        return CM_ERROR;
+    }
+
+    if (SHA256_Final(hash, &sha256) != 1) {
+        LOG_RUN_ERR("[hash]: Failed to calculate sha256.");
+        return CM_ERROR;
+    }
+
+    return CM_SUCCESS;
+}
+
+// combine_hash = data_hash ^ pre_hash
+static inline status_t xor_sha256_hash(const uint8_t *data_hash,
+                        const uint8_t *pre_hash, uint8_t *combine_hash)
+{
+    if (data_hash == NULL || pre_hash == NULL || combine_hash == NULL) {
+        LOG_RUN_ERR("[hash]: invalid param.");
+        return CM_ERROR;
+    }
+
+    // XOR operation on bytes
+    for (size_t i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        combine_hash[i] = data_hash[i] ^ pre_hash[i];
     }
 
     return CM_SUCCESS;
@@ -375,6 +482,25 @@ static inline void wr_free_packet_buffer(wr_packet_t *pack)
 
         wr_init_packet(pack, 0);
     }
+}
+
+static inline status_t compare_sha256(
+    const unsigned char *hash1, const unsigned char *hash2)
+{
+    if (hash1 == NULL || hash2 == NULL) {
+        LOG_RUN_ERR("[hash]: invalid param, failed to compare hash");
+        return CM_ERROR;
+    }
+
+    errno_t err = memcmp(hash1, hash2, SHA256_DIGEST_LENGTH);
+    
+    if (err != EOK) {
+        LOG_RUN_ERR("[hash]: failed to compare hash, errno:%d", err);
+        WR_THROW_ERROR(ERR_WR_MEM_CMP_FAILED);
+        return CM_ERROR;
+    }
+
+    return CM_SUCCESS;
 }
 
 status_t wr_put_text(wr_packet_t *pack, text_t *text);

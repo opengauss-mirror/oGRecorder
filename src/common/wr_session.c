@@ -166,6 +166,7 @@ static status_t wr_init_session(wr_session_t *session, const cs_pipe_t *pipe)
         session->wr_session_stat, WR_EVT_COUNT * sizeof(wr_stat_item_t), 0, WR_EVT_COUNT * sizeof(wr_stat_item_t));
     securec_check_ret(errcode);
     session->is_holding_hotpatch_latch = CM_FALSE;
+    WR_RETURN_IF_ERROR(init_session_hash_mgr(session));
     return CM_SUCCESS;
 }
 
@@ -934,6 +935,140 @@ void wr_server_session_unlock(wr_session_t *session)
     LOG_DEBUG_INF("Succeed to unlock session %u shm lock", session->id);
     cm_spin_unlock(&session->lock);
     LOG_DEBUG_INF("Succeed to unlock session %u lock", session->id);
+}
+
+void cm_spin_lock_init(spinlock_t *lock)
+{
+    CM_ASSERT(lock != NULL);
+    *lock = 0;  // 初始化为未锁定状态
+}
+
+// 初始化hash管理器
+status_t init_session_hash_mgr(wr_session_t *session)
+{
+    session_hash_mgr_t *mgr = &session->hash_mgr;
+    mgr->hash_count = 0;
+    mgr->hash_capacity = MAX_FILE_HASH_COUNT;
+    mgr->hash_items = (file_hash_info_t *)malloc(
+        sizeof(file_hash_info_t) * mgr->hash_capacity);
+    
+    if (mgr->hash_items == NULL) {
+        return CM_ERROR;
+    }
+    
+    cm_spin_lock_init(&mgr->lock);
+    return CM_SUCCESS;
+}
+
+// Add or Update Hash Information
+status_t update_file_hash(wr_session_t *session, uint32_t file_handle, const uint8_t *new_hash)
+{
+    session_hash_mgr_t *mgr = &session->hash_mgr;
+    errno_t err = 0;
+
+    if (new_hash == NULL) {
+        LOG_RUN_ERR("[hash]: invalid param, failed to update file hash.");
+    }
+    
+    cm_spin_lock(&mgr->lock, NULL);
+    
+    // Search Existing Records
+    for (uint32_t i = 0; i < mgr->hash_count; i++) {
+        if (mgr->hash_items[i].file_handle == file_handle) {
+            err = memcpy_s(mgr->hash_items[i].prev_hash, SHA256_DIGEST_LENGTH, 
+                            mgr->hash_items[i].curr_hash, SHA256_DIGEST_LENGTH);
+            if (err != EOK) {
+                LOG_RUN_ERR("[hash]: failed to update pre_hash, error code is %d.\n", err);
+                return CM_ERROR;
+            }
+            
+            err = memcpy_s(mgr->hash_items[i].curr_hash, SHA256_DIGEST_LENGTH,
+                            new_hash, SHA256_DIGEST_LENGTH);
+            if (err != EOK) {
+                LOG_RUN_ERR("[hash]: failed to update curr_hash, error code is %d.\n", err);
+                return CM_ERROR;
+            }
+            mgr->hash_items[i].last_update_time = cm_current_time();
+            cm_spin_unlock(&mgr->lock);
+            return CM_SUCCESS;
+        }
+    }
+    
+    // Add a new record
+    if (mgr->hash_count >= mgr->hash_capacity) {
+        cm_spin_unlock(&mgr->lock);
+        return CM_ERROR;
+    }
+    
+    file_hash_info_t *new_item = &mgr->hash_items[mgr->hash_count];
+    new_item->file_handle = file_handle;
+    err = memcpy_s(new_item->curr_hash, SHA256_DIGEST_LENGTH, 
+                    new_hash, SHA256_DIGEST_LENGTH);
+    if (err != EOK) {
+        LOG_RUN_ERR("[hash]: failed to insert hash information, error code is %d.\n", err);
+        return CM_ERROR;
+    }
+    err = memset_s(new_item->prev_hash, SHA256_DIGEST_LENGTH, 0, SHA256_DIGEST_LENGTH);
+    if (err != EOK) {
+        CM_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return CM_ERROR;
+    }
+    new_item->last_update_time = cm_current_time();
+    mgr->hash_count++;
+    
+    cm_spin_unlock(&mgr->lock);
+    return CM_SUCCESS;
+}
+
+status_t get_file_hash(wr_session_t *session, uint32_t file_handle, uint8_t *curr_hash, uint8_t *prev_hash)
+{
+    session_hash_mgr_t *mgr = &session->hash_mgr;
+    status_t status = CM_ERROR;
+    errno_t err = 0;
+
+    if (curr_hash == NULL || prev_hash == NULL) {
+        LOG_RUN_ERR("[hash]: invalid param, failed to get hash");
+        return CM_ERROR;
+    }
+    
+    cm_spin_lock(&mgr->lock, NULL);
+    
+    for (uint32_t i = 0; i < mgr->hash_count; i++) {
+        if (mgr->hash_items[i].file_handle == file_handle) {
+            err = memcpy_s(curr_hash, SHA256_DIGEST_LENGTH,
+                        mgr->hash_items[i].curr_hash, SHA256_DIGEST_LENGTH);
+            if (err != EOK) {
+                LOG_RUN_ERR("[hash]: failed to get curr_hash, error code is %d.\n", err);
+                return CM_ERROR;
+            }
+            err = memcpy_s(prev_hash, SHA256_DIGEST_LENGTH,
+                        mgr->hash_items[i].prev_hash, SHA256_DIGEST_LENGTH);
+            if (err != EOK) {
+                LOG_RUN_ERR("[hash]: failed to get prev_hash, error code is %d.\n", err);
+                return CM_ERROR;
+            }
+            status = CM_SUCCESS;
+            break;
+        }
+    }
+    
+    cm_spin_unlock(&mgr->lock);
+    return status;
+}
+
+status_t generate_random_sha256(unsigned char *hash)
+{
+    if (hash == NULL) {
+        LOG_RUN_ERR("invalid param, hash is NULL");
+        return WR_ERROR;
+    }
+
+    if (RAND_bytes(hash, SHA256_DIGEST_LENGTH) != 1) {
+        LOG_RUN_ERR("failed to generate sha256");
+        return WR_ERROR;
+    }
+
+    return WR_SUCCESS;
 }
 
 #ifdef __cplusplus

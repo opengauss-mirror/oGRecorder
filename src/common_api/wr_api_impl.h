@@ -58,6 +58,7 @@ typedef struct st_wr_load_ctrl_info {
 typedef struct st_wr_open_file_info {
     const char *file_path;
     int flag;
+    uint8_t hash[SHA256_DIGEST_LENGTH];
 } wr_open_file_info_t;
 
 typedef struct st_wr_close_file_info {
@@ -120,8 +121,8 @@ typedef struct st_wr_refresh_volume_info {
 } wr_refresh_volume_info_t;
 
 typedef struct st_wr_truncate_file_info {
+    int handle;
     int64 length;
-    int64 handle;
     int64 truncateType;
 } wr_truncate_file_info_t;
 
@@ -133,16 +134,17 @@ typedef struct st_wr_stat_file_info {
     char *expire_time;
 } wr_stat_file_info_t;
 typedef struct st_wr_write_file_info {
+    int handle;
     int64 offset;
-    int64 handle;
     int64 size;
     int64 rel_size;
+    unsigned char hash[SHA256_DIGEST_LENGTH];
     void *buf;
 } wr_write_file_info_t;
 
 typedef struct st_wr_read_file_info {
+    int handle;
     int64 offset;
-    int64 handle;
     int64 size;
     int64 rel_size;
     void *buf;
@@ -232,7 +234,7 @@ gft_node_t *wr_read_dir_impl(wr_conn_t *conn, wr_vfs_t *dir, bool32 skip_delete)
 status_t wr_close_dir_impl(wr_conn_t *conn, wr_vfs_t *dir);
 status_t wr_create_file_impl(wr_conn_t *conn, const char *file_path, int flag);
 status_t wr_remove_file_impl(wr_conn_t *conn, const char *file_path);
-status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int *handle);
+status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, wr_file_handle* file_handle);
 status_t wr_close_file_impl(wr_conn_t *conn, int handle, bool need_lock);
 status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_item_type_t *type);
 status_t wr_check_path_exist(wr_conn_t *conn, const char *path);
@@ -243,6 +245,7 @@ status_t wr_stat_file_impl(
     wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *count, int *mode, char **time);
 status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node);
 status_t wr_postpone_file_time_impl(wr_conn_t *conn, const char *file_name, const char *time);
+void wr_clean_file_handle(wr_file_handle *file_handle);
 
 status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file);
 status_t wr_init_client(uint32_t max_open_files, char *home);
@@ -250,7 +253,7 @@ void wr_destroy(void);
 status_t wr_get_fname_impl(int handle, char *fname, int fname_size);
 status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32_t *file_num);
 
-int64 wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);
+int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset);
 int64 wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);
 status_t wr_get_addr_impl(wr_conn_t *conn, int32_t handle, long long offset, char *pool_name, char *image_name,
     char *obj_addr, unsigned int *obj_id, unsigned long int *obj_offset);

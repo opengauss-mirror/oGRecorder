@@ -334,6 +334,7 @@ static status_t wr_process_create_file(wr_session_t *session)
         LOG_DEBUG_INF("Succeed to create file:%s in path:%s", name_str, parent_str);
         return status;
     }
+
     LOG_DEBUG_ERR("Failed to create file:%s in path:%s", name_str, parent_str);
     return status;
 }
@@ -374,30 +375,38 @@ static status_t wr_process_open_file(wr_session_t *session)
 {
     char *name = NULL;
     int32_t flag;
+    uint8_t hash[SHA256_DIGEST_LENGTH];
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
-    int64 fd = 0;
+    int fd = 0;
     status_t status = wr_open_file(session, (const char *)name, flag, &fd);
     if (status == CM_SUCCESS) {
-        WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, fd));
+        WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, fd));
     }
+
+    if (generate_random_sha256(hash) != WR_SUCCESS) {
+        LOG_RUN_ERR("Failed to generate random SHA256 hash\n");
+        return WR_ERROR;
+    }
+    WR_RETURN_IF_ERROR(update_file_hash(session, fd, hash));
+    WR_RETURN_IF_ERROR(wr_put_sha256(&session->send_pack, hash));
     return status;
 }
 
 static status_t wr_process_close_file(wr_session_t *session)
 {
-    int64 fd;
+    int fd;
     int32 need_lock;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fd));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%ld", fd));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &fd));
+    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%d", fd));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &need_lock));
 
-    WR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
+    WR_LOG_DEBUG_OP("Begin to close file, fd:%d", fd);
     WR_RETURN_IF_ERROR(wr_filesystem_close(fd, need_lock));
-    LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
+    LOG_DEBUG_INF("Succeed to close file, fd:%d", fd);
     return CM_SUCCESS;
 }
 
@@ -442,36 +451,72 @@ static status_t wr_process_write_file(wr_session_t *session)
 {
     int64 offset = 0;
     int64 file_size = 0;
-    int64 handle = 0;
+    int handle = 0;
     char *buf = NULL;
+    unsigned char cli_hash[SHA256_DIGEST_LENGTH];
+    unsigned char data_hash[SHA256_DIGEST_LENGTH];
+    unsigned char session_curr_hash[SHA256_DIGEST_LENGTH];
+    unsigned char session_prev_hash[SHA256_DIGEST_LENGTH];
+    unsigned char combine_hash[SHA256_DIGEST_LENGTH];
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &handle));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &file_size));
+    WR_RETURN_IF_ERROR(wr_get_sha256(&session->recv_pack, cli_hash));
     WR_RETURN_IF_ERROR(wr_get_data(&session->recv_pack, file_size, (void**)&buf));
 
+    status_t status = calculate_data_hash(buf, file_size, data_hash);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("Failed to calcalate data hash.");
+        return CM_ERROR;
+    }
+
+    status = get_file_hash(session, handle, session_curr_hash, session_prev_hash);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("Failed to get session hash.");
+        return CM_ERROR;
+    }
+
+    status = xor_sha256_hash(data_hash, session_curr_hash, combine_hash);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("Failed to calcalate combine_hash.");
+        return CM_ERROR;
+    }
+
+    status = compare_sha256(cli_hash, combine_hash);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("combine hash return failed.");
+        return CM_ERROR;
+    }
+
     WR_RETURN_IF_ERROR(wr_set_audit_resource(
-        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%lld, offset:%lld, size:%lld", handle, offset, file_size));
+        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%d, offset:%lld, size:%lld", handle, offset, file_size));
 
     int64 res = wr_filesystem_pwrite(handle, offset, file_size, buf);
     if (res == -1) {
-        LOG_RUN_ERR("Failed to write to handle: %lld, offset: %lld, size: %lld", handle, offset, file_size);
+        LOG_RUN_ERR("Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, file_size);
         return CM_ERROR;
     }
+    status = update_file_hash(session, handle, combine_hash);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("update hash failed.");
+        return CM_ERROR;
+    }
+
     WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, res));
     return CM_SUCCESS;
 }
 
 static status_t wr_process_read_file(wr_session_t *session)
 {
+    int handle;
     int64 offset;
     int64 size;
-    int64 handle;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &handle));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &size));
 
     // Allocate one extra byte for the null terminator
@@ -485,7 +530,7 @@ static status_t wr_process_read_file(wr_session_t *session)
     // Read the file content into the buffer
     int64 res = wr_filesystem_pread(handle, offset, size, buf);
     if (res == -1) {
-        LOG_RUN_ERR("Failed to read from handle: %lld, offset: %lld, size: %lld", handle, offset, size);
+        LOG_RUN_ERR("Failed to read from handle: %d, offset: %lld, size: %lld", handle, offset, size);
         return CM_ERROR;
     }
 
@@ -544,17 +589,17 @@ static status_t wr_process_fallocate_file(wr_session_t *session)
 
 static status_t wr_process_truncate_file(wr_session_t *session)
 {
+    int handle;
     int64 length;
-    int64 handle;
     int64 truncateType;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &length));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &handle));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &handle));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &truncateType));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "handle:%ld, length:%ld", handle, length));
-    LOG_DEBUG_INF("Truncate file handle:%lld, length:%lld", handle, length);
+        "handle:%d, length:%ld", handle, length));
+    LOG_DEBUG_INF("Truncate file handle:%d, length:%lld", handle, length);
     return wr_filesystem_truncate(handle, length);
 }
 

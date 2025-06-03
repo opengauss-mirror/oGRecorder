@@ -52,6 +52,8 @@ extern "C" {
 #define WR_RECYLE_META_TASK_NUM_MAX 4
 
 #define WR_SERVER_SESS_TIMEOUT 100
+
+#define MAX_FILE_HASH_COUNT 100000
 typedef enum st_wr_background_task_type {
     WR_RECOVERY_BACKGROUND_TASK = 0,
     WR_DELAY_CLEAN_BACKGROUND_TASK = 1,
@@ -142,6 +144,7 @@ typedef struct st_wr_session {
     bool8 put_log;
     bool8 is_holding_hotpatch_latch;
     spinlock_t shm_lock;  // for control current rw of the same session in shm
+    session_hash_mgr_t hash_mgr;
 } wr_session_t;
 
 static inline char *wr_init_sendinfo_buf(char *input)
@@ -205,6 +208,10 @@ uint32_t wr_get_alarm_check_task_idx(void);
 void wr_server_session_lock(wr_session_t *session);
 void wr_server_session_unlock(wr_session_t *session);
 wr_session_t *wr_get_reserv_session(uint32_t idx);
+status_t init_session_hash_mgr(wr_session_t *session);
+status_t update_file_hash(wr_session_t *session, uint32_t file_handle, const uint8_t *new_hash);
+status_t get_file_hash(wr_session_t *session, uint32_t file_handle, uint8_t *curr_hash, uint8_t *prev_hash);
+status_t generate_random_sha256(unsigned char *hash);
 
 #ifdef __cplusplus
 }

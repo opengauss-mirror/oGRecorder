@@ -290,13 +290,14 @@ int wr_file_delete(wr_vfs_handle vfs_handle, const char *name)
         return WR_ERROR;
     }
     status_t ret = wr_remove_file_impl(hdl->conn, full_name);
+    // (void)wr_clean_file_handle(file_handle);
     return (int)ret;
 }
 
-int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, int *fd)
+int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, wr_file_handle *file_handle)
 {
     timeval_t begin_tv;
-    *fd = -1;
+    file_handle->fd = -1;
 
     wr_begin_stat(&begin_tv);
     if (vfs_handle.handle == NULL) {
@@ -309,16 +310,22 @@ int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, int *fd)
         return WR_ERROR;
     }
 
-    char full_name[WR_MAX_NAME_LEN];
-    errno_t err = sprintf_s(full_name, WR_MAX_NAME_LEN, "%s/%s", vfs_handle.vfs_name, name);
+    errno_t err = memcpy_s(hdl->addr, strlen(name) + 1, name, strlen(name) + 1);
     if (SECUREC_UNLIKELY(err < 0)) {
         WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
         return WR_ERROR;
     }
-    status_t ret = wr_open_file_impl(hdl->conn, full_name, flag, fd);
+
+    char full_name[WR_MAX_NAME_LEN];
+    err = sprintf_s(full_name, WR_MAX_NAME_LEN, "%s/%s", vfs_handle.vfs_name, name);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return WR_ERROR;
+    }
+    status_t ret = wr_open_file_impl(hdl->conn, full_name, flag, file_handle);
     // if open fails, -1 is returned. DB determines based on -1
     if (ret == WR_SUCCESS) {
-        *fd += WR_HANDLE_BASE;
+        file_handle->fd += WR_HANDLE_BASE;
     }
     wr_session_end_stat(hdl->conn->session, &begin_tv, WR_FOPEN);
     return (int)ret;
@@ -397,7 +404,7 @@ int wr_set_main_inst(wr_instance_handle inst_handle)
     return (int)ret;
 }
 
-int wr_file_close(wr_vfs_handle vfs_handle, int fd, bool need_lock)
+int wr_file_close(wr_vfs_handle vfs_handle, wr_file_handle *file_handle, bool need_lock)
 {
     if (vfs_handle.handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
@@ -409,11 +416,12 @@ int wr_file_close(wr_vfs_handle vfs_handle, int fd, bool need_lock)
         return WR_ERROR;
     }
 
-    status_t ret = wr_close_file_impl(hdl->conn, HANDLE_VALUE(fd), need_lock);
+    status_t ret = wr_close_file_impl(hdl->conn, HANDLE_VALUE(file_handle->fd), need_lock);
+    (void)wr_clean_file_handle(file_handle);
     return (int)ret;
 }
 
-long long int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, unsigned long long count, long long offset)
+long long int wr_file_pwrite(wr_vfs_handle vfs_handle, wr_file_handle *file_handle, const void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -437,14 +445,14 @@ long long int wr_file_pwrite(wr_vfs_handle vfs_handle, int fd, const void *buf, 
         return WR_ERROR;
     }
 
-    long long int ret = wr_pwrite_file_impl(hdl->conn, HANDLE_VALUE(fd), buf, count, offset);
+    long long int ret = wr_pwrite_file_impl(hdl->conn, file_handle, buf, count, offset);
     if (ret == count) {
         wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PWRITE);
     }
     return ret;
 }
 
-long long int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigned long long count, long long offset)
+long long int wr_file_pread(wr_vfs_handle vfs_handle, wr_file_handle file_handle, void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -469,14 +477,14 @@ long long int wr_file_pread(wr_vfs_handle vfs_handle, int fd, void *buf, unsigne
         return WR_ERROR;
     }
 
-    long long int ret = wr_pread_file_impl(hdl->conn, HANDLE_VALUE(fd), buf, count, offset);
+    long long int ret = wr_pread_file_impl(hdl->conn, HANDLE_VALUE(file_handle.fd), buf, count, offset);
     if (ret == count) {
         wr_session_end_stat(hdl->conn->session, &begin_tv, WR_PREAD);
     }
     return ret;
 }
 
-int wr_file_truncate(wr_vfs_handle vfs_handle, int fd, int truncateType, long long offset)
+int wr_file_truncate(wr_vfs_handle vfs_handle, wr_file_handle file_handle, int truncateType, long long offset)
 {
     if (vfs_handle.handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
@@ -487,7 +495,7 @@ int wr_file_truncate(wr_vfs_handle vfs_handle, int fd, int truncateType, long lo
         LOG_RUN_ERR("ftruncate get conn error.");
         return WR_ERROR;
     }
-    status_t ret = wr_truncate_impl(hdl->conn, HANDLE_VALUE(fd), offset, truncateType);
+    status_t ret = wr_truncate_impl(hdl->conn, HANDLE_VALUE(file_handle.fd), offset, truncateType);
     return (int)ret;
 }
 

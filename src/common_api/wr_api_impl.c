@@ -37,6 +37,7 @@
 #include "wr_stats.h"
 #include "wr_cli_conn.h"
 #include <stdint.h>
+#include <openssl/sha.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -621,20 +622,20 @@ status_t wr_extend_files_context(wr_file_run_ctx_t *file_run_ctx)
     return CM_SUCCESS;
 }
 
-status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag, int *fd)
+status_t wr_open_file_on_server(wr_conn_t *conn, const char *file_path, int flag, wr_file_handle *file_handle)
 {
     wr_open_file_info_t send_info;
     send_info.file_path = file_path;
     send_info.flag = flag;
-    return wr_msg_interact(conn, WR_CMD_OPEN_FILE, (void*)&send_info, (void*)fd);
+    return wr_msg_interact(conn, WR_CMD_OPEN_FILE, (void*)&send_info, (void*)file_handle);
 }
 
-status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int *handle)
+status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, wr_file_handle* file_handle)
 {
     LOG_DEBUG_INF("wr begin to open file, file path:%s, flag:%d", file_path, flag);
     WR_RETURN_IF_ERROR(wr_check_device_path(file_path));
-    WR_RETURN_IF_ERROR(wr_open_file_on_server(conn, file_path, flag, handle));
-    LOG_DEBUG_INF("wr open file successfully, file_path:%s, flag:%d, handle:%d", file_path, flag, *handle);
+    WR_RETURN_IF_ERROR(wr_open_file_on_server(conn, file_path, flag, file_handle));
+    LOG_DEBUG_INF("wr open file successfully, file_path:%s, flag:%d, handle:%d", file_path, flag, file_handle->fd);
     return CM_SUCCESS;
 }
 
@@ -882,28 +883,42 @@ status_t wr_read_write_file(wr_conn_t *conn, int32_t handle, void *buf, int32_t 
     return status;
 }
 
-int64 wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
+int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
         LOG_DEBUG_ERR("File size is invalid: %lld.", size);
         return CM_ERROR;
     }
-    LOG_DEBUG_INF("wr pwrite file entry, handle:%d, size:%lld, offset:%lld", handle, size, offset);
+    LOG_DEBUG_INF("wr pwrite file entry, handle:%d, size:%lld, offset:%lld",
+                    HANDLE_VALUE(file_handle->fd), size, offset);
 
     wr_write_file_info_t send_info;
-    send_info.handle = handle;
+    send_info.handle = HANDLE_VALUE(file_handle->fd);
 
     status_t status;
     unsigned long long total_size = 0;
     unsigned long long curr_size;
     unsigned long long remaining_size = size;
     long long int rel_size;
+    uint8_t hash[SHA256_DIGEST_LENGTH];
 
     while (total_size < size) {
         curr_size = (remaining_size > WR_RW_STEP_SIZE) ? WR_RW_STEP_SIZE : remaining_size;
         send_info.offset = offset + total_size;
         send_info.size = curr_size;
         send_info.buf = (char *)buf + total_size;
+
+        status = calculate_data_hash(send_info.buf, curr_size, hash);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("Failed to calcalate data hash.");
+            return CM_ERROR;
+        }
+
+        status = xor_sha256_hash(hash, file_handle->hash, send_info.hash);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("Failed to calcalate combine_hash.");
+            return CM_ERROR;
+        }
 
         status = wr_msg_interact(conn, WR_CMD_WRITE_FILE, (void *)&send_info, (void *)&rel_size);
         if (status != CM_SUCCESS) {
@@ -920,6 +935,13 @@ int64 wr_pwrite_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned
 
         total_size += curr_size;
         remaining_size -= curr_size;
+        errno_t errcode = memcpy_s(file_handle->hash, SHA256_DIGEST_LENGTH,
+                                    send_info.hash, SHA256_DIGEST_LENGTH);
+        if (errcode != EOK) {
+            LOG_RUN_ERR("Failed to memcpy, size:%d.", SHA256_DIGEST_LENGTH);
+            WR_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
+            return CM_ERROR;
+        }
     }
 
     LOG_DEBUG_INF("wr pwrite file leave");
@@ -1520,7 +1542,7 @@ static status_t wr_encode_truncate_file(wr_conn_t *conn, wr_packet_t *pack, void
 {
     wr_truncate_file_info_t *info = (wr_truncate_file_info_t *)send_info;
     CM_RETURN_IFERR(wr_put_int64(pack, info->length));
-    CM_RETURN_IFERR(wr_put_int64(pack, info->handle));
+    CM_RETURN_IFERR(wr_put_int32(pack, info->handle));
     CM_RETURN_IFERR(wr_put_int64(pack, info->truncateType));
     return CM_SUCCESS;
 }
@@ -1530,14 +1552,15 @@ static status_t wr_encode_stat_file(wr_conn_t *conn, wr_packet_t *pack, void *se
     wr_stat_file_info_t *info = (wr_stat_file_info_t *)send_info;
     CM_RETURN_IFERR(wr_put_str(pack, info->name));
     return CM_SUCCESS;
-} 
+}
 
 static status_t wr_encode_write_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     wr_write_file_info_t *info = (wr_write_file_info_t *)send_info;
     CM_RETURN_IFERR(wr_put_int64(pack, info->offset));
-    CM_RETURN_IFERR(wr_put_int64(pack, info->handle));
+    CM_RETURN_IFERR(wr_put_int32(pack, info->handle));
     CM_RETURN_IFERR(wr_put_int64(pack, info->size));
+    CM_RETURN_IFERR(wr_put_sha256(pack, info->hash));
     CM_RETURN_IFERR(wr_put_data(pack, info->buf, info->size));
     return CM_SUCCESS;
 }
@@ -1546,7 +1569,7 @@ static status_t wr_encode_read_file(wr_conn_t *conn, wr_packet_t *pack, void *se
 {
     wr_read_file_info_t *info = (wr_read_file_info_t *)send_info;
     CM_RETURN_IFERR(wr_put_int64(pack, info->offset));
-    CM_RETURN_IFERR(wr_put_int64(pack, info->handle));
+    CM_RETURN_IFERR(wr_put_int32(pack, info->handle));
     CM_RETURN_IFERR(wr_put_int64(pack, info->size));
     return CM_SUCCESS;
 }
@@ -1646,6 +1669,11 @@ static status_t wr_encode_create_file(wr_conn_t *conn, wr_packet_t *pack, void *
     return CM_SUCCESS;
 }
 
+static status_t wr_decode_create_file(wr_packet_t *ack_pack, void *ack)
+{
+    CM_RETURN_IFERR(wr_get_sha256(ack_pack, (uint8_t *)ack));
+    return CM_SUCCESS;
+}
 
 static status_t wr_encode_delete_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
@@ -1654,7 +1682,9 @@ static status_t wr_encode_delete_file(wr_conn_t *conn, wr_packet_t *pack, void *
 
 static status_t wr_decode_open_file(wr_packet_t *ack_pack, void *ack)
 {
-    CM_RETURN_IFERR(wr_get_int64(ack_pack, (int64 *)ack));
+    wr_file_handle *file_handle = (wr_file_handle*)ack;
+    CM_RETURN_IFERR(wr_get_int32(ack_pack, &file_handle->fd));
+    CM_RETURN_IFERR(wr_get_sha256(ack_pack, file_handle->hash));
     return CM_SUCCESS;
 }
 
@@ -1693,7 +1723,7 @@ wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] =
     [WR_CMD_CLOSE_DIR] = {wr_encode_close_dir, NULL, "close dir"},
     [WR_CMD_OPEN_FILE] = {wr_encode_open_file, wr_decode_open_file, "open file"},
     [WR_CMD_CLOSE_FILE] = {wr_encode_close_file, NULL, "close file"},
-    [WR_CMD_CREATE_FILE] = {wr_encode_create_file, NULL, "create file"},
+    [WR_CMD_CREATE_FILE] = {wr_encode_create_file, wr_decode_create_file, "create file"},
     [WR_CMD_DELETE_FILE] = {wr_encode_delete_file, NULL, "delete file"},
     [WR_CMD_WRITE_FILE] = {wr_encode_write_file, wr_decode_write_file, "write file"},
     [WR_CMD_READ_FILE] = {wr_encode_read_file, wr_decode_read_file, "read file"},
@@ -1781,6 +1811,13 @@ status_t wr_msg_interact_with_stat(wr_conn_t *conn, uint8 cmd, void *send_info, 
         wr_end_stat_ex(&session->stat_ctx, &session->wr_session_stat[session->stat_ctx.wait_event], &begin_tv);
     }
     return status;
+}
+
+void wr_clean_file_handle(wr_file_handle *file_handle)
+{
+    file_handle->fd = -1;
+    file_handle->hash[0] = '\0';
+    file_handle->file_name[0] = '\0';
 }
 
 #ifdef __cplusplus

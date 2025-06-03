@@ -9,7 +9,7 @@
 #define TEST_DIR "testdir1"
 #define TEST_FILE1 "testdir1/testfile1"
 #define ONE_GB 1024 * 1024 * 1024
-#define SERVER_ADDR "127.0.0.1:19225"
+#define SERVER_ADDR "127.0.0.1:18440"
 
 int main() {
     int errorcode = 0;

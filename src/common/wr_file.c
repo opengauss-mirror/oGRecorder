@@ -416,7 +416,7 @@ status_t wr_open_file_check_s(
     return CM_SUCCESS;
 }
 
-status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int64 *fd)
+status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int *fd)
 {
     status_t status;
     WR_LOG_DEBUG_OP("Begin to open file:%s, session id:%u.", file, session->id);
@@ -425,7 +425,7 @@ status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int
         LOG_RUN_ERR("[FS]Failed to open file:%s.", file);
         return CM_ERROR;
     }
-    WR_LOG_DEBUG_OP("Succeed to open file:%s, fd:%lld, session:%u.", file, *fd, session->id);
+    WR_LOG_DEBUG_OP("Succeed to open file:%s, fd:%d, session:%u.", file, *fd, session->id);
     return CM_SUCCESS;
 }
 
