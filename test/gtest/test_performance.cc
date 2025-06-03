@@ -44,7 +44,7 @@ protected:
     }
 
     void TearDown() override {
-        wr_file_close(g_vfs_handle, handle);
+        wr_file_close(g_vfs_handle, handle, true);
         wr_file_delete(g_vfs_handle, TEST_FILE);
         wr_vfs_delete(g_inst_handle, TEST_DIR, 0);
     }

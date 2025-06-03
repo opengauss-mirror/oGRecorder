@@ -172,6 +172,26 @@ status_t wr_check_device_path(const char *path)
     return wr_check_path_is_valid(path + 1, (WR_FILE_PATH_MAX_LENGTH - 1));
 }
 
+status_t wr_check_expire_time(const char *file_name, const char *new_time)
+{
+    int64 offset, size;
+    time_t cur_atime;
+    wr_file_status_t mode;
+    if (wr_filesystem_stat(file_name, &offset, &size, &mode, &cur_atime) != CM_SUCCESS) {
+        LOG_RUN_ERR("[FS] Failed to get current file %s expire time.", file_name);
+        return CM_ERROR;
+    }
+
+    struct tm set_info;
+    strptime(new_time, "%Y-%m-%d %H:%M:%S", &set_info);
+    time_t set_time = mktime(&set_info);
+    if (set_time <= cur_atime) {
+        LOG_RUN_ERR("[FS] New expire time should be after current expire time. File %s current expire time: %s",
+            file_name, ctime(&cur_atime));
+    }
+    return CM_SUCCESS;
+}
+
 status_t wr_check_path_both(const char *path)
 {
     if (path == NULL || strlen(path) == 0) {
@@ -183,6 +203,19 @@ status_t wr_check_path_both(const char *path)
     } else {
         return wr_check_path_is_valid(path, WR_FILE_PATH_MAX_LENGTH);
     }
+}
+
+status_t wr_postpone_file(wr_session_t *session, const char *file, const char *time)
+{
+    status_t status;
+    WR_LOG_DEBUG_OP("Begin to extend file %s expired time to %s", file, time);
+    status = wr_filesystem_postpone(file, time);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("[FS]Failed to extend file %s expired time to %s.", file, time);
+        return CM_ERROR;
+    }
+    WR_LOG_DEBUG_OP("Succeed to extend file %s expired time to %s.", file, time);
+    return CM_SUCCESS;
 }
 
 status_t wr_get_name_from_path(const char *path, uint32_t *beg_pos, char *name)
@@ -291,7 +324,7 @@ static status_t wr_exist_item_core(
 
     static char path[WR_FILE_PATH_MAX_LENGTH];
     int err = snprintf_s(path, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1,
-                               "%s/%s", g_inst_cfg->data_dir, (dir_path));
+                               "%s/%s", g_inst_cfg->params.data_file_path, (dir_path));
     WR_SECUREC_SS_RETURN_IF_ERROR(err, CM_ERROR);
 
 

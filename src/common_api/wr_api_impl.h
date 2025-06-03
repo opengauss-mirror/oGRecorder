@@ -62,6 +62,7 @@ typedef struct st_wr_open_file_info {
 
 typedef struct st_wr_close_file_info {
     int64 fd;
+    int32 need_lock;
 } wr_close_file_info_t;
 
 typedef struct st_wr_create_file_info {
@@ -128,6 +129,8 @@ typedef struct st_wr_stat_file_info {
     const char *name;
     int64 offset;
     int64 size;
+    int32 mode;
+    char *expire_time;
 } wr_stat_file_info_t;
 typedef struct st_wr_write_file_info {
     int64 offset;
@@ -200,6 +203,11 @@ typedef struct st_wr_exist_recv_info {
     int32_t type;
 } wr_exist_recv_info_t;
 
+typedef struct st_wr_postpone_file_time {
+    const char *file_name;
+    const char *file_atime;
+} wr_postpone_file_time_t;
+
 #define WRAPI_BLOCK_SIZE 512
 #define WR_HOME "WR_HOME"
 #define SYS_HOME "HOME"
@@ -225,14 +233,16 @@ status_t wr_close_dir_impl(wr_conn_t *conn, wr_vfs_t *dir);
 status_t wr_create_file_impl(wr_conn_t *conn, const char *file_path, int flag);
 status_t wr_remove_file_impl(wr_conn_t *conn, const char *file_path);
 status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, int *handle);
-status_t wr_close_file_impl(wr_conn_t *conn, int handle);
+status_t wr_close_file_impl(wr_conn_t *conn, int handle, bool need_lock);
 status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_item_type_t *type);
 status_t wr_check_path_exist(wr_conn_t *conn, const char *path);
 int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin);
 status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst);
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType);
-status_t wr_stat_file_impl(wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *count);
+status_t wr_stat_file_impl(
+    wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *count, int *mode, char **time);
 status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node);
+status_t wr_postpone_file_time_impl(wr_conn_t *conn, const char *file_name, const char *time);
 
 status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file);
 status_t wr_init_client(uint32_t max_open_files, char *home);
@@ -257,7 +267,7 @@ void wr_set_conn_wait_event(wr_conn_t *conn, wr_wait_event_e event);
 void wr_unset_conn_wait_event(wr_conn_t *conn);
 status_t wr_msg_interact_with_stat(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack);
 
-status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd);
+status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd, bool need_lock);
 status_t wr_get_inst_status_on_server(wr_conn_t *conn, wr_server_status_t *wr_status);
 status_t wr_get_time_stat_on_server(wr_conn_t *conn, wr_stat_item_t *time_stat, uint64 size);
 status_t wr_set_main_inst_on_server(wr_conn_t *conn);

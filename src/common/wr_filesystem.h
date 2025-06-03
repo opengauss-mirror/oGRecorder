@@ -17,10 +17,12 @@ int64 wr_filesystem_pwrite(int64 handle, int64 offset, int64 size, const char *b
 int64 wr_filesystem_pread(int64 handle, int64 offset, int64 size, char *buf);
 status_t wr_filesystem_query_file_num(const char *vfs_name, uint32_t *file_num);
 status_t wr_filesystem_open(const char *file_path, int flag, int64 *fd);
-status_t wr_filesystem_close(int fd);
+status_t wr_filesystem_close(int fd, int need_lock);
 status_t wr_filesystem_truncate(int64 fd, int64 length);
-status_t wr_filesystem_stat(const char *name, int64 *offset, int64 *size);
-
+status_t wr_filesystem_stat(const char *name, int64 *offset, int64 *size, wr_file_status_t *mode, time_t *atime);
+status_t wr_filesystem_postpone(const char *file_path, const char *time);
+status_t wr_filesystem_get_systime(time_t *sys_time);
+status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_position);
 
 #ifdef __cplusplus
 }

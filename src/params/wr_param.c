@@ -127,6 +127,8 @@ static config_item_t g_wr_params[] = {
         CFG_INS, NULL, NULL, NULL, NULL},
     {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 62, EFFECT_REBOOT,
         CFG_INS, NULL, NULL, NULL, NULL},
+    {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 24,
+        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 };
 
 static const char *g_wr_config_file = (const char *)"wr_inst.ini";
@@ -279,6 +281,22 @@ static status_t wr_load_random_file(uchar *value, int32_t value_len)
         LOG_DEBUG_ERR("Random component file %s is invalid, size is %d.", file_name, file_size);
         return CM_ERROR;
     }
+    return CM_SUCCESS;
+}
+
+static status_t wr_load_data_file_path(wr_config_t *inst_cfg)
+{
+    int32 ret;
+    char *value = cm_get_config_value(&inst_cfg->config, "DATA_FILE_PATH");
+    status_t status = wr_verify_lock_file_path(value);
+    WR_RETURN_IFERR2(
+        status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load params, invalid DATA_FILE_PATH"));
+    ret = snprintf_s(inst_cfg->params.data_file_path, WR_UNIX_PATH_MAX, WR_UNIX_PATH_MAX - 1, "%s", value);
+    if (ret == -1) {
+        WR_RETURN_IFERR2(
+            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load params, invalid DATA_FILE_PATH"));
+    }
+
     return CM_SUCCESS;
 }
 
@@ -460,9 +478,6 @@ status_t wr_set_cfg_dir(const char *home, wr_config_t *inst_cfg)
         is_home_empty ? home_realpath : home);
     WR_SECUREC_SS_RETURN_IF_ERROR(iret_snprintf, CM_ERROR);
 
-    iret_snprintf = snprintf_s(inst_cfg->data_dir, WR_MAX_PATH_BUFFER_SIZE, WR_MAX_PATH_BUFFER_SIZE - 1, "%s/data",
-        is_home_empty ? home_realpath : home);
-    WR_SECUREC_SS_RETURN_IF_ERROR(iret_snprintf, CM_ERROR);
     g_inst_cfg = inst_cfg;
     return CM_SUCCESS;
 }
@@ -593,6 +608,7 @@ status_t wr_load_config(wr_config_t *inst_cfg)
     CM_RETURN_IFERR(wr_load_listen_addr(inst_cfg));
     CM_RETURN_IFERR(wr_load_enable_core_state_collect(inst_cfg));
     CM_RETURN_IFERR(wr_load_delay_clean_interval(inst_cfg));
+    CM_RETURN_IFERR(wr_load_data_file_path(inst_cfg));
     return CM_SUCCESS;
 }
 

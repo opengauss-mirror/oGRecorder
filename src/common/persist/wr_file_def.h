@@ -273,4 +273,11 @@ typedef struct st_wr_find_node_t {
     char vg_name[WR_MAX_NAME_LEN];
 } wr_find_node_t;
 
+typedef enum en_wr_file_status {
+    WR_FILE_INIT,
+    WR_FILE_LOCK,
+    WR_FILE_APPEND,
+    WR_FILE_EXPIRED
+} wr_file_status_t;
+
 #endif  // __WR_FILE_DEF_H__

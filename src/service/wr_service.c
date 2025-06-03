@@ -389,12 +389,14 @@ static status_t wr_process_open_file(wr_session_t *session)
 static status_t wr_process_close_file(wr_session_t *session)
 {
     int64 fd;
+    int32 need_lock;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fd));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%ld", fd));
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &need_lock));
 
     WR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
-    WR_RETURN_IF_ERROR(wr_filesystem_close(fd));
+    WR_RETURN_IF_ERROR(wr_filesystem_close(fd, need_lock));
     LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
     return CM_SUCCESS;
 }
@@ -561,12 +563,18 @@ static status_t wr_process_stat_file(wr_session_t *session)
     char *name = NULL;
     int64 offset;
     int64 size;
+    wr_file_status_t mode;
+    time_t time;
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
-    WR_RETURN_IF_ERROR(wr_filesystem_stat(name, &offset, &size));
+    WR_RETURN_IF_ERROR(wr_filesystem_stat(name, &offset, &size, &mode, &time));
     wr_put_int64(&session->send_pack, offset);
     wr_put_int64(&session->send_pack, size);
-    LOG_DEBUG_INF("Stat file name:%s, offset:%lld, size:%lld", name, offset, size);
+    wr_put_int32(&session->send_pack, (int32_t)mode);
+    char *expire_time = ctime(&time);
+    wr_put_str(&session->send_pack, ctime(&time));
+    LOG_DEBUG_INF(
+        "Stat file name:%s, offset:%lld, size:%lld, mode:%d, expire time:%s", name, offset, size, mode, expire_time);
     return CM_SUCCESS;
 }
 
@@ -898,6 +906,19 @@ static status_t wr_process_remote_switch_lock(wr_session_t *session, uint32_t cu
     return status;
 }
 
+static status_t wr_process_postpone_file_time(wr_session_t *session)
+{
+    char *name = NULL;
+    char *time = NULL;
+    wr_init_get(&session->recv_pack);
+    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
+    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &time));
+    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
+    WR_RETURN_IF_ERROR(wr_postpone_file(session, (const char *)name, (const char *)time));
+    LOG_DEBUG_INF("Succeed to extend file %s expired time", name);
+    return CM_SUCCESS;
+}
+
 static status_t wr_process_set_main_inst(wr_session_t *session)
 {
     status_t status = CM_ERROR;
@@ -981,6 +1002,8 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_SETCFG)] = {WR_CMD_SETCFG, wr_process_setcfg, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SET_MAIN_INST)] = {WR_CMD_SET_MAIN_INST, wr_process_set_main_inst, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SWITCH_LOCK)] = {WR_CMD_SWITCH_LOCK, wr_process_switch_lock, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_POSTPONE_FILE_TIME)] = {WR_CMD_POSTPONE_FILE_TIME, wr_process_postpone_file_time, NULL,
+        CM_TRUE},
     // query
     [WR_CMD_TYPE_OFFSET(WR_CMD_HANDSHAKE)] = {WR_CMD_HANDSHAKE, wr_process_handshake, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXIST)] = {WR_CMD_EXIST, wr_process_exist, NULL, CM_FALSE},

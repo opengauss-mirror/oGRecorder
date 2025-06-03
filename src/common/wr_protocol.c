@@ -52,6 +52,7 @@ static char *g_wr_cmd_desc[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_SETCFG)] = "setcfg",
     [WR_CMD_TYPE_OFFSET(WR_CMD_SET_MAIN_INST)] = "set main inst",
     [WR_CMD_TYPE_OFFSET(WR_CMD_SWITCH_LOCK)] = "switch cm lock",
+    [WR_CMD_TYPE_OFFSET(WR_CMD_POSTPONE_FILE_TIME)] = "extend file expired time",
     [WR_CMD_TYPE_OFFSET(WR_CMD_HANDSHAKE)] = "handshake with server",
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXIST)] = "exist item",
     [WR_CMD_TYPE_OFFSET(WR_CMD_GET_FTID_BY_PATH)] = "get ftid by path",
