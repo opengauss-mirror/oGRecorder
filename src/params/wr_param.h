@@ -31,6 +31,7 @@
 #include "cs_pipe.h"
 #include "mes_metadata.h"
 #include "mes_interface.h"
+#include "ssl_metadata.h"
 #include "wr_errno.h"
 #include "wr_api.h"
 #include "wr_nodes_list.h"
@@ -106,6 +107,7 @@ typedef struct st_wr_config {
     char home[WR_MAX_PATH_BUFFER_SIZE];
     char data_dir[WR_MAX_PATH_BUFFER_SIZE];
     config_t config;
+    config_t ssl_ser_config;
     wr_params_t params;
 } wr_config_t;
 extern wr_config_t *g_inst_cfg;
@@ -117,6 +119,8 @@ wr_config_t *wr_get_g_inst_cfg();
 
 status_t wr_load_config(wr_config_t *inst_cfg);
 status_t wr_set_cfg_dir(const char *home, wr_config_t *inst_cfg);
+status_t wr_load_ser_ssl_config(wr_config_t *inst_cfg);
+status_t wr_load_cli_ssl();
 
 static inline int32_t wr_storage_mode(wr_config_t *inst_cfg)
 {
@@ -156,6 +160,7 @@ void wr_ssl_ca_cert_expire(void);
 status_t wr_set_cfg_param(char *name, char *value, char *scope);
 status_t wr_get_cfg_param(const char *name, char **value);
 status_t wr_load_delay_clean_interval_core(char *value, wr_config_t *inst_cfg);
+status_t wr_set_cert_param(const char *param_name, const char *param_value);
 
 static inline status_t wr_load_blackbox_detail_on_inner(char *value, wr_config_t *inst_cfg)
 {

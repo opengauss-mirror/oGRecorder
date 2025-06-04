@@ -35,6 +35,7 @@
 #include "wr_param.h"
 #include "cm_res_mgr.h"  // for cm_res_mgr_t
 #include "wr_reactor.h"
+#include "ssl_func.h"
 
 #ifdef __cplusplus
 extern "C" {

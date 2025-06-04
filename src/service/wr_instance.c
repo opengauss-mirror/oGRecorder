@@ -137,6 +137,11 @@ static status_t wr_init_inst_handle_session(wr_instance_t *inst)
     return CM_SUCCESS;
 }
 
+status_t wr_init_certification(wr_instance_t *inst)
+{
+    return ser_init_ssl(inst->lsnr.socks[0]);
+}
+
 static status_t instance_init_core(wr_instance_t *inst)
 {
     status_t status = wr_init_session_pool(wr_get_max_total_session_cnt());
@@ -149,6 +154,8 @@ static status_t instance_init_core(wr_instance_t *inst)
     WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance failed to start reactors!"));
     status = wr_start_lsnr(inst);
     WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance failed to start lsnr!"));
+    status = wr_init_certification(inst);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "WR instance failed to startup certification"));
     status = wr_init_inst_handle_session(inst);
     WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance int handle session!"));
     return CM_SUCCESS;
@@ -257,6 +264,8 @@ status_t wr_startup(wr_instance_t *inst, wr_srv_args_t wr_args)
     WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Aborted due to starting timer thread.\n"));
     status = wr_load_config(&inst->inst_cfg);
     WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Failed to load parameters!\n"));
+    status = wr_load_ser_ssl_config(&inst->inst_cfg);
+    WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Failed to load server parameters!\n"));
     status = wr_save_process_pid(&inst->inst_cfg);
     WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Save wrserver pid failed!\n"));
     wr_init_maintain(inst, wr_args);
@@ -295,6 +304,12 @@ static status_t wr_handshake(wr_session_t *session)
     return status;
 }
 
+static status_t wr_certificate(wr_session_t *session)
+{
+    session->pipe.type = CS_TYPE_SSL;
+    return ser_cert_accept(&session->pipe);
+}
+
 static status_t wr_lsnr_proc(tcp_lsnr_t *lsnr, cs_pipe_t *pipe)
 {
     wr_session_t *session = NULL;
@@ -304,6 +319,9 @@ static status_t wr_lsnr_proc(tcp_lsnr_t *lsnr, cs_pipe_t *pipe)
     // process_handshake
     status = wr_handshake(session);
     WR_RETURN_IFERR3(status, LOG_RUN_ERR("[WR_CONNECT] handshake failed.\n"), wr_destroy_session(session));
+    status = wr_certificate(session);
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("[WR_CONNECT]SSL certificate failed."));
+    LOG_RUN_INF("[WR_CONNECT]The certification between client and server has finished.");
     status = wr_reactors_add_session(session);
     WR_RETURN_IFERR3(status,
         LOG_RUN_ERR("[WR_CONNECT]Session:%u socket:%u closed.", session->id, pipe->link.uds.sock),

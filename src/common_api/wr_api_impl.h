@@ -32,6 +32,7 @@
 #include "wr_interaction.h"
 #include "wr_session.h"
 #include "wr_api.h"
+#include "ssl_func.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -221,6 +222,7 @@ status_t wr_alloc_conn(wr_conn_t **conn);
 void wr_free_conn(wr_conn_t *conn);
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
 void wr_disconnect(wr_conn_t *conn);
+status_t wr_init_ssl();
 
 // NOTE:just for wrcmd because not support many threads in one process.
 status_t wr_connect_ex(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
@@ -248,6 +250,7 @@ status_t wr_postpone_file_time_impl(wr_conn_t *conn, const char *file_name, cons
 void wr_clean_file_handle(wr_file_handle *file_handle);
 
 status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file);
+status_t wr_cli_ssl_connect(wr_conn_t *conn);
 status_t wr_init_client(uint32_t max_open_files, char *home);
 void wr_destroy(void);
 status_t wr_get_fname_impl(int handle, char *fname, int fname_size);

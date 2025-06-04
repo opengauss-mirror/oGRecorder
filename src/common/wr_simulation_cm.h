@@ -29,6 +29,7 @@
 #include "cm_config.h"
 #include "cs_pipe.h"
 #include "mes_metadata.h"
+#include "ssl_metadata.h"
 #include "wr_errno.h"
 #ifdef __cplusplus
 extern "C" {

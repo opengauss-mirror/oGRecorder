@@ -45,6 +45,23 @@ wr_config_t *wr_get_g_inst_cfg()
     return &g_inst_cfg_inner;
 }
 
+config_t cli_ssl_cfg;
+
+static config_item_t g_wr_ssl_params[] = {
+    {"SER_SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 25, EFFECT_REBOOT, CFG_INS,
+        NULL, NULL, NULL, NULL},
+    {"SER_SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 26, EFFECT_REBOOT, CFG_INS,
+        NULL, NULL, NULL, NULL},
+    {"SER_SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 28, EFFECT_REBOOT, CFG_INS,
+        NULL, NULL, NULL, NULL},
+    {"CLI_SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 25, EFFECT_REBOOT, CFG_INS,
+        NULL, NULL, NULL, NULL},
+    {"CLI_SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 26, EFFECT_REBOOT, CFG_INS,
+        NULL, NULL, NULL, NULL},
+    {"CLI_SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 28, EFFECT_REBOOT, CFG_INS,
+        NULL, NULL, NULL, NULL},
+};
+
 static config_item_t g_wr_params[] = {
     {"SSL_CERT_NOTIFY_TIME", CM_TRUE, ATTR_READONLY, "30", NULL, NULL, "-", "[7,180]", "GS_TYPE_INTEGER", NULL, 0,
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
@@ -132,7 +149,10 @@ static config_item_t g_wr_params[] = {
 };
 
 static const char *g_wr_config_file = (const char *)"wr_inst.ini";
+static const char *g_wr_ser_config_file = (const char *)"wr_ser_inst.ini";
+static const char *g_wr_cli_config_file = (const char *)"wr_cli_inst.ini";
 #define WR_PARAM_COUNT (sizeof(g_wr_params) / sizeof(config_item_t))
+#define WR_CERT_PARAM_COUNT (sizeof(g_wr_ssl_params) / sizeof(config_item_t))
 
 static status_t wr_load_threadpool_cfg(wr_config_t *inst_cfg)
 {
@@ -573,6 +593,75 @@ static status_t wr_load_delay_clean_interval(wr_config_t *inst_cfg)
     return wr_load_delay_clean_interval_core(value, inst_cfg);
 }
 
+status_t wr_load_ser_ssl_params(wr_config_t *inst_cfg)
+{
+    char *value = cm_get_config_value(&inst_cfg->ssl_ser_config, "SER_SSL_CA");
+    status_t status = wr_set_cert_param("SER_SSL_CA", value);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "SER_SSL_CA"));
+
+    value = cm_get_config_value(&inst_cfg->ssl_ser_config, "SER_SSL_KEY");
+    status = wr_set_cert_param("SER_SSL_KEY", value);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "SER_SSL_KEY"));
+
+    value = cm_get_config_value(&inst_cfg->ssl_ser_config, "SER_SSL_CERT");
+    status = wr_set_cert_param("SER_SSL_CERT", value);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "SER_SSL_CERT"));
+
+    return CM_SUCCESS;
+}
+
+status_t wr_load_ser_ssl_config(wr_config_t *inst_cfg)
+{
+    char file_name[WR_FILE_NAME_BUFFER_SIZE];
+    errno_t ret = snprintf_s(file_name, WR_FILE_NAME_BUFFER_SIZE, WR_FILE_NAME_BUFFER_SIZE - 1, "%s/cfg/%s",
+        inst_cfg->home, g_wr_ser_config_file);
+    if (ret == -1) {
+        WR_RETURN_IFERR2(
+            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load ser params, invalid ser config file path"));
+    }
+
+    status_t status = 
+        cm_load_config(g_wr_ssl_params, WR_CERT_PARAM_COUNT, file_name, &inst_cfg->ssl_ser_config, CM_FALSE);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load seri config"));
+    CM_RETURN_IFERR(wr_load_ser_ssl_params(inst_cfg));
+    return CM_SUCCESS;
+}
+
+status_t wr_load_cli_ssl_params()
+{
+    char *value = cm_get_config_value(&cli_ssl_cfg, "CLI_SSL_CA");
+    status_t status = wr_set_cert_param("CLI_SSL_CA", value);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "CLI_SSL_CA"));
+
+    value = cm_get_config_value(&cli_ssl_cfg, "CLI_SSL_KEY");
+    status = wr_set_cert_param("CLI_SSL_KEY", value);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "CLI_SSL_KEY"));
+
+    value = cm_get_config_value(&cli_ssl_cfg, "CLI_SSL_CERT");
+    status = wr_set_cert_param("CLI_SSL_CERT", value);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "CLI_SSL_CERT"));
+
+    return CM_SUCCESS;
+}
+
+status_t wr_load_cli_ssl()
+{
+    char file_name[WR_FILE_NAME_BUFFER_SIZE];
+    char *path = getenv(WR_ENV_HOME);
+    errno_t ret = snprintf_s(file_name, WR_FILE_NAME_BUFFER_SIZE, WR_FILE_NAME_BUFFER_SIZE - 1, "%s/cfg/%s",
+        path, g_wr_cli_config_file);
+    if (ret == -1) {
+        WR_RETURN_IFERR2(
+            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load cli params, invalid cli config file path"));
+    }
+
+    status_t status =
+        cm_load_config(g_wr_ssl_params, WR_CERT_PARAM_COUNT, file_name, &cli_ssl_cfg, CM_FALSE);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load cli config"));
+    CM_RETURN_IFERR(wr_load_cli_ssl_params());
+    return CM_SUCCESS;
+}
+
 status_t wr_load_config(wr_config_t *inst_cfg)
 {
     char file_name[WR_FILE_NAME_BUFFER_SIZE];
@@ -724,6 +813,20 @@ status_t wr_get_cfg_param(const char *name, char **value)
         return CM_ERROR;
     }
 
+    return CM_SUCCESS;
+}
+
+status_t wr_set_cert_param(const char *param_name, const char *param_value)
+{
+    if (param_name == NULL) {
+        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "the ssl param name should not be null."));
+    }
+    LOG_RUN_INF("wr set ssl param, param_name=%s param_value=%s", param_name, param_value);
+    cert_param_t param_type;
+    cert_param_value_t out_value;
+    CM_RETURN_IFERR(ssl_chk_md_param(param_name, param_value, &param_type, &out_value));
+    status_t status = ssl_set_md_param(param_type, &out_value);
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, param_name));
     return CM_SUCCESS;
 }
 
