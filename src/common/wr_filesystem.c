@@ -74,13 +74,18 @@ status_t wr_filesystem_rmdir(const char *name, uint64 flag) {
 
         struct dirent *entry;
         char path[WR_FILE_PATH_MAX_LENGTH];
+        int32_t ret = 0;
 
         while ((entry = readdir(dir)) != NULL) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
 
-            snprintf(path, sizeof(path), "%s/%s", WR_FS_GET_PATH(name), entry->d_name);
+            ret = snprintf_s(path, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1, "%s/%s", WR_FS_GET_PATH(name), entry->d_name);
+            if (ret == -1) {
+                WR_THROW_ERROR(ERR_SYSTEM_CALL, ret);
+                return CM_ERROR;
+            }
             if (unlink(path) != 0) {
                 LOG_RUN_ERR("[FS] Failed to remove file: %s", path);
                 WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
