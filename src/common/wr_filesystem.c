@@ -106,6 +106,44 @@ status_t wr_filesystem_rmdir(const char *name, uint64 flag) {
     return CM_SUCCESS;
 }
 
+status_t wr_filesystem_opendir(const char *name, void **out_dir)
+{
+    if (!name || !out_dir) {
+        LOG_RUN_ERR("[FS] Invalid parameters: name or out_dir is NULL");
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
+    }
+
+    DIR *dir = opendir(WR_FS_GET_PATH(name));
+    if (!dir) {
+        LOG_RUN_ERR("[FS] Failed to open directory: %s", name);
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
+    }
+
+    LOG_RUN_INF("[FS] Successfully opened directory: %s", name);
+    *out_dir = (void *)dir;
+    return CM_SUCCESS;
+}
+
+status_t wr_filesystem_closedir(void *dir)
+{
+    if (!dir) {
+        LOG_RUN_ERR("[FS] Invalid directory handle for");
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
+    }
+
+    if (closedir((DIR *)dir) != 0) {
+        LOG_RUN_ERR("[FS] Failed to close directory");
+        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
+    }
+
+    LOG_RUN_INF("[FS] Successfully closed directory");
+    return CM_SUCCESS;
+}
+
 
 #define WR_LOCK_MODE 0400
 #define WR_APPEND_MODE 0600
@@ -176,28 +214,47 @@ int64 wr_filesystem_pread(int handle, int64 offset, int64 size, char *buf) {
     return res;
 }
 
-status_t wr_filesystem_query_file_num(const char *vfs_name, uint32_t *file_num) {
-    if (!vfs_name || !file_num) {
+status_t wr_filesystem_query_file_num(void *dir, uint32_t *file_num) {
+    if (!file_num) {
         LOG_RUN_ERR("[FS] Invalid parameters: vfs_name or file_num is NULL");
-    }
-
-    DIR *dir = opendir(WR_FS_GET_PATH(vfs_name));
-    if (!dir) {
-        LOG_RUN_ERR("[FS] Failed to open directory: %s", vfs_name);
-        WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
-        return CM_ERROR;
     }
 
     struct dirent *entry;
     *file_num = 0;
-
-    while ((entry = readdir(dir)) != NULL) {
+    rewinddir(dir);
+    while ((entry = readdir((DIR*)dir)) != NULL) {
         if (entry->d_type == DT_REG) {
             (*file_num)++;
         }
     }
+    rewinddir(dir);
+    return CM_SUCCESS;
+}
 
-    (void)closedir(dir);
+status_t wr_filesystem_query_file_info(void *dir, wr_file_item_t *file_items, uint32_t max_files, uint32_t *file_count, bool is_continue) {
+    if (!file_items || !file_count) {
+        LOG_RUN_ERR("[FS] Invalid parameters:file_items, or file_count is NULL");
+        return CM_ERROR;
+    }
+
+    if (!is_continue) {
+        rewinddir(dir);
+    }
+    struct dirent *entry;
+    *file_count = 0;
+
+    while ((entry = readdir((DIR*)dir)) != NULL) {
+        if (entry->d_type == DT_REG) {
+            wr_file_item_t *current_item = &file_items[*file_count];
+            strncpy(current_item->name, entry->d_name, WR_MAX_NAME_LEN - 1);
+            current_item->name[WR_MAX_NAME_LEN - 1] = '\0';
+            (*file_count)++;
+            if (*file_count >= max_files) {
+                break;
+            }
+        }
+    }
+    
     return CM_SUCCESS;
 }
 

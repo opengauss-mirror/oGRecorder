@@ -6,9 +6,9 @@ extern "C" {
 }
 #define TEST_LOG_DIR "./test_log"
 #define TEST_DIR "testdir1"
-#define TEST_FILE1 "testfile1"
-#define TEST_FILE2 "testfile2"
-#define TEST_FILE3 "testfile3"
+#define TEST_FILE1 "TEST_FILE_1"
+#define TEST_FILE2 "TEST_FILE_2"
+#define TEST_FILE3 "TEST_FILE_3"
 #define ONE_GB 1024 * 1024 * 1024
 #define SERVER_ADDR "127.0.0.1:19225"
 
@@ -78,10 +78,14 @@ TEST_F(WrApiTest, TestWrVfsMount) {
 }
 
 TEST_F(WrApiTest, TestWrVfsCreateFiles) {
-    EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE1, NULL), WR_SUCCESS);
-    EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE2, NULL), WR_SUCCESS);
-    EXPECT_EQ(wr_file_create(g_vfs_handle, TEST_FILE3, NULL), WR_SUCCESS);
-    EXPECT_NE(wr_file_create(g_vfs_handle, TEST_FILE1, NULL), WR_SUCCESS);
+    char file_name[256];
+    for (int i = 1; i <= 200; i++) {
+        snprintf(file_name, sizeof(file_name), "TEST_FILE_%d", i);
+        EXPECT_EQ(wr_file_create(g_vfs_handle, file_name, NULL), WR_SUCCESS);
+    }
+
+    // 测试重复创建第一个文件
+    EXPECT_NE(wr_file_create(g_vfs_handle, "TEST_FILE_1", NULL), WR_SUCCESS);
 }
 
 TEST_F(WrApiTest, TestWrfileOpen) {
@@ -159,9 +163,20 @@ TEST_F(WrApiTest, TestWrfileClose) {
 }
 
 TEST_F(WrApiTest, TestWrVfsQueryFileNum) {
+    #define FILE_INFO_NUM 100
+    // 确保文件数量查询正确
     int file_num = 0;
-    EXPECT_EQ(wr_vfs_query_file_num(g_inst_handle, TEST_DIR, &file_num), WR_SUCCESS);
-    EXPECT_EQ(file_num, 3);
+    wr_file_item_t file_info[FILE_INFO_NUM] = {0};
+    EXPECT_EQ(wr_vfs_query_file_num(g_vfs_handle, &file_num), WR_SUCCESS);
+    EXPECT_EQ(file_num, 200);
+    EXPECT_EQ(wr_vfs_query_file_info(g_vfs_handle, file_info, true), WR_SUCCESS);
+    for (int i = 0; i < FILE_INFO_NUM; i++) {
+        printf("File %d: Name: %s\n", i + 1, file_info[i].name);
+    }
+    EXPECT_EQ(wr_vfs_query_file_info(g_vfs_handle, file_info, true), WR_SUCCESS);
+    for (int i = 0; i < FILE_INFO_NUM; i++) {
+        printf("File %d: Name: %s\n", i + 1, file_info[i].name);
+    }
 }
 
 TEST_F(WrApiTest, TestWrVfsDeleteFiles) {

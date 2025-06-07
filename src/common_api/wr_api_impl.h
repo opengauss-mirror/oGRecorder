@@ -152,15 +152,10 @@ typedef struct st_wr_read_file_info {
 } wr_read_file_info_t;
 
 typedef struct st_wr_query_file_num_info {
-    const char *vfs_name;
+    void* dir;
     uint32_t file_num;
+    bool is_continue;
 } wr_query_file_num_info_t;
-
-typedef struct st_wr_refresh_file_table_info {
-    uint64 block_id;
-    const char *vg_name;
-    uint32_t vg_id;
-} wr_refresh_file_table_info_t;
 
 typedef struct st_wr_update_written_size_info {
     uint64 fid;
@@ -185,6 +180,11 @@ typedef struct st_wr_remove_dir_info {
     const char *name;
     uint64 attrFlag;
 } wr_remove_dir_info_t;
+
+typedef struct st_wr_mount_vfs_info {
+    const char *vfs_name;
+    void* dir;
+} wr_mount_vfs_info_t;
 
 typedef struct st_wr_get_server_info {
     char *home;
@@ -231,6 +231,8 @@ status_t wr_lock_vg_s(wr_vg_info_item_t *vg_item, wr_session_t *session);
 status_t wr_cli_session_lock(wr_conn_t *conn, wr_session_t *session);
 status_t wr_vfs_create_impl(wr_conn_t *conn, const char *dir_name, unsigned long long attrFlag);
 status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir, unsigned long long attrFlag);
+status_t wr_vfs_mount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle, unsigned long long attrFlag);
+status_t wr_vfs_unmount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle);
 wr_vfs_t *wr_open_dir_impl(wr_conn_t *conn, const char *dir_path, bool32 refresh_recursive);
 gft_node_t *wr_read_dir_impl(wr_conn_t *conn, wr_vfs_t *dir, bool32 skip_delete);
 status_t wr_close_dir_impl(wr_conn_t *conn, wr_vfs_t *dir);
@@ -254,7 +256,8 @@ status_t wr_cli_ssl_connect(wr_conn_t *conn);
 status_t wr_init_client(uint32_t max_open_files, char *home);
 void wr_destroy(void);
 status_t wr_get_fname_impl(int handle, char *fname, int fname_size);
-status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32_t *file_num);
+status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, uint32_t *file_num);
+status_t wr_vfs_query_file_info_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, wr_file_item_t *file_info, bool is_continue);
 
 int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset);
 int64 wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);

@@ -31,7 +31,10 @@
 static char *g_wr_cmd_desc[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_MKDIR)] = "mkdir",
     [WR_CMD_TYPE_OFFSET(WR_CMD_RMDIR)] = "rmdir",
+    [WR_CMD_TYPE_OFFSET(WR_CMD_MOUNT_VFS)] = "mount vfs",
+    [WR_CMD_TYPE_OFFSET(WR_CMD_UNMOUNT_VFS)] = "unmount vfs",
     [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_NUM)] = "query file num",
+    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_INFO)] = "query file info",
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_DIR)] = "open dir",
     [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_DIR)] = "close dir",
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_FILE)] = "open file",
