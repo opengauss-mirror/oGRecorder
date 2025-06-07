@@ -286,17 +286,68 @@ static status_t wr_process_rmdir(wr_session_t *session)
     return status;
 }
 
-static status_t wr_process_query_file_num(wr_session_t *session)
+static status_t wr_process_mount_vfs(wr_session_t *session)
 {
     char *vfs_name = NULL;
+    wr_init_get(&session->recv_pack);
+    void* dir;
+    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vfs_name));
+    if (wr_filesystem_opendir(vfs_name, &dir) != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Failed to mount vfs:%s", vfs_name);
+        return CM_ERROR;
+    }
+    (void)wr_put_int64(&session->send_pack, (int64)dir);
+    return CM_SUCCESS;
+}
+
+static status_t wr_process_unmount_vfs(wr_session_t *session)
+{
+    void* dir;
+    wr_init_get(&session->recv_pack);
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&dir));
+    if (wr_filesystem_closedir(dir) != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Failed to unmount vfs");
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
+static status_t wr_process_query_file_num(wr_session_t *session)
+{
+    void *dir = NULL;
     uint32_t file_num = 0;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vfs_name));
-    if (wr_filesystem_query_file_num(vfs_name, &file_num) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to query file num for vfs:%s", vfs_name);
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&dir));
+    if (wr_filesystem_query_file_num(dir, &file_num) != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Failed to query file num for vfs");
         return CM_ERROR;
     }
     (void)wr_put_int32(&session->send_pack, file_num);
+    return CM_SUCCESS;
+}
+
+#define WR_MAX_FILE_NUM 100
+static status_t wr_process_query_file_info(wr_session_t *session)
+{
+    uint32_t file_count = 0;
+    bool is_continue = CM_FALSE;
+    wr_file_item_t file_items[WR_MAX_FILE_NUM];
+    void *dir = NULL;
+
+    wr_init_get(&session->recv_pack);
+    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32*)&is_continue));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64*)&dir));
+
+    if (wr_filesystem_query_file_info(dir, file_items, WR_MAX_FILE_NUM, &file_count, is_continue) != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Failed to query file info for vfs");
+        return CM_ERROR;
+    }
+
+    WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, file_count));
+
+    for (uint32_t i = 0; i < file_count; i++) {
+        WR_RETURN_IF_ERROR(wr_put_data(&session->send_pack, &file_items[i], sizeof(wr_file_item_t)));
+    }
     return CM_SUCCESS;
 }
 
@@ -1029,7 +1080,10 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     // modify
     [WR_CMD_TYPE_OFFSET(WR_CMD_MKDIR)] = {WR_CMD_MKDIR, wr_process_mkdir, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RMDIR)] = {WR_CMD_RMDIR, wr_process_rmdir, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_NUM)] = {WR_CMD_QUERY_FILE_NUM, wr_process_query_file_num, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_MOUNT_VFS)] = {WR_CMD_MOUNT_VFS, wr_process_mount_vfs, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_UNMOUNT_VFS)] = {WR_CMD_UNMOUNT_VFS, wr_process_unmount_vfs, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_NUM)] = {WR_CMD_QUERY_FILE_NUM, wr_process_query_file_num, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_INFO)] = {WR_CMD_QUERY_FILE_INFO, wr_process_query_file_info, NULL, CM_TRUE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_DIR)] = {WR_CMD_OPEN_DIR, wr_process_open_dir, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_DIR)] = {WR_CMD_CLOSE_DIR, wr_process_close_dir, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_FILE)] = {WR_CMD_OPEN_FILE, wr_process_open_file, NULL, CM_FALSE},

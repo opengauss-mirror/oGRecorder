@@ -96,6 +96,7 @@ typedef struct st_wr_dirent {
 
 typedef struct wr_vfs_handle {
     wr_instance_handle handle;
+    void *dir;
     char vfs_name[WR_MAX_NAME_LEN];
 } wr_vfs_handle;
 
@@ -143,6 +144,10 @@ typedef struct st_wr_stat {
     wr_item_type_t type;
 } wr_stat_t;
 
+typedef struct st_wr_file_item {
+    char name[WR_MAX_NAME_LEN];
+} wr_file_item_t;
+
 typedef enum en_wr_conn_opt_key {
     WR_CONN_OPT_TIME_OUT = 0,
 } wr_conn_opt_key_e;
@@ -173,8 +178,8 @@ WR_DECLARE int wr_vfs_delete(wr_instance_handle inst_handle, const char *vfs_nam
 WR_DECLARE int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_handle *vfs_handle);
 WR_DECLARE int wr_vfs_unmount(wr_vfs_handle *vfs_handle);
 WR_DECLARE int wr_vfs_control(void);
-WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle dir, wr_dir_item_t item, wr_dir_item_t *result);
-WR_DECLARE int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, int *file_num);
+WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle vfs_handle, wr_file_item_t *result, bool is_continue);
+WR_DECLARE int wr_vfs_query_file_num(wr_vfs_handle vfs_handle, int *file_num);
 
 // file
 WR_DECLARE int wr_file_create(wr_vfs_handle vfs_handle, const char *name, const FileParameter *param);

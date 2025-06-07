@@ -381,6 +381,36 @@ status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir, unsigned long long
     return status;
 }
 
+status_t wr_vfs_mount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle, unsigned long long attrFlag)
+{
+    if (vfs_handle->vfs_name == NULL) {
+        LOG_RUN_ERR("vfs name is NULL.");
+        return CM_ERROR;
+    }
+    LOG_DEBUG_INF("wr mount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
+    wr_mount_vfs_info_t send_info;
+    send_info.vfs_name = vfs_handle->vfs_name;
+    send_info.dir = NULL; 
+    status_t status = wr_msg_interact(conn, WR_CMD_MOUNT_VFS, (void *)&send_info,  (void *)&send_info);
+    vfs_handle->dir = send_info.dir;
+    LOG_DEBUG_INF("wr mount vfs leave");
+    return status;
+}
+
+status_t wr_vfs_unmount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle)
+{
+    if (vfs_handle->vfs_name == NULL) {
+        LOG_RUN_ERR("vfs name is NULL.");
+        return CM_ERROR;
+    }
+    LOG_DEBUG_INF("wr unmount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
+    wr_mount_vfs_info_t send_info;
+    send_info.dir = vfs_handle->dir; 
+    status_t status = wr_msg_interact(conn, WR_CMD_UNMOUNT_VFS, (void *)&send_info,  (void *)&send_info);
+    LOG_DEBUG_INF("wr unmount vfs leave");
+    return status;
+}
+
 static wr_vfs_t *wr_open_dir_impl_core(wr_conn_t *conn, wr_find_node_t *find_node)
 {
     wr_vg_info_item_t *vg_item = wr_find_vg_item(find_node->vg_name);
@@ -440,11 +470,11 @@ wr_vfs_t *wr_open_dir_impl(wr_conn_t *conn, const char *dir_path, bool32 refresh
     return wr_open_dir_impl_core(conn, find_node);
 }
 
-status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint32_t *file_num)
+status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, uint32_t *file_num)
 {
-    LOG_DEBUG_INF("wr query file num entry, vfs_name:%s", vfs_name);
+    LOG_DEBUG_INF("wr query file num entry");
     wr_query_file_num_info_t send_info;
-    send_info.vfs_name = vfs_name;
+    send_info.dir = vfs_handle.dir;
     send_info.file_num = *file_num;
     status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_NUM, (void *)&send_info, (void *)&send_info);
     if (status != CM_SUCCESS) {
@@ -454,6 +484,22 @@ status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, const char *vfs_name, uint3
     *file_num = send_info.file_num;
     LOG_DEBUG_INF("wr query file num leave");
     return status;
+}
+
+status_t wr_vfs_query_file_info_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, wr_file_item_t *file_info, bool is_continue)
+{
+    LOG_DEBUG_INF("Client query file info entry, vfs_name: %s", vfs_handle.vfs_name);
+    wr_query_file_num_info_t send_info;
+    send_info.dir = vfs_handle.dir;
+    send_info.is_continue = is_continue;
+    status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_INFO, (void *)&send_info, (void *)file_info);
+    if (status != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Failed to interact with server for file info query");
+        return CM_ERROR;
+    }
+
+    LOG_DEBUG_INF("Client query file info leave.");
+    return CM_SUCCESS;
 }
 
 gft_node_t *wr_read_dir_impl(wr_conn_t *conn, wr_vfs_t *dir, bool32 skip_delete)
@@ -1428,10 +1474,32 @@ static status_t wr_encode_handshake(wr_conn_t *conn, wr_packet_t *pack, void *se
     return CM_SUCCESS;
 }
 
+static status_t wr_encode_mount_vfs(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_mount_vfs_info_t *info = (wr_mount_vfs_info_t *)send_info;
+    CM_RETURN_IFERR(wr_put_str(pack, info->vfs_name));
+    return CM_SUCCESS;
+}
+
+static status_t wr_encode_unmount_vfs(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_mount_vfs_info_t *info = (wr_mount_vfs_info_t *)send_info;
+    CM_RETURN_IFERR(wr_put_int64(pack, (int64)info->dir));
+    return CM_SUCCESS;
+}
+
 static status_t wr_encode_query_file_num(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     wr_query_file_num_info_t *info = (wr_query_file_num_info_t *)send_info;
-    CM_RETURN_IFERR(wr_put_str(pack, info->vfs_name));
+    CM_RETURN_IFERR(wr_put_int64(pack, (int64)info->dir));
+    return CM_SUCCESS;
+}
+
+static status_t wr_encode_query_file_info(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
+{
+    wr_query_file_num_info_t *info = (wr_query_file_num_info_t *)send_info;
+    CM_RETURN_IFERR(wr_put_int32(pack, info->is_continue));
+    CM_RETURN_IFERR(wr_put_int64(pack, (int64)info->dir));
     return CM_SUCCESS;
 }
 
@@ -1445,10 +1513,33 @@ static status_t wr_decode_stat_file(wr_packet_t *ack_pack, void *ack)
     return CM_SUCCESS;
 }
 
+static status_t wr_decode_mount_vfs(wr_packet_t *ack_pack, void *ack)
+{
+    wr_mount_vfs_info_t *info = (wr_mount_vfs_info_t *)ack;
+    CM_RETURN_IFERR(wr_get_int64(ack_pack, (int64*)&(info->dir)));
+    return CM_SUCCESS;
+}
+
 static status_t wr_decode_query_file_num(wr_packet_t *ack_pack, void *ack)
 {
     wr_query_file_num_info_t *info = (wr_query_file_num_info_t *)ack;
-    CM_RETURN_IFERR(wr_get_int32(ack_pack, (int32_t *)&(info->file_num)));
+    CM_RETURN_IFERR(wr_get_int32(ack_pack, (int32*)&(info->file_num)));
+    return CM_SUCCESS;
+}
+
+static status_t wr_decode_query_file_info(wr_packet_t *ack_pack, void *ack)
+{
+    int32_t file_num = 0;
+    wr_file_item_t *info = (wr_file_item_t *)ack;
+    wr_file_item_t *tmp;
+
+    CM_RETURN_IFERR(wr_get_int32(ack_pack, &file_num));
+
+    for (uint32_t i = 0; i < file_num; i++) {
+        CM_RETURN_IFERR(wr_get_data(ack_pack, sizeof(wr_file_item_t), (void **)&tmp));
+        memcpy_s(&info[i], sizeof(wr_file_item_t), tmp, sizeof(wr_file_item_t));
+    }
+
     return CM_SUCCESS;
 }
 
@@ -1737,8 +1828,11 @@ typedef struct st_wr_packet_proc {
 wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] = 
 {   
     [WR_CMD_MKDIR] = {wr_encode_make_dir, NULL, "make dir"},
-    [WR_CMD_RMDIR] = {wr_encode_remove_dir, NULL, "remove dir"},
+    [WR_CMD_RMDIR] = {wr_encode_remove_dir, NULL, "remove dir"}, 
+    [WR_CMD_MOUNT_VFS] = {wr_encode_mount_vfs, wr_decode_mount_vfs, "mount vfs"},
+    [WR_CMD_UNMOUNT_VFS] = {wr_encode_unmount_vfs, NULL, "unmount vfs"},
     [WR_CMD_QUERY_FILE_NUM] = {wr_encode_query_file_num, wr_decode_query_file_num, "query file num"},
+    [WR_CMD_QUERY_FILE_INFO] = {wr_encode_query_file_info, wr_decode_query_file_info, "query file info"},
     [WR_CMD_OPEN_DIR] = {wr_encode_open_dir, wr_decode_open_dir, "open dir"},
     [WR_CMD_CLOSE_DIR] = {wr_encode_close_dir, NULL, "close dir"},
     [WR_CMD_OPEN_FILE] = {wr_encode_open_file, wr_decode_open_file, "open file"},

@@ -179,14 +179,27 @@ int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_ha
         WR_THROW_ERROR(ERR_SYSTEM_CALL, err);
         return WR_ERROR;
     }
-    return WR_SUCCESS;
+    status_t ret = wr_vfs_mount_impl(hdl->conn, vfs_handle, 0);
+    return (int)ret;
 }
 
 int wr_vfs_unmount(wr_vfs_handle *vfs_handle)
 {
+    if (vfs_handle == NULL) {
+        LOG_RUN_ERR("vfs_handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)vfs_handle->handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("dremove get conn error.");
+        return WR_ERROR;
+    }
+    status_t ret = wr_vfs_unmount_impl(hdl->conn, vfs_handle);
     vfs_handle->handle = NULL;
     vfs_handle->vfs_name[0] = '\0';
-    return WR_SUCCESS; 
+    vfs_handle->dir = NULL;
+
+    return ret; 
 }
 
 int wr_vfs_control(void)
@@ -223,26 +236,50 @@ int wr_stat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handl
     return ret;
 }
 
-int wr_vfs_query_file_num(wr_instance_handle inst_handle, const char *vfs_name, int *file_num)
+int wr_vfs_query_file_num(wr_vfs_handle vfs_handle, int *file_num)
 {
     if (file_num == NULL) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "file_num");
         return WR_ERROR;
     }
-    if (inst_handle == NULL) {
+    if (vfs_handle.handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
         return WR_ERROR;
     }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("lstat get conn error.");
         return WR_ERROR;
     }
 
-    status_t ret = wr_vfs_query_file_num_impl(hdl->conn, vfs_name, (uint32_t *)file_num);
+    status_t ret = wr_vfs_query_file_num_impl(hdl->conn, vfs_handle, (uint32_t *)file_num);
     if (ret != WR_SUCCESS) {
         *file_num = 0;
-        LOG_DEBUG_INF("vfs query file num :%s error", vfs_name);
+        LOG_DEBUG_INF("vfs query file num error");
+        return WR_ERROR;
+    }
+    return WR_SUCCESS;
+}
+
+int wr_vfs_query_file_info(wr_vfs_handle vfs_handle, wr_file_item_t *result, bool is_continue)
+{
+    if (result == NULL) {
+        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "result");
+        return WR_ERROR;
+    }
+   if (vfs_handle.handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return WR_ERROR;
+    }
+    st_wr_instance_handle *hdl = (st_wr_instance_handle*)(vfs_handle.handle);
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("lstat get conn error.");
+        return WR_ERROR;
+    }
+
+    status_t ret = wr_vfs_query_file_info_impl(hdl->conn, vfs_handle, result, is_continue);
+    if (ret != WR_SUCCESS) {
+        LOG_DEBUG_INF("vfs query file info :%s error", vfs_handle.vfs_name);
         return WR_ERROR;
     }
     return WR_SUCCESS;
