@@ -56,8 +56,6 @@ status_t wr_verify_enable_core_state_collect(void *lex, void *def);
 status_t wr_notify_enable_core_state_collect(void *se, void *item, char *value);
 status_t wr_verify_delay_clean_interval(void *lex, void *def);
 status_t wr_notify_delay_clean_interval(void *se, void *item, char *value);
-status_t wr_verify_cluster_run_mode(void *lex, void *def);
-status_t wr_notify_cluster_run_mode(void *se, void *item, char *value);
 status_t wr_verify_blackbox_detail_on(void *lex, void *def);
 status_t wr_notify_blackbox_detail_on(void *se, void *item, char *value);
 status_t wr_verify_mes_wait_timeout(void *lex, void *def);

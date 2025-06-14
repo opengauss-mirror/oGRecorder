@@ -224,24 +224,6 @@ void cmd_parse_clean(wr_args_t *cmd_args_set, int set_size)
     }
 }
 
-status_t cmd_check_au_size(const char *au_size_str)
-{
-    uint32_t min_multiple = WR_MIN_AU_SIZE / SIZE_K(1);
-    uint32_t max_multiple = WR_MAX_AU_SIZE / SIZE_K(1);
-    uint32_t au_size;
-    status_t ret = cm_str2uint32(au_size_str, &au_size);
-    if (ret != CM_SUCCESS) {
-        WR_PRINT_ERROR("au_size %s is error!\n", au_size_str);
-        return CM_ERROR;
-    }
-    if (au_size == 0 || au_size < min_multiple || au_size > max_multiple) {
-        WR_PRINT_ERROR(
-            "au_size %u is error, au_size cannot be 0, must greater than 2MB, smaller than 64MB!\n", au_size);
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
-
 status_t cmd_check_wr_home(const char *wr_home)
 {
     return wr_check_path(wr_home);
@@ -343,8 +325,6 @@ config_item_t g_wr_admin_parameters[] = {
         EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"_AUDIT_LEVEL", CM_TRUE, ATTR_NONE, "1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 9, EFFECT_REBOOT, CFG_INS,
         NULL, NULL, NULL, NULL},
-    {"CLUSTER_RUN_MODE", CM_TRUE, ATTR_NONE, "cluster_primary", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 10,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     { "LOG_COMPRESSED",  CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]",  "GS_TYPE_BOOLEAN", NULL,
         11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 };
@@ -367,6 +347,11 @@ static status_t wr_load_local_server_config_core(
     res = cm_read_config(file_name, &inst_cfg->config);
     if (res != CM_SUCCESS) {
         LOG_DEBUG_ERR("Read config from %s failed.\n", file_name);
+    }
+    res = wr_load_config(inst_cfg);
+    if (res != CM_SUCCESS) {
+        LOG_DEBUG_ERR("Load config from %s failed.\n", file_name);
+        return res;
     }
     return res;
 }

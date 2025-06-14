@@ -789,6 +789,20 @@ status_t wr_check_path_exist(wr_conn_t *conn, const char *path)
     return CM_SUCCESS;
 }
 
+status_t wr_check_file_exist(wr_conn_t *conn, const char *path, bool *is_exist)
+{
+    bool32 exist = false;
+    gft_item_type_t type;
+
+    WR_RETURN_IFERR2(wr_exist_impl(conn, path, &exist, &type),
+        WR_THROW_ERROR_EX(ERR_WR_FILE_NOT_EXIST, "Failed to check the path %s exists.\n", path));
+    if (!exist || type != GFT_FILE) {
+        *is_exist = false;
+    }
+    *is_exist = true;
+    return CM_SUCCESS;
+}
+
 static status_t wr_validate_seek_origin(int origin, int64 offset, wr_file_context_t *context, int64 *new_offset)
 {
     if (origin == SEEK_SET) {

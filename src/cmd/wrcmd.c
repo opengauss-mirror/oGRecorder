@@ -768,6 +768,42 @@ static status_t stopwr_proc(void)
     return status;
 }
 
+static wr_args_t cmd_switchover_args[] = {};
+static wr_args_set_t cmd_switchover_args_set = {
+    cmd_switchover_args,
+    sizeof(cmd_switchover_args) / sizeof(wr_args_t),
+    NULL,
+};
+
+static void switchover_help(const char *prog_name, int print_flag)
+{
+    (void)printf("\nUsage:%s stopwr [-U UDS:socket_domain]\n", prog_name);
+    (void)printf("[client command] stop wr server\n");
+    if (print_flag == WR_HELP_SIMPLE) {
+        return;
+    }
+    help_param_uds();
+}
+
+static status_t switchover_proc(void)
+{
+    wr_config_t *inst_cfg = wr_get_g_inst_cfg();
+    char server_path[CM_MAX_IP_LEN] = {0};
+    errno_t err = sprintf_s(server_path, CM_MAX_IP_LEN, "%s:%u",
+                            inst_cfg->params.listen_addr.host, inst_cfg->params.listen_addr.port);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        WR_PRINT_ERROR("Failed to get server_path.\n");
+        return WR_ERROR;
+    }
+    status_t status = wr_set_main_inst(server_path);
+    if (status != CM_SUCCESS) {
+        WR_PRINT_ERROR("Failed to switchover server.\n");
+    } else {
+        WR_PRINT_INF("Succeed to switchover server.\n");
+    }
+    return status;
+}
+
 // clang-format off
 wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"ts", ts_help, ts_proc, &cmd_ts_args_set, false},
@@ -782,6 +818,7 @@ wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"getcfg", getcfg_help, getcfg_proc, &cmd_getcfg_args_set, false},
     {"getstatus", getstatus_help, getstatus_proc, &cmd_getstatus_args_set, false},
     {"stopwr", stopwr_help, stopwr_proc, &cmd_stopwr_args_set, true},
+    {"switchover", switchover_help, switchover_proc, &cmd_switchover_args_set, true},
 };
 
 void clean_cmd()
@@ -798,9 +835,6 @@ static void help(char *prog_name, wr_help_type help_type)
     (void)printf("Usage:%s %s/%s show help information of wrcmd\n", prog_name, HELP_SHORT, HELP_LONG);
     (void)printf("Usage:%s %s/%s show all help information of wrcmd\n", prog_name, ALL_SHORT, ALL_LONG);
     (void)printf("Usage:%s %s/%s show version information of wrcmd\n", prog_name, VERSION_SHORT, VERSION_LONG);
-    if (!g_run_interatively) {
-        (void)printf("Usage:%s -i/--interactive run wrcmd interatively\n", prog_name);
-    }
     (void)printf("commands:\n");
     for (uint32_t i = 0; i < sizeof(g_wr_admin_cmd) / sizeof(g_wr_admin_cmd[0]); ++i) {
         g_wr_admin_cmd[i].help(prog_name, help_type);
@@ -1006,15 +1040,8 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    do {
-        if (g_run_interatively) {
-            wr_cmd_run_interactively();
-            ret = CM_SUCCESS;
-            break;
-        }
-        cm_reset_error();
-        ret = execute_cmd(argc, argv, idx);
-    } while (0);
+    cm_reset_error();
+    ret = execute_cmd(argc, argv, idx);
 
     clean_cmd();
     return ret;

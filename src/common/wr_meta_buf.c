@@ -783,7 +783,7 @@ char *wr_find_block_in_shm(wr_session_t *session, wr_vg_info_item_t *vg_item, wr
         return meta_addr;
     }
     if (meta_addr != NULL) {
-        if (check_version && (WR_STANDBY_CLUSTER || !wr_is_readwrite() || active_refresh)) {
+        if (check_version && (!wr_is_readwrite() || active_refresh)) {
             status = wr_check_block_version(vg_item, block_id, type, meta_addr, NULL, CM_FALSE);
             if (status != CM_SUCCESS) {
                 return NULL;

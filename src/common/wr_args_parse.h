@@ -83,7 +83,6 @@ typedef enum en_wr_help_type {
 status_t cmd_parse_args(int argc, char **argv, wr_args_set_t *args_set);
 void cmd_parse_init(wr_args_t *cmd_args_set, int set_size);
 void cmd_parse_clean(wr_args_t *cmd_args_set, int set_size);
-status_t cmd_check_au_size(const char *au_size_str);
 status_t wr_load_local_server_config(wr_config_t *inst_cfg);
 status_t cmd_check_uint64(const char *lsn_str);
 status_t cmd_check_wr_home(const char *wr_home);

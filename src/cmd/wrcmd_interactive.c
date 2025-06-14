@@ -712,39 +712,3 @@ void cmd_print_interactive_help(char *prog_name, wr_help_type help_type)
     }
 }
 
-void wr_cmd_run_interactively()
-{
-    uint32_t welcome_width = 0;
-    int hist_count = 0;
-    int list_num = 0;
-    char *args[WR_MAX_ARG_NUM] = {0};
-    int argc;
-    uint32_t cmd_idx;
-    bool8 go_ahead;
-    bool8 exit_cmd;
-    setlocale(LC_CTYPE, "");
-
-    while (!feof(stdin)) {
-        welcome_width = wr_cmd_print_welcome();
-
-        (void)memset_s(g_cmd_buf, MAX_CMD_LEN, 0, MAX_CMD_LEN);
-        exit_cmd = wr_cmd_fgets(&hist_count, &list_num, welcome_width, g_cmd_buf, MAX_CMD_LEN);
-        if (exit_cmd) {
-            break;
-        }
-        argc = wr_cmd_parse_args(g_cmd_buf, args, WR_MAX_ARG_NUM);
-
-        cm_reset_error();
-        go_ahead = wr_exe_interactive_cmd(argc, args);
-        if (!go_ahead) {
-            continue;
-        }
-
-        execute_help_cmd(argc, args, &cmd_idx, &go_ahead);
-        if (!go_ahead) {
-            continue;
-        }
-
-        (void)execute_cmd(argc, args, cmd_idx);
-    }
-}
