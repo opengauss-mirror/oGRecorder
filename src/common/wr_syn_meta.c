@@ -180,7 +180,7 @@ status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint
 
     wr_vg_info_item_t *vg_item = wr_find_vg_item_by_id(meta_syn->vg_id);
     if (vg_item == NULL) {
-        WR_RETURN_IFERR2(CM_ERROR, LOG_DEBUG_ERR("Failed to find vg:%u.", meta_syn->vg_id));
+        WR_RETURN_IFERR2(CM_ERROR, LOG_RUN_ERR("Failed to find vg:%u.", meta_syn->vg_id));
     }
 
     uint32_t meta_len = wr_buffer_cache_get_block_size(meta_syn->meta_type);
@@ -188,7 +188,7 @@ status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint
     wr_common_block_t *syn_meta_block = WR_GET_COMMON_BLOCK_HEAD(meta_syn->meta);
     if (meta_len != meta_syn->meta_len || check_sum != syn_meta_block->checksum) {
         WR_RETURN_IFERR2(CM_ERROR,
-            LOG_DEBUG_ERR(
+            LOG_RUN_ERR(
                 "syn meta file:%llu, file_ver:%llu, vg :%u, block: %llu, type:%u, with version:%llu data error skip.",
                 meta_syn->fid, meta_syn->file_ver, meta_syn->vg_id, meta_syn->meta_block_id, meta_syn->meta_type,
                 meta_syn->syn_meta_version));

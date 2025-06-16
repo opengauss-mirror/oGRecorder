@@ -145,7 +145,7 @@ status_t wr_get_volume_version(wr_vg_info_item_t *item, uint64 *version)
     status_t status =
         wr_load_vg_ctrl_part(item, (int64)WR_CTRL_VOLUME_OFFSET, temp, (int32_t)WR_DISK_UNIT_SIZE, &remote);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to load vg core version %s.", item->entry_path);
+        LOG_RUN_ERR("Failed to load vg core version %s.", item->entry_path);
         return status;
     }
     *version = ((wr_core_ctrl_t *)temp)->version;

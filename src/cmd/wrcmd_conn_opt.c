@@ -45,7 +45,7 @@ static status_t wr_uds_set_up_connection(const char *server_locator, wr_uds_conn
 {
     status_t status = wr_connect_ex(server_locator, NULL, &wr_conn->conn);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to set up connect(url:%s)\n", server_locator);
+        LOG_RUN_ERR("Failed to set up connect(url:%s)\n", server_locator);
         return status;
     }
     wr_conn->is_connected = true;

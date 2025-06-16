@@ -476,7 +476,7 @@ int32_t wr_open_memory_file(const char *file_name)
     uint32_t mode = O_RDONLY | O_BINARY;
     char realpath[CM_FILE_NAME_BUFFER_SIZE] = {0};
     if (realpath_file(file_name, realpath, CM_FILE_NAME_BUFFER_SIZE) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to find realpath file %s", file_name);
+        LOG_RUN_ERR("Failed to find realpath file %s", file_name);
         return -1;
     }
     if (!cm_file_exist(realpath)) {
@@ -484,7 +484,7 @@ int32_t wr_open_memory_file(const char *file_name)
         return -1;
     }
     if (cm_open_file(realpath, mode, &file_fd) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to open memory file %s", realpath);
+        LOG_RUN_ERR("Failed to open memory file %s", realpath);
         return -1;
     }
     return file_fd;
@@ -496,11 +496,11 @@ bool32 wr_check_software_version(int32_t file_fd, int64_t *offset)
     uint32_t software_version;
     status_t status = cm_read_file(file_fd, &software_version, sizeof(uint32_t), &read_size);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to read software_version");
+        LOG_RUN_ERR("Failed to read software_version");
         return CM_FALSE;
     }
     if (software_version > (uint32_t)WR_SOFTWARE_VERSION) {
-        LOG_DEBUG_ERR("The file software_version which is %u is bigger than the actural software_version which is %u.",
+        LOG_RUN_ERR("The file software_version which is %u is bigger than the actural software_version which is %u.",
             software_version, (uint32_t)WR_SOFTWARE_VERSION);
         return CM_FALSE;
     }
@@ -670,7 +670,7 @@ static status_t getcfg_proc(void)
     status_t status = wr_getcfg_impl(conn, name, value, WR_PARAM_BUFFER_SIZE);
     if (status != CM_SUCCESS) {
         if (strlen(value) != 0 && cm_str_equal_ins(name, "SSL_PWD_CIPHERTEXT")) {
-            LOG_DEBUG_ERR("Failed to get cfg, name is %s, value is ***.\n", name);
+            LOG_RUN_ERR("Failed to get cfg, name is %s, value is ***.\n", name);
             (void)printf("Failed to get cfg, name is %s, value is %s.\n", name, value);
             (void)fflush(stdout);
             wr_print_detail_error();

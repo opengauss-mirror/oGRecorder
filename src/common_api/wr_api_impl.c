@@ -200,7 +200,7 @@ status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_
     status_t ret = cs_connect(
         server_locator, &conn->pipe, NULL);
     if (ret != CM_SUCCESS) {
-        LOG_DEBUG_ERR("connect server failed, ip port:%s", server_locator);
+        LOG_RUN_ERR("connect server failed, ip port:%s", server_locator);
         return ret;
     }
     wr_init_packet(&conn->pack, conn->pipe.options);
@@ -257,7 +257,7 @@ status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file)
     errno_t err;
     err = strcpy_s(conn->cli_info.process_name, sizeof(conn->cli_info.process_name), cm_sys_program_name());
     if (err != EOK) {
-        LOG_DEBUG_ERR("System call strcpy_s error %d.", err);
+        LOG_RUN_ERR("System call strcpy_s error %d.", err);
         return CM_ERROR;
     }
     conn->cli_info.connect_time = cm_clock_monotonic_now();
@@ -282,7 +282,7 @@ status_t wr_cli_ssl_connect(wr_conn_t *conn)
 {
     status_t status = cli_ssl_connect(&conn->pipe);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to do cli ssl certification.");
+        LOG_RUN_ERR("Failed to do cli ssl certification.");
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -430,7 +430,7 @@ static wr_vfs_t *wr_open_dir_impl_core(wr_conn_t *conn, wr_find_node_t *find_nod
     wr_vfs_t *dir = (wr_vfs_t *)cm_malloc(sizeof(wr_vfs_t));
     if (dir == NULL) {
         WR_UNLOCK_VG_META_S(vg_item, conn->session);
-        LOG_DEBUG_ERR("Failed to malloc.");
+        LOG_RUN_ERR("Failed to malloc.");
         return NULL;
     }
     dir->cur_ftid = node->items.first;
@@ -478,7 +478,7 @@ status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, u
     send_info.file_num = *file_num;
     status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_NUM, (void *)&send_info, (void *)&send_info);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("wr query file num error");
+        LOG_RUN_ERR("wr query file num error");
         return CM_ERROR;
     }
     *file_num = send_info.file_num;
@@ -494,7 +494,7 @@ status_t wr_vfs_query_file_info_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, 
     send_info.is_continue = is_continue;
     status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_INFO, (void *)&send_info, (void *)file_info);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to interact with server for file info query");
+        LOG_RUN_ERR("Failed to interact with server for file info query");
         return CM_ERROR;
     }
 
@@ -558,11 +558,11 @@ status_t wr_find_vg_by_file_path(const char *path, wr_vg_info_item_t **vg_item)
     uint32_t beg_pos = 0;
     char vg_name[WR_MAX_NAME_LEN];
     status_t status = wr_get_name_from_path(path, &beg_pos, vg_name);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to get name from path:%s, status:%d.", path, status));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to get name from path:%s, status:%d.", path, status));
 
     *vg_item = wr_find_vg_item(vg_name);
     if (*vg_item == NULL) {
-        LOG_DEBUG_ERR("Failed to find VG:%s.", vg_name);
+        LOG_RUN_ERR("Failed to find VG:%s.", vg_name);
         WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, vg_name);
         return CM_ERROR;
     }
@@ -577,7 +577,7 @@ static status_t wr_get_ftid_by_path_on_server(wr_conn_t *conn, const char *path,
 
     if (extra_info.len != sizeof(wr_find_node_t)) {
         WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_GET_FTID_BY_PATH), "get result length error");
-        LOG_DEBUG_ERR("get result length error.");
+        LOG_RUN_ERR("get result length error.");
         return CM_ERROR;
     }
     wr_find_node_t find_node = *(wr_find_node_t *)extra_info.str;
@@ -604,7 +604,7 @@ gft_node_t *wr_get_node_by_path_impl(wr_conn_t *conn, const char *path)
     }
     wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
     if (vg_item == NULL) {
-        LOG_DEBUG_ERR("Failed to find vg,vg name %s.", vg_name);
+        LOG_RUN_ERR("Failed to find vg,vg name %s.", vg_name);
         WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, vg_name);
         return NULL;
     }
@@ -714,14 +714,14 @@ status_t wr_latch_context_by_handle(
     wr_env_t *wr_env = wr_get_env();
     if (!wr_env->initialized) {
         WR_THROW_ERROR(ERR_WR_ENV_NOT_INITIALIZED);
-        LOG_DEBUG_ERR("wr env not initialized.");
+        LOG_RUN_ERR("wr env not initialized.");
         return CM_ERROR;
     }
     wr_file_run_ctx_t *file_run_ctx = &wr_env->file_run_ctx;
     if (handle >= (int32_t)file_run_ctx->max_open_file || handle < 0) {
         WR_THROW_ERROR(
             ERR_WR_INVALID_PARAM, "value of handle must be a positive integer and less than max_open_file.");
-        LOG_DEBUG_ERR("File handle is invalid:%d.", handle);
+        LOG_RUN_ERR("File handle is invalid:%d.", handle);
         return CM_ERROR;
     }
 
@@ -729,7 +729,7 @@ status_t wr_latch_context_by_handle(
     // wr_latch(&file_cxt->latch, latch_mode, ((wr_session_t *)conn->session)->id);
     if (file_cxt->flag == WR_FILE_CONTEXT_FLAG_FREE) {
         // wr_unlatch(&file_cxt->latch);
-        LOG_DEBUG_ERR("Failed to r/w, file is closed, handle:%d, context id:%u.", handle, file_cxt->id);
+        LOG_RUN_ERR("Failed to r/w, file is closed, handle:%d, context id:%u.", handle, file_cxt->id);
         return CM_ERROR;
     }
 
@@ -737,7 +737,7 @@ status_t wr_latch_context_by_handle(
 
     if (file_cxt->node == NULL) {
         // wr_unlatch(&file_cxt->latch);
-        LOG_DEBUG_ERR("file node is null, handle:%d, context id:%u.", handle, file_cxt->id);
+        LOG_RUN_ERR("file node is null, handle:%d, context id:%u.", handle, file_cxt->id);
         return CM_ERROR;
     }
 
@@ -807,24 +807,24 @@ static status_t wr_validate_seek_origin(int origin, int64 offset, wr_file_contex
 {
     if (origin == SEEK_SET) {
         if (offset > (int64)WR_MAX_FILE_SIZE) {
-            LOG_DEBUG_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
+            LOG_RUN_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
             return CM_ERROR;
         }
         *new_offset = offset;
     } else if (origin == SEEK_CUR) {
         if (offset > (int64)WR_MAX_FILE_SIZE || context->offset > (int64)WR_MAX_FILE_SIZE ||
             offset + context->offset > (int64)WR_MAX_FILE_SIZE) {
-            LOG_DEBUG_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
+            LOG_RUN_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
             return CM_ERROR;
         }
         *new_offset = context->offset + offset;
     } else if (origin == SEEK_END || origin == WR_SEEK_MAXWR) {  // for get alloced size, or actual used size
         if (offset > 0) {
-            LOG_DEBUG_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
+            LOG_RUN_ERR("Invalid parameter offset:%lld, context offset:%lld.", offset, context->offset);
             return CM_ERROR;
         }
     } else {
-        LOG_DEBUG_ERR("Invalid parameter origin:%d, when seek file.", origin);
+        LOG_RUN_ERR("Invalid parameter origin:%d, when seek file.", origin);
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -851,11 +851,11 @@ int64 wr_seek_file_impl_core(wr_rw_param_t *param, int64 offset, int origin)
     size = cm_atomic_get(&context->node->size);
     if (!wr_is_fs_meta_valid(context->node) || new_offset > size || need_refresh) {
         status = wr_check_apply_refresh_file(conn, context, 0);
-        WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to apply refresh file,fid:%llu.", context->fid));
+        WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to apply refresh file,fid:%llu.", context->fid));
         size = cm_atomic_get(&context->node->size);
 
         if (offset > size && param->is_read) {
-            LOG_DEBUG_ERR("Invalid parameter offset is greater than size, offset:%lld, new_offset:%lld,"
+            LOG_RUN_ERR("Invalid parameter offset is greater than size, offset:%lld, new_offset:%lld,"
                           " file size:%llu, vgid:%u, fid:%llu, node fid:%llu, need_refresh:%d.",
                 offset, new_offset, context->node->size, context->vg_item->id, context->fid, context->node->fid,
                 need_refresh);
@@ -943,7 +943,7 @@ status_t wr_read_write_file(wr_conn_t *conn, int32_t handle, void *buf, int32_t 
     status_t status;
 
     if (size < 0) {
-        LOG_DEBUG_ERR("File size is invalid: %d.", size);
+        LOG_RUN_ERR("File size is invalid: %d.", size);
         return CM_ERROR;
     }
     LOG_DEBUG_INF("wr read write file entry, handle:%d, is_read:%u", handle, is_read);
@@ -956,7 +956,7 @@ status_t wr_read_write_file(wr_conn_t *conn, int32_t handle, void *buf, int32_t 
 int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
-        LOG_DEBUG_ERR("File size is invalid: %lld.", size);
+        LOG_RUN_ERR("File size is invalid: %lld.", size);
         return CM_ERROR;
     }
     LOG_DEBUG_INF("wr pwrite file entry, handle:%d, size:%lld, offset:%lld",
@@ -1021,7 +1021,7 @@ int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const vo
 int64 wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
-        LOG_DEBUG_ERR("File size is invalid: %lld.", size);
+        LOG_RUN_ERR("File size is invalid: %lld.", size);
         return CM_ERROR;
     }
     LOG_DEBUG_INF("wr pread file entry, handle:%d, size:%lld, offset:%lld", handle, size, offset);
@@ -1068,25 +1068,25 @@ status_t wr_fallocate_impl(wr_conn_t *conn, int handle, int mode, long long int 
     wr_file_context_t *context = NULL;
 
     if (mode < 0) {
-        LOG_DEBUG_ERR("File mode is invalid:%d.", mode);
+        LOG_RUN_ERR("File mode is invalid:%d.", mode);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "mode must be a positive integer");
         return CM_ERROR;
     }
 
     if (offset > (int64)WR_MAX_FILE_SIZE) {
-        LOG_DEBUG_ERR("Offset is invalid:%lld.", offset);
+        LOG_RUN_ERR("Offset is invalid:%lld.", offset);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
     }
 
     if (length < 0) {
-        LOG_DEBUG_ERR("File length is invalid:%lld.", length);
+        LOG_RUN_ERR("File length is invalid:%lld.", length);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "length must be a positive integer");
         return CM_ERROR;
     }
 
     if (length > (int64)WR_MAX_FILE_SIZE) {
-        LOG_DEBUG_ERR("File length is invalid:%lld.", length);
+        LOG_RUN_ERR("File length is invalid:%lld.", length);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "length must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
     }
@@ -1109,8 +1109,8 @@ status_t wr_fallocate_impl(wr_conn_t *conn, int handle, int mode, long long int 
 
 status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst)
 {
-    WR_RETURN_IFERR2(wr_check_device_path(src), LOG_DEBUG_ERR("old name path is invalid."));
-    WR_RETURN_IFERR2(wr_check_device_path(dst), LOG_DEBUG_ERR("new name path is invalid."));
+    WR_RETURN_IFERR2(wr_check_device_path(src), LOG_RUN_ERR("old name path is invalid."));
+    WR_RETURN_IFERR2(wr_check_device_path(dst), LOG_RUN_ERR("new name path is invalid."));
     LOG_DEBUG_INF("Rename file, old name path: %s, new name path: %s", src, dst);
     wr_rename_file_info_t send_info;
     send_info.src = src;
@@ -1123,13 +1123,13 @@ status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int tru
 {
     if (length < 0) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "length must be a positive integer");
-        LOG_DEBUG_ERR("File length is invalid:%lld.", length);
+        LOG_RUN_ERR("File length is invalid:%lld.", length);
         return CM_ERROR;
     }
 
     if (length > (int64)WR_MAX_FILE_SIZE) {
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "length must less than WR_MAX_FILE_SIZE");
-        LOG_DEBUG_ERR("File length is invalid:%lld.", length);
+        LOG_RUN_ERR("File length is invalid:%lld.", length);
         return CM_ERROR;
     }
 
@@ -1180,7 +1180,7 @@ static status_t wr_init_err_proc(
     wr_unlatch(&wr_env->latch);
 
     if (errmsg != NULL) {
-        LOG_DEBUG_ERR("init error: %s", errmsg);
+        LOG_RUN_ERR("init error: %s", errmsg);
     }
 
     return errcode;
@@ -1306,34 +1306,6 @@ void wr_destroy(void)
     wr_unlatch(&wr_env->latch);
 }
 
-status_t wr_get_fname_impl(int handle, char *fname, int fname_size)
-{
-    wr_env_t *wr_env = wr_get_env();
-    if (!wr_env->initialized) {
-        WR_THROW_ERROR(ERR_WR_ENV_NOT_INITIALIZED);
-        return CM_ERROR;
-    }
-    wr_file_run_ctx_t *file_run_ctx = &wr_env->file_run_ctx;
-    if (handle < 0 || (uint32_t)handle >= file_run_ctx->max_open_file) {
-        WR_THROW_ERROR(
-            ERR_WR_INVALID_PARAM, "value of handle must be a positive integer and less than max_open_file.");
-        return CM_ERROR;
-    }
-    if (fname_size < 0) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "value of fname_size is a positive number.");
-        return CM_ERROR;
-    }
-    wr_file_context_t *context = wr_get_file_context_by_handle(file_run_ctx, handle);
-    WR_RETURN_IF_NULL(context->node);
-    int len = (fname_size > WR_MAX_NAME_LEN) ? WR_MAX_NAME_LEN : fname_size;
-    errno_t errcode = strcpy_s(fname, (size_t)len, context->node->name);
-    if (SECUREC_UNLIKELY(errcode != EOK)) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "value of fname_size is not large enough.");
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
-
 status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, const char *scope)
 {
     WR_RETURN_IF_ERROR(wr_check_name(name));
@@ -1434,35 +1406,6 @@ status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node)
         return WR_ERROR;
     }
     return WR_SUCCESS;
-}
-
-static status_t wr_get_phy_size_prepare(wr_conn_t *conn, wr_file_context_t *context, long long *size)
-{
-    *size = 0;
-    WR_LOCK_VG_META_S_RETURN_ERROR(context->vg_item, conn->session);
-    status_t status = wr_check_apply_refresh_file(conn, context, 0);
-    if (status != CM_SUCCESS) {
-        return status;
-    }
-    *size = cm_atomic_get(&context->node->size);
-    WR_UNLOCK_VG_META_S(context->vg_item, conn->session);
-    return CM_SUCCESS;
-}
-
-status_t wr_get_phy_size_impl(wr_conn_t *conn, int handle, long long *size)
-{
-    wr_file_context_t *context = NULL;
-    WR_RETURN_IF_ERROR(wr_latch_context_by_handle(conn, handle, &context, LATCH_MODE_SHARE));
-
-    status_t status = wr_get_phy_size_prepare(conn, context, size);
-    if (status != WR_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to apply refresh file,fid:%llu.", context->fid);
-        wr_unlatch(&context->latch);
-        return WR_ERROR;
-    }
-    *size = context->node->size;
-    wr_unlatch(&context->latch);
-    return status;
 }
 
 static status_t wr_encode_setcfg(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
@@ -1608,12 +1551,12 @@ static status_t wr_decode_exist(wr_packet_t *ack_pack, void *ack)
     wr_exist_recv_info_t *info = (wr_exist_recv_info_t *)ack;
     if (wr_get_int32(ack_pack, &(info->result)) != CM_SUCCESS) {
         WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_EXIST), "get result data error");
-        LOG_DEBUG_ERR("get result data error.");
+        LOG_RUN_ERR("get result data error.");
         return CM_ERROR;
     }
     if (wr_get_int32(ack_pack, &(info->type)) != CM_SUCCESS) {
         WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_EXIST), "get type data error");
-        LOG_DEBUG_ERR("get type data error.");
+        LOG_RUN_ERR("get type data error.");
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -1879,7 +1822,7 @@ status_t wr_decode_packet(wr_packet_proc_t *make_proc, wr_packet_t *ack_pack, vo
     }
     wr_init_get(ack_pack);
     status_t ret = make_proc->decode_proc(ack_pack, ack);
-    WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("Decode %s msg failed", make_proc->cmd_info));
+    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("Decode %s msg failed", make_proc->cmd_info));
     return ret;
 }
 

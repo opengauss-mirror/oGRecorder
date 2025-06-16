@@ -161,7 +161,7 @@ static void wr_proc_broadcast_req_inner(wr_session_t *session, wr_notify_req_msg
     int ret =
         mes_send_response(dst_inst, ack_check.wr_head.flags, ruid, (char *)&ack_check, sizeof(wr_notify_ack_msg_t));
     if (ret != CM_SUCCESS) {
-        LOG_DEBUG_ERR("[MES] send message failed, src inst(%hhu), dst inst(%hhu) ret(%d) ", src_inst, dst_inst, ret);
+        LOG_RUN_ERR("[MES] send message failed, src inst(%hhu), dst inst(%hhu) ret(%d) ", src_inst, dst_inst, ret);
         return;
     }
     WR_LOG_DEBUG_OP("[MES] Succeed to send message, notify %llu  result: %u. cmd=%u, src_inst=%hhu, dst_inst=%hhu.",
@@ -183,7 +183,7 @@ int32_t wr_process_broadcast_ack(wr_notify_ack_msg_t *ack, wr_recv_msg_t *recv_m
             }
             break;
         default:
-            LOG_DEBUG_ERR("invalid broadcast ack type");
+            LOG_RUN_ERR("invalid broadcast ack type");
             break;
     }
     return ret;
@@ -202,7 +202,7 @@ static void wr_ack_version_not_match(wr_session_t *session, wr_message_head_t *r
     ack_head.result = ERR_WR_VERSION_NOT_MATCH;
     int ret = mes_send_response(dst_inst, ack_head.flags, ruid, (char *)&ack_head, WR_MES_MSG_HEAD_SIZE);
     if (ret != CM_SUCCESS) {
-        LOG_DEBUG_ERR(
+        LOG_RUN_ERR(
             "send version not match message failed, src inst(%hhu), dst inst(%hhu) ret(%d)", src_inst, dst_inst, ret);
         return;
     }
@@ -217,7 +217,7 @@ void wr_proc_broadcast_req(wr_session_t *session, mes_msg_t *msg)
         return;
     }
     if (msg->size < OFFSET_OF(wr_notify_req_msg_t, type)) {
-        LOG_DEBUG_ERR("invalid message req size");
+        LOG_RUN_ERR("invalid message req size");
         return;
     }
     wr_notify_req_msg_t *req = (wr_notify_req_msg_t *)msg->buffer;
@@ -229,7 +229,7 @@ void wr_proc_broadcast_req(wr_session_t *session, mes_msg_t *msg)
 static void wr_set_cluster_proto_vers(uint8 inst_id, uint32_t version)
 {
     if (inst_id >= WR_MAX_INSTANCES) {
-        LOG_DEBUG_ERR("Invalid request inst_id:%hhu, version is %u.", inst_id, version);
+        LOG_RUN_ERR("Invalid request inst_id:%hhu, version is %u.", inst_id, version);
         return;
     }
     bool32 set_flag = CM_FALSE;
@@ -459,7 +459,7 @@ void wr_proc_remote_req_err(wr_session_t *session, wr_message_head_t *req_wr_hea
     uint32_t ack_size = 0;
     status_t status = wr_prepare_ack_msg(session, ret, &ack_buf, &ack_size, req_wr_head->msg_proto_ver);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("The wrserver prepare ack msg failed, src node:%u, dst node:%u.", req_wr_head->src_inst,
+        LOG_RUN_ERR("The wrserver prepare ack msg failed, src node:%u, dst node:%u.", req_wr_head->src_inst,
             req_wr_head->dst_inst);
         return;
     }
@@ -516,7 +516,7 @@ static void wr_process_message(uint32_t work_idx, ruid_type ruid, mes_msg_t *msg
         cm_panic(0);
     }
     if (msg->size < WR_MES_MSG_HEAD_SIZE) {
-        LOG_DEBUG_ERR("invalid message req size.");
+        LOG_RUN_ERR("invalid message req size.");
         return;
     }
     wr_message_head_t *wr_head = (wr_message_head_t *)msg->buffer;
@@ -527,7 +527,7 @@ static void wr_process_message(uint32_t work_idx, ruid_type ruid, mes_msg_t *msg
     wr_session_t *session = session_ctrl->sessions[work_idx];
     status_t ret;
     if (wr_head->size < WR_MES_MSG_HEAD_SIZE) {
-        LOG_DEBUG_ERR("Invalid message size");
+        LOG_RUN_ERR("Invalid message size");
         return;
     }
     wr_set_cluster_proto_vers((uint8)wr_head->src_inst, wr_head->sw_proto_ver);
@@ -537,7 +537,7 @@ static void wr_process_message(uint32_t work_idx, ruid_type ruid, mes_msg_t *msg
         return;
     }
     if (wr_head->wr_cmd >= WR_CMD_CEIL) {
-        LOG_DEBUG_ERR("Invalid request received,cmd is %u.", (uint8)wr_head->wr_cmd);
+        LOG_RUN_ERR("Invalid request received,cmd is %u.", (uint8)wr_head->wr_cmd);
         return;
     }
     wr_init_packet(&session->recv_pack, CM_FALSE);
@@ -941,7 +941,7 @@ void wr_check_mes_conn(uint64 cur_inst_map)
 static uint32_t wr_get_remote_proto_ver(uint32_t remoteid)
 {
     if (remoteid >= WR_MAX_INSTANCES) {
-        LOG_DEBUG_ERR("Invalid remote id:%u.", remoteid);
+        LOG_RUN_ERR("Invalid remote id:%u.", remoteid);
         return WR_PROTO_VERSION;
     }
     uint32_t remote_proto_ver = (uint32_t)cm_atomic32_get((atomic32_t *)&g_wr_instance.cluster_proto_vers[remoteid]);
@@ -1125,14 +1125,14 @@ void wr_proc_syb2active_req(wr_session_t *session, mes_msg_t *msg)
     uint16 dstid = req_head.dst_inst;
     ruid_type ruid = req_head.ruid;
     if (size > WR_MAX_PACKET_SIZE) {
-        LOG_DEBUG_ERR(
+        LOG_RUN_ERR(
             "The wr server receive msg from remote failed, src node:%u, dst node:%u, size is %u.", srcid, dstid, size);
         return;
     }
     LOG_DEBUG_INF("[MES] The wr server receive messages from remote node, src node:%u, dst node:%u.", srcid, dstid);
     errno_t errcode = memcpy_s(session->recv_pack.buf, size, msg->buffer + WR_MES_MSG_HEAD_SIZE, size);
     if (errcode != EOK) {
-        LOG_DEBUG_ERR("The wr server memcpy msg failed, src node:%u, dst node:%u.", srcid, dstid);
+        LOG_RUN_ERR("The wr server memcpy msg failed, src node:%u, dst node:%u.", srcid, dstid);
         return;
     }
     status_t ret = wr_proc_standby_req(session);
@@ -1140,7 +1140,7 @@ void wr_proc_syb2active_req(wr_session_t *session, mes_msg_t *msg)
     uint32_t body_size = 0;
     status_t status = wr_prepare_ack_msg(session, ret, &body_buf, &body_size, req_head.msg_proto_ver);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("The wr server prepare ack msg failed, src node:%u, dst node:%u.", srcid, dstid);
+        LOG_RUN_ERR("The wr server prepare ack msg failed, src node:%u, dst node:%u.", srcid, dstid);
         return;
     }
     LOG_DEBUG_INF(
@@ -1152,7 +1152,7 @@ void wr_proc_syb2active_req(wr_session_t *session, mes_msg_t *msg)
     ack.result = ret;
     ret = mes_send_response_x(ack.dst_inst, ack.flags, ack.ruid, 2, &ack, WR_MES_MSG_HEAD_SIZE, body_buf, body_size);
     if (ret != CM_SUCCESS) {
-        LOG_DEBUG_ERR("The wr server fails to send messages to the remote node, src node:%u, dst node:%u.",
+        LOG_RUN_ERR("The wr server fails to send messages to the remote node, src node:%u, dst node:%u.",
             (uint32_t)(ack.src_inst), (uint32_t)(ack.dst_inst));
         return;
     }

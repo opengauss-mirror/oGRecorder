@@ -115,7 +115,7 @@ int32_t shm_hashmap_init(shm_hashmap_t *map, uint32_t id, cm_oamap_compare_t com
     void *addr = NULL;
     uint32_t shm_key;
     if (map == NULL) {
-        LOG_DEBUG_ERR("Null pointer specified");
+        LOG_RUN_ERR("Null pointer specified");
         return ERR_WR_INVALID_PARAM;
     }
     map->hash_ctrl.bucket_limits = WR_MAX_BUCKET_NUM;

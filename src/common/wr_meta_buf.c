@@ -219,7 +219,7 @@ status_t wr_hashmap_extend_and_redistribute_batch(
         }
         status_t status = wr_hashmap_extend_and_redistribute(session, hash_ctrl);
         if (status != CM_SUCCESS) {
-            LOG_DEBUG_ERR("[HASHMAP]Failed to extend hashmap, extend_num is %u, i is %u.", extend_num, i);
+            LOG_RUN_ERR("[HASHMAP]Failed to extend hashmap, extend_num is %u, i is %u.", extend_num, i);
             return status;
         }
         i++;
@@ -235,7 +235,7 @@ void wr_hashmap_dynamic_extend_and_redistribute_per_vg(wr_vg_info_item_t *vg_ite
         LOG_DEBUG_INF("[HASHMAP]Begin to extend hashmap of vg %s.", vg_item->vg_name);
         status_t status = wr_hashmap_extend_and_redistribute_batch(session, hash_ctrl, WR_EXTEND_BATCH);
         if (status != CM_SUCCESS) {
-            LOG_DEBUG_ERR(
+            LOG_RUN_ERR(
                 "[HASHMAP]Failed to extend hashmap of vg %s, nsegments is %u, max_bucket is %u, bucket_num is %u.",
                 vg_item->vg_name, hash_ctrl->nsegments, hash_ctrl->max_bucket, hash_ctrl->bucket_num);
             wr_leave_shm(session, vg_item);
@@ -298,7 +298,7 @@ status_t wr_register_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_i
     }
     errno_t errcode = memset_s(block_ctrl, sizeof(wr_block_ctrl_t), 0, sizeof(wr_block_ctrl_t));
     if (errcode) {
-        LOG_DEBUG_ERR("Failed to memset block ctrl, block id %s.", wr_display_metaid(block_id));
+        LOG_RUN_ERR("Failed to memset block ctrl, block id %s.", wr_display_metaid(block_id));
         return CM_ERROR;
     }
     wr_lock_shm_meta_bucket_x(session, &bucket->enque_lock);
@@ -346,7 +346,7 @@ void wr_unregister_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_ite
         next_id = *(ga_obj_id_t *)&block_ctrl->hash_next;
     }
     wr_unlock_shm_meta_bucket(session, &bucket->enque_lock);
-    LOG_DEBUG_ERR("Key to remove not found");
+    LOG_RUN_ERR("Key to remove not found");
 }
 
 status_t wr_get_block_from_disk(
@@ -390,7 +390,7 @@ status_t wr_check_block_version(wr_vg_info_item_t *vg_item, wr_block_id_t block_
     // just read block header
     status_t status = wr_get_block_from_disk(vg_item, block_id, buf, offset, WR_DISK_UNIT_SIZE, CM_FALSE);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to get block: %s from disk, meta_addr:%p, offset:%lld, size:%d.",
+        LOG_RUN_ERR("Failed to get block: %s from disk, meta_addr:%p, offset:%lld, size:%d.",
             wr_display_metaid(block_id), buf, offset, WR_DISK_UNIT_SIZE);
         return status;
     }
@@ -409,7 +409,7 @@ status_t wr_check_block_version(wr_vg_info_item_t *vg_item, wr_block_id_t block_
                 status = wr_get_block_from_disk(vg_item, block_id, meta_addr, offset, (int32_t)size, CM_TRUE);
             }
             if (status != CM_SUCCESS) {
-                LOG_DEBUG_ERR("Failed to get block: %s from disk, meta_addr:%p, offset:%lld, size:%u.",
+                LOG_RUN_ERR("Failed to get block: %s from disk, meta_addr:%p, offset:%lld, size:%u.",
                     wr_display_metaid(block_id), meta_addr, offset, size);
                 return status;
             }
@@ -478,7 +478,7 @@ static status_t wr_load_buffer_cache(wr_session_t *session, wr_vg_info_item_t *v
     if (status != CM_SUCCESS) {
         wr_unlock_shm_meta_bucket(session, &bucket->enque_lock);
         ga_free_object(pool_id, obj_id);
-        LOG_DEBUG_ERR("Failed to get block from disk, v:%u,au:%llu,block:%u,item:%u,type:%d.", block_id.volume,
+        LOG_RUN_ERR("Failed to get block from disk, v:%u,au:%llu,block:%u,item:%u,type:%d.", block_id.volume,
             (uint64)block_id.au, block_id.block, block_id.item, type);
         return status;
     }
@@ -490,7 +490,7 @@ static status_t wr_load_buffer_cache(wr_session_t *session, wr_vg_info_item_t *v
     if (errcode != EOK) {
         wr_unlock_shm_meta_bucket(session, &bucket->enque_lock);
         ga_free_object(pool_id, obj_id);
-        LOG_DEBUG_ERR("Failed to memset block ctrl, v:%u,au:%llu,block:%u,item:%u,type:%d.", block_id.volume,
+        LOG_RUN_ERR("Failed to memset block ctrl, v:%u,au:%llu,block:%u,item:%u,type:%d.", block_id.volume,
             (uint64)block_id.au, block_id.block, block_id.item, type);
         return CM_ERROR;
     }
@@ -521,7 +521,7 @@ void *wr_find_block_in_bucket(wr_session_t *session, wr_vg_info_item_t *vg_item,
     shm_hashmap_t *hashmap = vg_item->buffer_cache;
     if (hashmap == NULL) {
         if (is_print_error_log) {
-            LOG_DEBUG_ERR("Pointer to map or compare_func is NULL");
+            LOG_RUN_ERR("Pointer to map or compare_func is NULL");
         }
         return NULL;
     }
@@ -534,7 +534,7 @@ void *wr_find_block_in_bucket(wr_session_t *session, wr_vg_info_item_t *vg_item,
     shm_hashmap_bucket_t *bucket = shm_hashmap_get_bucket(hash_ctrl, bucket_idx, &segment_objid);
     if (bucket == NULL) {
         if (is_print_error_log) {
-            LOG_DEBUG_ERR("Pointer to bucket %u is NULL.", bucket_idx);
+            LOG_RUN_ERR("Pointer to bucket %u is NULL.", bucket_idx);
         }
         return NULL;
     }
@@ -576,7 +576,7 @@ static void *wr_find_block_in_bucket_ex(wr_session_t *session, wr_vg_info_item_t
     CM_ASSERT(key != NULL);
     if (map == NULL) {
         if (is_print_error_log) {
-            LOG_DEBUG_ERR("Pointer to map or compare_func is NULL");
+            LOG_RUN_ERR("Pointer to map or compare_func is NULL");
         }
         return NULL;
     }
@@ -590,7 +590,7 @@ static void *wr_find_block_in_bucket_ex(wr_session_t *session, wr_vg_info_item_t
     shm_hashmap_bucket_t *bucket = shm_hashmap_get_bucket(hash_ctrl, bucket_idx, &segment_objid);
     if (bucket == NULL) {
         if (is_print_error_log) {
-            LOG_DEBUG_ERR("Pointer to bucket %u is NULL.", bucket_idx);
+            LOG_RUN_ERR("Pointer to bucket %u is NULL.", bucket_idx);
         }
         return NULL;
     }
@@ -665,7 +665,7 @@ static status_t wr_add_buffer_cache_inner(wr_session_t *session, shm_hash_ctrl_t
     errno_t errcode = memcpy_s(meta_addr, size, refresh_buf, size);
     if (errcode != EOK) {
         ga_free_object(pool_id, obj_id);
-        LOG_DEBUG_ERR("Failed to memcpy block, v:%u,au:%llu,block:%u,item:%u,type:%d.", add_block_id.volume,
+        LOG_RUN_ERR("Failed to memcpy block, v:%u,au:%llu,block:%u,item:%u,type:%d.", add_block_id.volume,
             (uint64)add_block_id.au, add_block_id.block, add_block_id.item, type);
         CM_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
         return CM_ERROR;
@@ -677,7 +677,7 @@ static status_t wr_add_buffer_cache_inner(wr_session_t *session, shm_hash_ctrl_t
     errcode = memset_s(block_ctrl, sizeof(wr_block_ctrl_t), 0, sizeof(wr_block_ctrl_t));
     if (errcode != EOK) {
         ga_free_object(pool_id, obj_id);
-        LOG_DEBUG_ERR("Failed to memset block ctrl, v:%u,au:%llu,block:%u,item:%u,type:%d.", add_block_id.volume,
+        LOG_RUN_ERR("Failed to memset block ctrl, v:%u,au:%llu,block:%u,item:%u,type:%d.", add_block_id.volume,
             (uint64)add_block_id.au, add_block_id.block, add_block_id.item, type);
         CM_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
         return CM_ERROR;
@@ -797,7 +797,7 @@ char *wr_find_block_in_shm(wr_session_t *session, wr_vg_info_item_t *vg_item, wr
 
     status = wr_load_buffer_cache(session, vg_item, block_id, type, &meta_addr, out_obj_id);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to load meta_addr block, block_id: %s.", wr_display_metaid(block_id));
+        LOG_RUN_ERR("Failed to load meta_addr block, block_id: %s.", wr_display_metaid(block_id));
         return NULL;
     }
     return meta_addr;
@@ -824,7 +824,7 @@ char *wr_find_block_from_disk_and_refresh_shm(wr_session_t *session, wr_vg_info_
         return NULL;
     }
     if (wr_load_buffer_cache(session, vg_item, block_id, type, &meta_addr, out_obj_id) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to load meta_addr block, block_id: %s.", wr_display_metaid(block_id));
+        LOG_RUN_ERR("Failed to load meta_addr block, block_id: %s.", wr_display_metaid(block_id));
         return NULL;
     }
     return meta_addr;

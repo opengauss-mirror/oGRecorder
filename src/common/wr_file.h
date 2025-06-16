@@ -49,7 +49,6 @@ typedef struct st_wr_node_data {
 status_t wr_make_dir(wr_session_t *session, const char *dir_name);
 status_t wr_open_dir(wr_session_t *session, const char *dir_path, bool32 is_refresh, wr_find_node_t *find_info);
 void wr_close_dir(wr_session_t *session, char *vg_name, uint64 ftid);
-status_t wr_find_vg_by_dir(const char *dir_path, char *name, wr_vg_info_item_t **vg_item);
 
 void wr_lock_vg_mem_and_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item);
 void wr_lock_vg_mem_and_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item);

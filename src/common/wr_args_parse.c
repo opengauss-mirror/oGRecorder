@@ -289,13 +289,13 @@ status_t set_config_info(char *home, wr_config_t *inst_cfg)
     status_t status;
     status = wr_set_cfg_dir(home, inst_cfg);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Environment variant WR_HOME not found!\n");
+        LOG_RUN_ERR("Environment variant WR_HOME not found!\n");
         return status;
     }
 
     status = wr_load_config(inst_cfg);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to load parameters!\n");
+        LOG_RUN_ERR("Failed to load parameters!\n");
         return status;
     }
     return CM_SUCCESS;
@@ -346,11 +346,11 @@ static status_t wr_load_local_server_config_core(
     }
     res = cm_read_config(file_name, &inst_cfg->config);
     if (res != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Read config from %s failed.\n", file_name);
+        LOG_RUN_ERR("Read config from %s failed.\n", file_name);
     }
     res = wr_load_config(inst_cfg);
     if (res != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Load config from %s failed.\n", file_name);
+        LOG_RUN_ERR("Load config from %s failed.\n", file_name);
         return res;
     }
     return res;

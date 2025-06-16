@@ -100,7 +100,7 @@ static status_t wr_process_remote(wr_session_t *session)
 
         ret = wr_exec_sync(session, remoteid, currid, &remote_result);
         if (ret != CM_SUCCESS) {
-            LOG_DEBUG_ERR(
+            LOG_RUN_ERR(
                 "End of processing the remote request(%d) failed, remote node(%u),current node(%u), result code(%d).",
                 session->recv_pack.head->cmd, remoteid, currid, ret);
             if (session->recv_pack.head->cmd == WR_CMD_SWITCH_LOCK) {
@@ -214,7 +214,7 @@ static void wr_return_error(wr_session_t *session)
     (void)wr_put_str_with_cutoff(send_pack, message);
     status_t status = wr_write(&session->pipe, send_pack);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to reply,size:%u, cmd:%u.", send_pack->head->size, send_pack->head->cmd);
+        LOG_RUN_ERR("Failed to reply,size:%u, cmd:%u.", send_pack->head->size, send_pack->head->cmd);
     }
     cm_reset_error();
 }
@@ -233,7 +233,7 @@ static void wr_return_success(wr_session_t *session)
 
     status = wr_write(&session->pipe, send_pack);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to reply message,size:%u, cmd:%u.", send_pack->head->size, send_pack->head->cmd);
+        LOG_RUN_ERR("Failed to reply message, size:%u, cmd:%u.", send_pack->head->size, send_pack->head->cmd);
     }
 }
 
@@ -264,7 +264,7 @@ static status_t wr_process_mkdir(wr_session_t *session)
         LOG_DEBUG_INF("Succeed to mkdir:%s", dir);
         return status;
     }
-    LOG_DEBUG_ERR("Failed to mkdir:%s", dir);
+    LOG_RUN_ERR("Failed to mkdir:%s", dir);
     return status;
 }
 
@@ -282,7 +282,7 @@ static status_t wr_process_rmdir(wr_session_t *session)
         LOG_DEBUG_INF("Succeed to rmdir:%s", dir);
         return status;
     }
-    LOG_DEBUG_ERR("Failed to rmdir:%s", dir);
+    LOG_RUN_ERR("Failed to rmdir:%s", dir);
     return status;
 }
 
@@ -294,7 +294,7 @@ static status_t wr_process_mount_vfs(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vfs_name));
     
     if (wr_filesystem_opendir(vfs_name, &dir) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to mount vfs:%s", vfs_name);
+        LOG_RUN_ERR("Failed to mount vfs:%s", vfs_name);
         return CM_ERROR;
     }
     (void)wr_put_int64(&session->send_pack, (int64)dir);
@@ -307,7 +307,7 @@ static status_t wr_process_unmount_vfs(wr_session_t *session)
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&dir));
     if (wr_filesystem_closedir(dir) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to unmount vfs");
+        LOG_RUN_ERR("Failed to unmount vfs");
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -320,7 +320,7 @@ static status_t wr_process_query_file_num(wr_session_t *session)
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&dir));
     if (wr_filesystem_query_file_num(dir, &file_num) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to query file num for vfs");
+        LOG_RUN_ERR("Failed to query file num for vfs");
         return CM_ERROR;
     }
     (void)wr_put_int32(&session->send_pack, file_num);
@@ -340,7 +340,7 @@ static status_t wr_process_query_file_info(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64*)&dir));
 
     if (wr_filesystem_query_file_info(dir, file_items, WR_MAX_FILE_NUM, &file_count, is_continue) != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to query file info for vfs");
+        LOG_RUN_ERR("Failed to query file info for vfs");
         return CM_ERROR;
     }
 
@@ -387,7 +387,7 @@ static status_t wr_process_create_file(wr_session_t *session)
         return status;
     }
 
-    LOG_DEBUG_ERR("Failed to create file:%s in path:%s", name_str, parent_str);
+    LOG_RUN_ERR("Failed to create file:%s in path:%s", name_str, parent_str);
     return status;
 }
 
@@ -396,7 +396,7 @@ static status_t wr_process_delete_file(wr_session_t *session)
     char *name = NULL;
     wr_init_get(&session->recv_pack);
     status_t status = wr_get_str(&session->recv_pack, &name);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("delete file get file name failed."));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("delete file get file name failed."));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
     WR_LOG_DEBUG_OP("Begin to rm file:%s", name);
     status = wr_filesystem_rm(name);
@@ -404,7 +404,7 @@ static status_t wr_process_delete_file(wr_session_t *session)
         LOG_DEBUG_INF("Succeed to rm file:%s", name);
         return status;
     }
-    LOG_DEBUG_ERR("Failed to rm file:%s", name);
+    LOG_RUN_ERR("Failed to rm file:%s", name);
     return status;
 }
 
@@ -478,7 +478,7 @@ static status_t wr_process_open_dir(wr_session_t *session)
         LOG_DEBUG_INF("Succeed to open dir:%s, ftid: %s", name, wr_display_metaid(find_info.ftid));
         return status;
     }
-    LOG_DEBUG_ERR("Failed to open dir:%s", name);
+    LOG_RUN_ERR("Failed to open dir:%s", name);
     return status;
 }
 
@@ -1144,7 +1144,7 @@ static status_t wr_exec_cmd(wr_session_t *session, bool32 local_req)
     wr_cmd_hdl_t *handle = wr_get_cmd_handle(session->recv_pack.head->cmd);
 
     if ((handle == NULL) || (handle->proc == NULL)) {
-        LOG_DEBUG_ERR("the req cmd: %d is not valid.", session->recv_pack.head->cmd);
+        LOG_RUN_ERR("the req cmd: %d is not valid.", session->recv_pack.head->cmd);
         return CM_ERROR;
     }
 
@@ -1226,7 +1226,7 @@ status_t wr_process_command(wr_session_t *session)
 
     status = wr_exec_cmd(session, CM_TRUE);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to execute command:%d.", session->recv_pack.head->cmd);
+        LOG_RUN_ERR("Failed to execute command:%d.", session->recv_pack.head->cmd);
         wr_return_error(session);
         return CM_ERROR;
     } else {

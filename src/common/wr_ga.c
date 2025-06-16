@@ -460,7 +460,7 @@ int32_t ga_alloc_object_list(ga_pool_id_e pool_id, uint32_t count, ga_queue_t *l
     while (pool->ctrl->free_objects.count < count) {
         status = ga_extend_pool(pool_id);
         WR_RETURN_IFERR3(
-            status, cm_spin_unlock(&pool->ctrl->mutex), LOG_DEBUG_ERR("Failed to extend pool:%u.", pool_id));
+            status, cm_spin_unlock(&pool->ctrl->mutex), LOG_RUN_ERR("Failed to extend pool:%u.", pool_id));
         LOG_DEBUG_INF("Extend pool:%u, free_obj_count:%u, count:%u.", pool_id, pool->ctrl->free_objects.count, count);
     }
 

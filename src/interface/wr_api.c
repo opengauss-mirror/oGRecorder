@@ -443,7 +443,7 @@ int wr_is_maintain(unsigned int *is_maintain, wr_instance_handle inst_handle)
     }
     wr_server_status_t wr_status = {0};
     status_t ret = wr_get_inst_status(&wr_status, inst_handle);
-    WR_RETURN_IFERR2(ret, LOG_DEBUG_ERR("get error when get inst status"));
+    WR_RETURN_IFERR2(ret, LOG_RUN_ERR("get error when get inst status"));
     *is_maintain = wr_status.is_maintain;
     return CM_SUCCESS;
 }
@@ -492,12 +492,12 @@ long long int wr_file_pwrite(wr_vfs_handle vfs_handle, wr_file_handle *file_hand
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
     if (count < 0) {
-        LOG_DEBUG_ERR("File size is invalid:%lld.", count);
+        LOG_RUN_ERR("File size is invalid:%lld.", count);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "size must be a positive integer");
         return CM_ERROR;
     }
     if (offset > (int64_t)WR_MAX_FILE_SIZE) {
-        LOG_DEBUG_ERR("Invalid parameter offset:%lld.", offset);
+        LOG_RUN_ERR("Invalid parameter offset:%lld.", offset);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
     }
@@ -524,12 +524,12 @@ long long int wr_file_pread(wr_vfs_handle vfs_handle, wr_file_handle file_handle
     wr_begin_stat(&begin_tv);
 
     if (count < 0) {
-        LOG_DEBUG_ERR("File size is invalid:%lld.", count);
+        LOG_RUN_ERR("File size is invalid:%lld.", count);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "size must be a positive integer");
         return CM_ERROR;
     }
     if (offset > (int64_t)WR_MAX_FILE_SIZE) {
-        LOG_DEBUG_ERR("Invalid parameter offset:%lld.", offset);
+        LOG_RUN_ERR("Invalid parameter offset:%lld.", offset);
         WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "offset must less than WR_MAX_FILE_SIZE");
         return CM_ERROR;
     }
@@ -611,32 +611,10 @@ int wr_file_performance()
     return WR_SUCCESS;
 }
 
-int wr_fsize_physical(int handle, long long *fsize, wr_instance_handle inst_handle)
-{
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("fszie get conn error.");
-        return WR_ERROR;
-    }
-    status_t ret = wr_get_phy_size_impl(hdl->conn, HANDLE_VALUE(handle), fsize);
-    return (int)ret;
-}
-
 int wr_get_error(int *errcode, const char **errmsg)
 {
     cm_get_error(errcode, errmsg);
     return CM_SUCCESS;
-}
-
-int wr_get_fname(int handle, char *fname, int fname_size)
-{
-    status_t ret = wr_get_fname_impl(HANDLE_VALUE(handle), fname, fname_size);
-    wr_get_api_volume_error();
-    return (int)ret;
 }
 
 int wr_fallocate(int handle, int mode, long long offset, long long length, wr_instance_handle inst_handle)
