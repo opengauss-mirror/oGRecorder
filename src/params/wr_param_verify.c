@@ -353,35 +353,6 @@ status_t wr_notify_audit_level(void *se, void *item, char *value)
     return CM_SUCCESS;
 }
 
-status_t wr_verify_cluster_run_mode(void *lex, void *def)
-{
-    char *value = (char *)lex;
-    if (cm_strcmpi(value, "cluster_standby") != 0 && cm_strcmpi(value, "cluster_primary") != 0) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "CLUSTER_RUN_MODE");
-        return CM_ERROR;
-    }
-
-    int32_t iret_snprintf =
-        snprintf_s(((wr_def_t *)def)->value, CM_PARAM_BUFFER_SIZE, CM_PARAM_BUFFER_SIZE - 1, "%s", value);
-    WR_SECUREC_SS_RETURN_IF_ERROR(iret_snprintf, CM_ERROR);
-    return CM_SUCCESS;
-}
-
-status_t wr_notify_cluster_run_mode(void *se, void *item, char *value)
-{
-    if (cm_strcmpi(value, "cluster_standby") == 0) {
-        g_inst_cfg->params.cluster_run_mode = CLUSTER_STANDBY;
-        LOG_RUN_INF("The cluster_run_mode is cluster_standby.");
-    } else if (cm_strcmpi(value, "cluster_primary") == 0) {
-        g_inst_cfg->params.cluster_run_mode = CLUSTER_PRIMARY;
-        LOG_RUN_INF("The cluster_run_mode is cluster_primary.");
-    } else {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load params, invalid CLUSTER_RUN_MODE"));
-    }
-    return CM_SUCCESS;
-}
-
 status_t wr_verify_mes_wait_timeout(void *lex, void *def)
 {
     char *value = (char *)lex;

@@ -57,9 +57,6 @@ typedef enum en_wr_mode {
     WR_MODE_DISK = 3           // A DATANODE's DISK
 } wr_mode_e;
 
-/* use for dorado cluster */
-typedef enum cluster_run_mode_t { CLUSTER_PRIMARY = 0, CLUSTER_STANDBY = 1 } cluster_run_mode_t;
-
 #if defined(_DEBUG) || defined(DEBUG) || defined(DB_DEBUG_VERSION)
 #define WR_RECYLE_META_RANGE_MAX 10000U
 #endif
@@ -97,7 +94,6 @@ typedef struct st_wr_params {
     uint32_t mes_wait_timeout;
     bool32 enable_core_state_collect;
     uint32_t delay_clean_interval;
-    cluster_run_mode_t cluster_run_mode;
     wr_recycle_meta_pos_t recyle_meta_pos;
     uint32_t space_usage_hwm;
     uint32_t space_usage_lwm;

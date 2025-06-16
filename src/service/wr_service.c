@@ -292,6 +292,7 @@ static status_t wr_process_mount_vfs(wr_session_t *session)
     wr_init_get(&session->recv_pack);
     void* dir;
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vfs_name));
+    
     if (wr_filesystem_opendir(vfs_name, &dir) != CM_SUCCESS) {
         LOG_DEBUG_ERR("Failed to mount vfs:%s", vfs_name);
         return CM_ERROR;
@@ -425,17 +426,17 @@ static status_t wr_process_exist(wr_session_t *session)
 static status_t wr_process_open_file(wr_session_t *session)
 {
     char *name = NULL;
+    int fd = 0;
     int32_t flag;
     uint8_t hash[SHA256_DIGEST_LENGTH];
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
-    int fd = 0;
-    status_t status = wr_open_file(session, (const char *)name, flag, &fd);
-    if (status == CM_SUCCESS) {
-        WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, fd));
-    }
+    WR_LOG_DEBUG_OP("Begin to close file, fd:%d", fd);
+    WR_RETURN_IF_ERROR(wr_open_file(session, (const char *)name, flag, &fd));
+    LOG_DEBUG_INF("Succeed to close file, fd:%d", fd);
+    WR_RETURN_IF_ERROR(wr_put_int32(&session->send_pack, fd));
 
     if (generate_random_sha256(hash) != WR_SUCCESS) {
         LOG_RUN_ERR("Failed to generate random SHA256 hash\n");
@@ -443,7 +444,7 @@ static status_t wr_process_open_file(wr_session_t *session)
     }
     WR_RETURN_IF_ERROR(update_file_hash(session, fd, hash));
     WR_RETURN_IF_ERROR(wr_put_sha256(&session->send_pack, hash));
-    return status;
+    return CM_SUCCESS;
 }
 
 static status_t wr_process_close_file(wr_session_t *session)
@@ -541,9 +542,6 @@ static status_t wr_process_write_file(wr_session_t *session)
         return CM_ERROR;
     }
 
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(
-        session->audit_info.resource, WR_AUDIT_MODIFY, "handle:%d, offset:%lld, size:%lld", handle, offset, file_size));
-
     int64 res = wr_filesystem_pwrite(handle, offset, file_size, buf);
     if (res == -1) {
         LOG_RUN_ERR("Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, file_size);
@@ -593,7 +591,6 @@ static status_t wr_process_read_file(wr_session_t *session)
     // Send the data
     WR_RETURN_IF_ERROR(wr_put_text(&session->send_pack, &data));
 
-    // Free the allocated buffer
     free(buf);
 
     return CM_SUCCESS;

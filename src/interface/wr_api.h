@@ -184,6 +184,7 @@ WR_DECLARE int wr_vfs_query_file_num(wr_vfs_handle vfs_handle, int *file_num);
 // file
 WR_DECLARE int wr_file_create(wr_vfs_handle vfs_handle, const char *name, const FileParameter *param);
 WR_DECLARE int wr_file_delete(wr_vfs_handle vfs_handle, const char *name);
+WR_DECLARE int wr_file_exist(wr_vfs_handle vfs_handle, const char *name, bool *is_exist);
 WR_DECLARE int wr_file_open(wr_vfs_handle vfs_handle, const char *name, int flag, wr_file_handle *file_handle);
 WR_DECLARE int wr_file_close(wr_vfs_handle vfs_handle, wr_file_handle *file_handle, bool need_lock);
 WR_DECLARE int wr_file_truncate(wr_vfs_handle vfs_handle, wr_file_handle file_handle, int truncateType, long long offset);
@@ -217,7 +218,7 @@ WR_DECLARE int wr_create_inst(const char *storageServerAddr, wr_instance_handle 
 WR_DECLARE int wr_delete_inst(wr_instance_handle inst_handle);
 
 // instance param
-WR_DECLARE int wr_set_main_inst(wr_instance_handle inst_handle);
+WR_DECLARE int wr_set_main_inst(const char *storageServerAddr);
 WR_DECLARE int wr_get_inst_status(wr_server_status_t *wr_status, wr_instance_handle inst_handle);
 WR_DECLARE int wr_is_maintain(unsigned int *is_maintain, wr_instance_handle inst_handle);
 

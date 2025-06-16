@@ -571,7 +571,7 @@ status_t wr_refresh_root_ft(wr_vg_info_item_t *vg_item, bool32 check_version, bo
     if (!wr_is_server()) {
         return CM_SUCCESS;
     }
-    if (!WR_STANDBY_CLUSTER && wr_is_readwrite() && !active_refresh) {
+    if (wr_is_readwrite() && !active_refresh) {
         WR_ASSERT_LOG(wr_need_exec_local(), "only masterid %u can be readwrite.", wr_get_master_id());
         return CM_SUCCESS;
     }
@@ -734,7 +734,7 @@ status_t wr_check_refresh_ft(wr_vg_info_item_t *vg_item)
     if (!wr_is_server()) {
         return CM_SUCCESS;
     }
-    if (!WR_STANDBY_CLUSTER && wr_is_readwrite()) {
+    if (wr_is_readwrite()) {
         WR_ASSERT_LOG(wr_need_exec_local(), "only masterid %u can be readwrite.", wr_get_master_id());
         return CM_SUCCESS;
     }

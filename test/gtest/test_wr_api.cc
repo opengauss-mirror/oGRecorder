@@ -79,10 +79,13 @@ TEST_F(WrApiTest, TestWrVfsMount) {
 
 TEST_F(WrApiTest, TestWrVfsCreateFiles) {
     char file_name[256];
+    bool is_exist = false;
     for (int i = 1; i <= 200; i++) {
         snprintf(file_name, sizeof(file_name), "TEST_FILE_%d", i);
         EXPECT_EQ(wr_file_create(g_vfs_handle, file_name, NULL), WR_SUCCESS);
     }
+    EXPECT_EQ(wr_file_exist(g_vfs_handle, "TEST_FILE_1", &is_exist), WR_SUCCESS);
+    EXPECT_EQ(is_exist, true);
 
     // 测试重复创建第一个文件
     EXPECT_NE(wr_file_create(g_vfs_handle, "TEST_FILE_1", NULL), WR_SUCCESS);
@@ -90,7 +93,7 @@ TEST_F(WrApiTest, TestWrVfsCreateFiles) {
 
 TEST_F(WrApiTest, TestWrfileOpen) {
     EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), WR_SUCCESS);
-    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS); 
     EXPECT_EQ(wr_file_open(g_vfs_handle, TEST_FILE3, O_RDWR | O_SYNC, &file_handle3), WR_SUCCESS);
 }
 

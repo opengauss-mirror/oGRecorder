@@ -75,10 +75,6 @@
 
 #define WR_VG_IS_VALID(ctrl_p) ((ctrl_p)->vg_info.valid_flag == WR_CTRL_VALID_FLAG)
 
-#define WR_STANDBY_CLUSTER (g_inst_cfg->params.cluster_run_mode == CLUSTER_STANDBY)
-#define WR_IS_XLOG_VG(VG_ID) (VG_ID == g_inst_cfg->params.xlog_vg_id)
-#define WR_STANDBY_CLUSTER_XLOG_VG(VG_ID) (WR_STANDBY_CLUSTER && WR_IS_XLOG_VG(VG_ID))
-
 #define WR_FS_BLOCK_ROOT_SIZE 64
 #define WR_AU_ROOT_SIZE 64
 
