@@ -874,7 +874,7 @@ void wr_clean_session_latch(wr_session_t *session, bool32 is_daemon)
         // the stack_top may be the right invalid or latch not finish to set offset_type
         // or unlatch not over, just finish unlatch the latch, but not set offset_type
         if (offset_type != WR_LATCH_OFFSET_SHMOFFSET) {
-            LOG_DEBUG_ERR("Clean sid:%u shared_latch offset type is invalid %u,latch_place:%d.",
+            LOG_RUN_ERR("Clean sid:%u shared_latch offset type is invalid %u,latch_place:%d.",
                 WR_SESSIONID_IN_LOCK(session->id), session->latch_stack.latch_offset_stack[latch_place].type,
                 latch_place);
             if (session->latch_stack.op == LATCH_SHARED_OP_UNLATCH_BEG && i != (int32_t)session->latch_stack.stack_top) {

@@ -263,30 +263,6 @@ status_t wr_get_name_from_path(const char *path, uint32_t *beg_pos, char *name)
     return CM_SUCCESS;
 }
 
-status_t wr_find_vg_by_dir(const char *dir_path, char *name, wr_vg_info_item_t **vg_item)
-{
-    status_t status;
-    uint32_t beg_pos = 0;
-
-    status = wr_get_name_from_path(dir_path, &beg_pos, name);
-    if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to get name from path %s,%d.", dir_path, status);
-        return status;
-    }
-
-    if (name[0] == 0) {
-        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, dir_path, ", get vg name is NULL.");
-        return CM_ERROR;
-    }
-
-    *vg_item = wr_find_vg_item(name);
-    if (*vg_item == NULL) {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, name));
-    }
-
-    return CM_SUCCESS;
-}
-
 void wr_lock_vg_mem_and_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item)
 {
     wr_lock_vg_mem_x(vg_item);
@@ -329,7 +305,7 @@ static status_t wr_exist_item_core(
 
 
     if (lstat(path, &st) != 0) {
-        LOG_DEBUG_ERR("failed to get stat for path %s, errno %d.\n", path, errno);
+        LOG_RUN_ERR("failed to get stat for path %s, errno %d.\n", path, errno);
         return CM_ERROR;
     }
 
@@ -340,7 +316,7 @@ static status_t wr_exist_item_core(
     } else if (S_ISLNK(st.st_mode)) {
         *output_type = GFT_LINK;
     } else {
-        LOG_DEBUG_ERR("file %s type is %o, not supported", path, st.st_mode);
+        LOG_RUN_ERR("file %s type is %o, not supported", path, st.st_mode);
         *output_type = -1;
         return CM_ERROR;
     }
@@ -379,7 +355,7 @@ status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, 
                 LOG_DEBUG_INF("Reset error %d when check dir failed.", status);
                 cm_reset_error();
             } else {
-                WR_BREAK_IFERR2(CM_ERROR, LOG_DEBUG_ERR("Failed to check item, errcode:%d.", status));
+                WR_BREAK_IFERR2(CM_ERROR, LOG_RUN_ERR("Failed to check item, errcode:%d.", status));
             }
         }
         status = CM_SUCCESS;
@@ -392,7 +368,7 @@ status_t wr_check_file(wr_vg_info_item_t *vg_item)
 {
     status_t status = wr_check_refresh_ft(vg_item);
     WR_RETURN_IFERR2(
-        status, LOG_DEBUG_ERR("Failed to check and update file table %s.", vg_item->wr_ctrl->vg_info.vg_name));
+        status, LOG_RUN_ERR("Failed to check and update file table %s.", vg_item->wr_ctrl->vg_info.vg_name));
     return CM_SUCCESS;
 }
 
@@ -400,12 +376,12 @@ status_t wr_open_file_check_s(
     wr_session_t *session, const char *file, wr_vg_info_item_t **vg_item, gft_item_type_t type, gft_node_t **out_node)
 {
     status_t status = wr_check_file(*vg_item);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to check file, errcode:%d.", cm_get_error_code()));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to check file, errcode:%d.", cm_get_error_code()));
     wr_vg_info_item_t *file_vg_item = *vg_item;
     wr_check_dir_output_t output_info = {out_node, &file_vg_item, NULL, CM_FALSE};
     status = wr_check_dir(session, file, type, &output_info, CM_TRUE);
     WR_RETURN_IFERR2(
-        status, LOG_DEBUG_ERR("Failed to check dir when open file read, errcode:%d.", cm_get_error_code()));
+        status, LOG_RUN_ERR("Failed to check dir when open file read, errcode:%d.", cm_get_error_code()));
     if (file_vg_item->id != (*vg_item)->id) {
         wr_unlock_vg_mem_and_shm(session, *vg_item);
         LOG_DEBUG_INF(
@@ -433,7 +409,7 @@ status_t wr_close_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64
 {
     status_t status =
         wr_delete_open_file_index(session, vg_item, ftid, session->cli_info.cli_pid, session->cli_info.start_time);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to delete open file index, ftid:%llu.", ftid));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to delete open file index, ftid:%llu.", ftid));
     return CM_SUCCESS;
 }
 
@@ -521,7 +497,7 @@ status_t wr_format_bitmap_node(wr_session_t *session, wr_vg_info_item_t *vg_item
     uint32_t block_num = (uint32_t)WR_GET_FS_BLOCK_NUM_IN_AU(wr_ctrl);
     ga_queue_t queue;
     status = ga_alloc_object_list(GA_16K_POOL, block_num, &queue);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("[FS][FORMAT] Failed to alloc object list, block num is %u.", block_num));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("[FS][FORMAT] Failed to alloc object list, block num is %u.", block_num));
     uint32_t obj_id = queue.first;
     ga_obj_id_t ga_obj_id;
     ga_obj_id.pool_id = GA_16K_POOL;
@@ -535,7 +511,7 @@ status_t wr_format_bitmap_node(wr_session_t *session, wr_vg_info_item_t *vg_item
 
         status =
             wr_register_buffer_cache(session, vg_item, block->common.id, ga_obj_id, (char *)block, WR_BLOCK_TYPE_FS);
-        WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("[FS][FORMAT] Failed to register block:%s, obj is %u.",
+        WR_RETURN_IFERR2(status, LOG_RUN_ERR("[FS][FORMAT] Failed to register block:%s, obj is %u.",
                                       wr_display_metaid(block->common.id), obj_id));
 
         wr_init_bitmap_block(wr_ctrl, (char *)block, i, auid);
@@ -557,7 +533,7 @@ status_t wr_refresh_root_ft_inner(wr_vg_info_item_t *vg_item)
     wr_ctrl_t *wr_ctrl = vg_item->wr_ctrl;
     char *root = wr_ctrl->root;
     status_t status = wr_load_vg_ctrl_part(vg_item, (int64)WR_CTRL_ROOT_OFFSET, root, (int32_t)WR_BLOCK_SIZE, &remote);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to get the whole root."));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to get the whole root."));
     if (remote == CM_FALSE) {
         uint32_t checksum = wr_get_checksum(root, WR_BLOCK_SIZE);
         wr_common_block_t *block = (wr_common_block_t *)root;
@@ -583,7 +559,7 @@ status_t wr_refresh_root_ft(wr_vg_info_item_t *vg_item, bool32 check_version, bo
         uint64 disk_version;
         status_t status = wr_get_root_version(vg_item, &disk_version);
         if (status != CM_SUCCESS) {
-            LOG_DEBUG_ERR("Failed to get the root version.");
+            LOG_RUN_ERR("Failed to get the root version.");
             return status;
         }
 
@@ -722,7 +698,7 @@ status_t wr_get_root_version(wr_vg_info_item_t *vg_item, uint64 *version)
     bool32 remote = CM_FALSE;
     status_t status = wr_load_vg_ctrl_part(vg_item, (int64)WR_CTRL_ROOT_OFFSET, temp, WR_DISK_UNIT_SIZE, &remote);
     if (status != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to load vg core version %s.", vg_item->entry_path);
+        LOG_RUN_ERR("Failed to load vg core version %s.", vg_item->entry_path);
         return status;
     }
     *version = ((wr_common_block_t *)temp)->version;
@@ -741,13 +717,13 @@ status_t wr_check_refresh_ft(wr_vg_info_item_t *vg_item)
     uint64 disk_version;
     bool32 remote = CM_FALSE;
     status_t status = wr_get_root_version(vg_item, &disk_version);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to get root version %s.", vg_item->entry_path));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to get root version %s.", vg_item->entry_path));
 
     wr_root_ft_block_t *ft_block_m = WR_GET_ROOT_BLOCK(vg_item->wr_ctrl);
     if (wr_compare_version(disk_version, ft_block_m->ft_block.common.version)) {
         status = wr_load_vg_ctrl_part(
             vg_item, (int64)WR_CTRL_ROOT_OFFSET, vg_item->wr_ctrl->root, (int32_t)WR_BLOCK_SIZE, &remote);
-        WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to load vg core part %s.", vg_item->entry_path));
+        WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to load vg core part %s.", vg_item->entry_path));
     }
     WR_LOG_DEBUG_OP(
         "wr_check_refresh_ft version:%llu, disk version:%llu.", ft_block_m->ft_block.common.version, disk_version);
@@ -787,18 +763,18 @@ status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data)
     status_t status;
     if (node_data->size < 0) {
         WR_THROW_ERROR(ERR_WR_FILE_INVALID_SIZE, node_data->offset, node_data->size);
-        LOG_DEBUG_ERR("Invalid fallocate offset:%lld, size:%lld.", node_data->offset, node_data->size);
+        LOG_RUN_ERR("Invalid fallocate offset:%lld, size:%lld.", node_data->offset, node_data->size);
         return CM_ERROR;
     }
 
     if (node_data->mode != 0) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_DEBUG_ERR("Failed to check mode,vg id %d.", node_data->mode),
+        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("Failed to check mode,vg id %d.", node_data->mode),
             WR_THROW_ERROR(ERR_WR_INVALID_ID, "fallocate mode", (uint64)node_data->mode));
     }
 
     wr_vg_info_item_t *vg_item = wr_find_vg_item_by_id(node_data->vgid);
     if (vg_item == NULL) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_DEBUG_ERR("Failed to find vg, vg id:%u.", node_data->vgid),
+        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("Failed to find vg, vg id:%u.", node_data->vgid),
             WR_THROW_ERROR(ERR_WR_INVALID_ID, "vg id", (uint64)node_data->vgid));
     }
     node_data->vg_name = (char *)vg_item->vg_name;
@@ -808,7 +784,7 @@ status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data)
     if (node == NULL) {
         wr_unlock_vg_mem_and_shm(session, vg_item);
         WR_RETURN_IFERR2(
-            CM_ERROR, LOG_DEBUG_ERR("Failed to find ftid, ftid:%s.", wr_display_metaid(node_data->ftid)));
+            CM_ERROR, LOG_RUN_ERR("Failed to find ftid, ftid:%s.", wr_display_metaid(node_data->ftid)));
     }
 
     status = wr_extend_with_updt_written_size(session, vg_item, node, node_data);
@@ -825,7 +801,7 @@ static status_t wr_prepare_truncate(wr_session_t *session, wr_vg_info_item_t *vg
     status_t status = wr_check_file(vg_item);
     if (status != CM_SUCCESS) {
         WR_RETURN_IFERR3(CM_ERROR, wr_unlock_vg_mem_and_shm(session, vg_item),
-            LOG_DEBUG_ERR("Failed to check file,errcode:%d.", cm_get_error_code()));
+            LOG_RUN_ERR("Failed to check file,errcode:%d.", cm_get_error_code()));
     }
     return CM_SUCCESS;
 }
@@ -1023,7 +999,7 @@ status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64 lengt
 {
     wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
     if (vg_item == NULL) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_DEBUG_ERR("Failed to find vg with name %s.", vg_name),
+        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("Failed to find vg with name %s.", vg_name),
             WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, vg_name));
     }
 
@@ -1055,14 +1031,14 @@ status_t wr_check_rename_path(wr_session_t *session, const char *src_path, const
     text_t src_name;
     cm_str2text((char *)src_path, &src_name);
     if (!cm_fetch_rtext(&src_name, '/', '\0', &src_dir)) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_DEBUG_ERR("not a complete absolute path name(%s %s)", T2S(&src_dir), src_path),
+        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("not a complete absolute path name(%s %s)", T2S(&src_dir), src_path),
             WR_THROW_ERROR(ERR_WR_FILE_RENAME, "can not change path."));
     }
 
     text_t dst_dir;
     cm_str2text((char *)dst_path, dst_name);
     if (!cm_fetch_rtext(dst_name, '/', '\0', &dst_dir)) {
-        WR_RETURN_IFERR2(CM_ERROR, LOG_DEBUG_ERR("not a complete absolute path name(%s %s)", T2S(&dst_dir), dst_path));
+        WR_RETURN_IFERR2(CM_ERROR, LOG_RUN_ERR("not a complete absolute path name(%s %s)", T2S(&dst_dir), dst_path));
     }
 
     if (cm_text_equal(&src_dir, &dst_dir) == CM_FALSE) {
@@ -1079,11 +1055,11 @@ status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, u
     wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
     if (vg_item == NULL) {
         WR_RETURN_IFERR3(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, vg_name), LOG_DEBUG_ERR("Failed to find vg, %s.", vg_name));
+            CM_ERROR, WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, vg_name), LOG_RUN_ERR("Failed to find vg, %s.", vg_name));
     }
 
     status_t status = wr_check_open_file(session, vg_item, ftid, is_open);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Failed to check open file, vg:%s, ftid:%llu.", vg_name, ftid));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to check open file, vg:%s, ftid:%llu.", vg_name, ftid));
     return CM_SUCCESS;
 }
 
@@ -1093,7 +1069,7 @@ status_t wr_update_file_written_size(
     status_t status = CM_SUCCESS;
     wr_vg_info_item_t *vg_item = wr_find_vg_item_by_id(vg_id);
     if (!vg_item) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_DEBUG_ERR("Failed to find vg,vg id %u.", vg_id),
+        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("Failed to find vg,vg id %u.", vg_id),
             WR_THROW_ERROR(ERR_WR_INVALID_ID, "vg id", (uint64)vg_id));
     }
 
@@ -1141,7 +1117,7 @@ status_t wr_update_file_written_size(
         if (status != CM_SUCCESS) {
             wr_unlatch_node(node);
             wr_unlock_vg_mem_and_shm(session, vg_item);
-            WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("Fail to update written_size:%llu of file:%s, node size:%llu.",
+            WR_RETURN_IFERR2(status, LOG_RUN_ERR("Fail to update written_size:%llu of file:%s, node size:%llu.",
                                           node->written_size, node->name, node->size));
         }
     }
@@ -1228,7 +1204,7 @@ status_t wr_block_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *v
         status = wr_open_volume(
             vg_item->wr_ctrl->volume.defs[block_id.volume].name, NULL, WR_INSTANCE_OPEN_FLAG, &volume);
         WR_RETURN_IFERR2(
-            status, LOG_DEBUG_ERR("open volume %s failed.", vg_item->wr_ctrl->volume.defs[block_id.volume].name));
+            status, LOG_RUN_ERR("open volume %s failed.", vg_item->wr_ctrl->volume.defs[block_id.volume].name));
         vg_item->volume_handle[block_id.volume] = volume;
     }
 

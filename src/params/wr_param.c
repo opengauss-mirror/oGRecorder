@@ -63,89 +63,88 @@ static config_item_t g_wr_ssl_params[] = {
 };
 
 static config_item_t g_wr_params[] = {
-    {"SSL_CERT_NOTIFY_TIME", CM_TRUE, ATTR_READONLY, "30", NULL, NULL, "-", "[7,180]", "GS_TYPE_INTEGER", NULL, 0,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"WR_CM_SO_NAME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 1, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 3, EFFECT_REBOOT, CFG_INS, NULL,
-        NULL, NULL, NULL},
-    {"_LOG_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER", NULL, 4,
-        EFFECT_REBOOT, CFG_INS, wr_verify_log_backup_file_count, wr_notify_log_backup_file_count, NULL, NULL},
-    {"_LOG_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER", NULL, 5,
-        EFFECT_REBOOT, CFG_INS, wr_verify_log_file_size, wr_notify_log_file_size, NULL, NULL},
-    {"INST_ID", CM_TRUE, ATTR_READONLY, "0", NULL, NULL, "-", "[0,64)", "GS_TYPE_INTEGER", NULL, 6, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"_LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER", NULL, 8,
-        EFFECT_IMMEDIATELY, CFG_INS, wr_verify_log_level, wr_notify_log_level, NULL, NULL},
-    {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER", NULL, 9,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_AUDIT_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER", NULL, 12,
-        EFFECT_REBOOT, CFG_INS, wr_verify_audit_backup_file_count, wr_notify_audit_backup_file_count, NULL, NULL},
-    {"_AUDIT_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER", NULL, 13,
-        EFFECT_REBOOT, CFG_INS, wr_verify_audit_file_size, wr_notify_audit_file_size, NULL, NULL},
-    {"_LOG_FILE_PERMISSIONS", CM_TRUE, ATTR_READONLY, "600", NULL, NULL, "-", "[600-777]", "GS_TYPE_INTEGER", NULL, 14,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_LOG_PATH_PERMISSIONS", CM_TRUE, ATTR_READONLY, "700", NULL, NULL, "-", "[700-777]", "GS_TYPE_INTEGER", NULL, 15,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_PWD_CIPHERTEXT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 16, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"_SHM_KEY", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER", NULL, 17, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"WR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 18,
-        EFFECT_IMMEDIATELY, CFG_INS, wr_verify_nodes_list, wr_notify_wr_nodes_list, NULL, NULL},
-    {"INTERCONNECT_TYPE", CM_TRUE, ATTR_READONLY, "TCP", NULL, NULL, "-", "TCP,RDMA", "GS_TYPE_VARCHAR", NULL, 19,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"INTERCONNECT_CHANNEL_NUM", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,32]", "GS_TYPE_INTEGER", NULL, 20,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER", NULL, 21,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER", NULL, 22,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"MES_ELAPSED_SWITCH", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN", NULL, 23,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 25, EFFECT_REBOOT, CFG_INS,
-        NULL, NULL, NULL, NULL},
-    {"SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 26, EFFECT_REBOOT, CFG_INS,
-        NULL, NULL, NULL, NULL},
-    {"SSL_CRL", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 27, EFFECT_REBOOT, CFG_INS,
-        NULL, NULL, NULL, NULL},
-    {"SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 28, EFFECT_REBOOT, CFG_INS,
-        NULL, NULL, NULL, NULL},
-    {"SSL_CIPHER", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 29, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"POOL_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 30, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"IMAGE_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 31, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"_AUDIT_LEVEL", CM_TRUE, ATTR_NONE, "1", NULL, NULL, "-", "[0,255]", "GS_TYPE_INTEGER", NULL, 34,
-        EFFECT_IMMEDIATELY, CFG_INS, wr_verify_audit_level, wr_notify_audit_level, NULL, NULL},
-    {"SSL_PERIOD_DETECTION", CM_TRUE, ATTR_READONLY, "7", NULL, NULL, "-", "[1,180]", "GS_TYPE_INTEGER", NULL, 35,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"MES_WITH_IP", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN", NULL, 36,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"IP_WHITE_LIST_ON", CM_TRUE, ATTR_READONLY, "TRUE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN", NULL, 37,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"IO_THREADS", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,8]", "GS_TYPE_INTEGER", NULL, 38, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER", NULL, 39,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_BLACKBOX_DETAIL_ON", CM_TRUE, ATTR_NONE, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN", NULL, 40,
-        EFFECT_IMMEDIATELY, CFG_INS, wr_verify_blackbox_detail_on, wr_notify_blackbox_detail_on, NULL, NULL},
-    {"MES_WAIT_TIMEOUT", CM_TRUE, ATTR_NONE, "10000", NULL, NULL, "-", "[500,30000]", "GS_TYPE_INTEGER", NULL, 43,
-        EFFECT_IMMEDIATELY, CFG_INS, wr_verify_mes_wait_timeout, wr_notify_mes_wait_timeout, NULL, NULL},
+    {"SSL_CERT_NOTIFY_TIME", CM_TRUE, ATTR_READONLY, "30", NULL, NULL, "-", "[7,180]", "GS_TYPE_INTEGER",
+        NULL, 0, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"WR_CM_SO_NAME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 1, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"_LOG_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
+        NULL, 3, EFFECT_REBOOT, CFG_INS, wr_verify_log_backup_file_count, wr_notify_log_backup_file_count, NULL, NULL},
+    {"_LOG_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
+        NULL, 4, EFFECT_REBOOT, CFG_INS, wr_verify_log_file_size, wr_notify_log_file_size, NULL, NULL},
+    {"INST_ID", CM_TRUE, ATTR_READONLY, "0", NULL, NULL, "-", "[0,64)", "GS_TYPE_INTEGER",
+        NULL, 5, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"_LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER",
+        NULL, 6, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_log_level, wr_notify_log_level, NULL, NULL},
+    {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
+        NULL, 7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"_AUDIT_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
+        NULL, 8, EFFECT_REBOOT, CFG_INS, wr_verify_audit_backup_file_count, wr_notify_audit_backup_file_count, NULL, NULL},
+    {"_AUDIT_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
+        NULL, 9, EFFECT_REBOOT, CFG_INS, wr_verify_audit_file_size, wr_notify_audit_file_size, NULL, NULL},
+    {"_LOG_FILE_PERMISSIONS", CM_TRUE, ATTR_READONLY, "600", NULL, NULL, "-", "[600-777]", "GS_TYPE_INTEGER",
+        NULL, 10, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"_LOG_PATH_PERMISSIONS", CM_TRUE, ATTR_READONLY, "700", NULL, NULL, "-", "[700-777]", "GS_TYPE_INTEGER",
+        NULL, 11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_PWD_CIPHERTEXT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 12, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"_SHM_KEY", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER",
+        NULL, 13, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"WR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 14, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_nodes_list, wr_notify_wr_nodes_list, NULL, NULL},
+    {"INTERCONNECT_TYPE", CM_TRUE, ATTR_READONLY, "TCP", NULL, NULL, "-", "TCP,RDMA", "GS_TYPE_VARCHAR",
+        NULL, 15, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"INTERCONNECT_CHANNEL_NUM", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,32]", "GS_TYPE_INTEGER",
+        NULL, 16, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER",
+        NULL, 17, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER",
+        NULL, 18, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"MES_ELAPSED_SWITCH", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
+        NULL, 19, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 20, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 21, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CRL", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 22, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 23, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CIPHER", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 24, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"POOL_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 25, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"IMAGE_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 26, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"_AUDIT_LEVEL", CM_TRUE, ATTR_NONE, "1", NULL, NULL, "-", "[0,255]", "GS_TYPE_INTEGER",
+        NULL, 27, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_audit_level, wr_notify_audit_level, NULL, NULL},
+    {"SSL_PERIOD_DETECTION", CM_TRUE, ATTR_READONLY, "7", NULL, NULL, "-", "[1,180]", "GS_TYPE_INTEGER",
+        NULL, 28, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"MES_WITH_IP", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
+        NULL, 29, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"IP_WHITE_LIST_ON", CM_TRUE, ATTR_READONLY, "TRUE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
+        NULL, 30, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"IO_THREADS", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,8]", "GS_TYPE_INTEGER",
+        NULL, 31, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER",
+        NULL, 32, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"_BLACKBOX_DETAIL_ON", CM_TRUE, ATTR_NONE, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
+        NULL, 33, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_blackbox_detail_on, wr_notify_blackbox_detail_on, NULL, NULL},
+    {"MES_WAIT_TIMEOUT", CM_TRUE, ATTR_NONE, "10000", NULL, NULL, "-", "[500,30000]", "GS_TYPE_INTEGER",
+        NULL, 34, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_mes_wait_timeout, wr_notify_mes_wait_timeout, NULL, NULL},
     {"_ENABLE_CORE_STATE_COLLECT", CM_TRUE, ATTR_NONE, "TRUE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
-        NULL, 44, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_enable_core_state_collect,
-        wr_notify_enable_core_state_collect, NULL, NULL},
-    {"DELAY_CLEAN_INTERVAL", CM_TRUE, ATTR_NONE, "5", NULL, NULL, "-", "[5,1000000]", "GS_TYPE_INTEGER", NULL, 45,
-        EFFECT_IMMEDIATELY, CFG_INS, wr_verify_delay_clean_interval, wr_notify_delay_clean_interval, NULL, NULL},
-    {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN", NULL, 56,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"LOG_ALARM_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 59, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 62, EFFECT_REBOOT,
-        CFG_INS, NULL, NULL, NULL, NULL},
-    {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR", NULL, 24,
-        EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 35, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_enable_core_state_collect, wr_notify_enable_core_state_collect, NULL, NULL},
+    {"DELAY_CLEAN_INTERVAL", CM_TRUE, ATTR_NONE, "5", NULL, NULL, "-", "[5,1000000]", "GS_TYPE_INTEGER",
+        NULL, 36, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_delay_clean_interval, wr_notify_delay_clean_interval, NULL, NULL},
+    {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
+        NULL, 37, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"LOG_ALARM_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 38, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 39, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 40, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 };
 
 static const char *g_wr_config_file = (const char *)"wr_inst.ini";
@@ -298,7 +297,7 @@ static status_t wr_load_random_file(uchar *value, int32_t value_len)
     cm_close_file(handle);
     WR_RETURN_IF_ERROR(ret);
     if (file_size < RANDOM_LEN + 1) {
-        LOG_DEBUG_ERR("Random component file %s is invalid, size is %d.", file_name, file_size);
+        LOG_RUN_ERR("Random component file %s is invalid, size is %d.", file_name, file_size);
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -324,24 +323,24 @@ int32_t wr_decrypt_pwd_cb(const char *cipher_text, uint32_t cipher_len, char *pl
 {
     if (cipher_text == NULL) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_DEBUG_ERR("[WR] failed to decrypt SSL cipher: cipher is NULL"));
+            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: cipher is NULL"));
     }
     if (cipher_len == 0 || cipher_len >= WR_PARAM_BUFFER_SIZE) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_DEBUG_ERR("[WR] failed to decrypt SSL cipher: cipher size [%u] is invalid.", cipher_len));
+            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: cipher size [%u] is invalid.", cipher_len));
     }
     if (plain_text == NULL) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_DEBUG_ERR("[WR] failed to decrypt SSL cipher: plain is NULL"));
+            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: plain is NULL"));
     }
     if (plain_len < CM_PASSWD_MAX_LEN) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_DEBUG_ERR("[WR] failed to decrypt SSL cipher: plain len [%u] is invalid.", plain_len));
+            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: plain len [%u] is invalid.", plain_len));
     }
     cipher_t cipher;
     if (cm_base64_decode(cipher_text, cipher_len, (uchar *)&cipher, (uint32_t)(sizeof(cipher_t) + 1)) == 0) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_DEBUG_ERR("[WR] failed to decode SSL cipher."));
+            LOG_RUN_ERR("[WR] failed to decode SSL cipher."));
     }
     if (cipher.cipher_len > 0) {
         status_t status = wr_load_random_file(cipher.rand, (int32_t)sizeof(cipher.rand));
@@ -350,7 +349,7 @@ int32_t wr_decrypt_pwd_cb(const char *cipher_text, uint32_t cipher_len, char *pl
         WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_VALUE_ERROR, "[WR] failed to decrypt ssl pwd."));
     } else {
         CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT");
-        LOG_DEBUG_ERR("[WR] failed to decrypt ssl pwd for the cipher len is invalid.");
+        LOG_RUN_ERR("[WR] failed to decrypt ssl pwd for the cipher len is invalid.");
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -444,7 +443,7 @@ static status_t wr_load_listen_addr(wr_config_t *inst_cfg)
         return CM_ERROR;
     }
 
-    char buffer[256];
+    char buffer[WR_MAX_PATH_BUFFER_SIZE];
     strncpy(buffer, value, sizeof(buffer) - 1);
     buffer[sizeof(buffer) - 1] = '\0';
 
@@ -551,7 +550,7 @@ static status_t wr_load_shm_key(wr_config_t *inst_cfg)
     // key组成为: (((基础_SHM_KEY << WR_MAX_SHM_KEY_BITS)      + inst_id) << 16) | 实际的业务id，
     // 实际的业务id具体范围现在分为[1,2][3,18],[19,20496]
     status_t status = cm_str2uint32(value, &inst_cfg->params.shm_key);
-    WR_RETURN_IFERR2(status, LOG_DEBUG_ERR("invalid parameter value of '_SHM_KEY', value:%s.", value));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("invalid parameter value of '_SHM_KEY', value:%s.", value));
 
     if (inst_cfg->params.shm_key < WR_MIN_SHM_KEY || inst_cfg->params.shm_key > WR_MAX_SHM_KEY) {
         WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "the value of '_SHM_KEY' is invalid"));

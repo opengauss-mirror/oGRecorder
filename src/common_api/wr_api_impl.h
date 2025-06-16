@@ -256,7 +256,6 @@ status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file);
 status_t wr_cli_ssl_connect(wr_conn_t *conn);
 status_t wr_init_client(uint32_t max_open_files, char *home);
 void wr_destroy(void);
-status_t wr_get_fname_impl(int handle, char *fname, int fname_size);
 status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, uint32_t *file_num);
 status_t wr_vfs_query_file_info_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, wr_file_item_t *file_info, bool is_continue);
 
@@ -269,7 +268,6 @@ status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, co
 status_t wr_getcfg_impl(wr_conn_t *conn, const char *name, char *out_str, size_t str_len);
 status_t wr_stop_server_impl(wr_conn_t *conn);
 void wr_get_api_volume_error(void);
-status_t wr_get_phy_size_impl(wr_conn_t *conn, int handle, long long *size);
 status_t wr_msg_interact(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack);
 status_t wr_fallocate_impl(wr_conn_t *conn, int handle, int mode, long long int offset, long long int length);
 

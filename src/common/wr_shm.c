@@ -61,24 +61,24 @@ static uint32_t cm_shm_idx_of(cm_shm_type_e type, uint32_t id)
 
     if (type == SHM_TYPE_FIXED) {
         if (id >= CM_FIXED_SHM_ID_TAIL) {
-            LOG_DEBUG_ERR("Fixed shared memory ID is out of  range : %u", id);
+            LOG_RUN_ERR("Fixed shared memory ID is out of  range : %u", id);
             return CM_INVALID_SHM_IDX;
         }
         result = id;
     } else if (type == SHM_TYPE_HASH) {
         if (id >= CM_HASH_SHM_MAX_ID) {
-            LOG_DEBUG_ERR("GA shared memory ID is out of range : %u", id);
+            LOG_RUN_ERR("GA shared memory ID is out of range : %u", id);
             return CM_INVALID_SHM_IDX;
         }
         result = CM_FIXED_SHM_ID_TAIL + id;
     } else if (type == SHM_TYPE_GA) {
         if (id >= CM_GA_SHM_MAX_ID) {
-            LOG_DEBUG_ERR("GA shared memory ID is out of range : %u", id);
+            LOG_RUN_ERR("GA shared memory ID is out of range : %u", id);
             return CM_INVALID_SHM_IDX;
         }
         result = CM_FIXED_SHM_ID_TAIL + CM_HASH_SHM_MAX_ID + id;
     } else {
-        LOG_DEBUG_ERR("invalid type, type: %u", type);
+        LOG_RUN_ERR("invalid type, type: %u", type);
         return CM_INVALID_SHM_IDX;
     }
     return result;
@@ -273,7 +273,7 @@ static void *cm_attach_to_existing_shm(cm_shm_key_t key, cm_shm_handle_t handle,
 #ifndef WIN32
     if ((result != NULL) && (size != 0)) {
         if (cm_native_shm_size(key) != size) {
-            LOG_DEBUG_ERR("Failed to attach shared memory, key=0x%08x, reason=expected size %llu can not match actual "
+            LOG_RUN_ERR("Failed to attach shared memory, key=0x%08x, reason=expected size %llu can not match actual "
                           "size %llu. The existent shared memory may be created by other process or last existed gmdb "
                           "instance, please delete it manually and retry again.",
                 key, size, cm_native_shm_size(key));
@@ -366,12 +366,12 @@ static status_t cm_check_shm_ctrl(void)
 #endif
 
     if (memcmp(cm_shm_ctrl()->magic, CM_SHM_MAGIC, sizeof(cm_shm_ctrl()->magic)) != 0) {
-        LOG_DEBUG_ERR("mismatched magic number");
+        LOG_RUN_ERR("mismatched magic number");
         return ERR_WR_SHM_CHECK;
     }
 
     if (cm_shm_ctrl()->self_version != CM_SHM_CTRL_CURRENT_VERSION) {
-        LOG_DEBUG_ERR("Failed to check shared memory ctrl ,key=0x%08x, reason=expected version %u can not match actual "
+        LOG_RUN_ERR("Failed to check shared memory ctrl ,key=0x%08x, reason=expected version %u can not match actual "
                       "version %u.",
             CM_SHM_CTRL_KEY, CM_SHM_CTRL_CURRENT_VERSION, cm_shm_ctrl()->self_version);
         return ERR_WR_SHM_CHECK;

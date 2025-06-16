@@ -258,7 +258,7 @@ status_t rp_redo_rename_file(wr_session_t *session, wr_vg_info_item_t *vg_item, 
 
     status_t status = wr_update_ft_block_disk(vg_item, cur_block, data->node.id);
     WR_RETURN_IFERR2(
-        status, LOG_DEBUG_ERR("[REDO] Failed to update fs block: %s to disk.", wr_display_metaid(data->node.id)));
+        status, LOG_RUN_ERR("[REDO] Failed to update fs block: %s to disk.", wr_display_metaid(data->node.id)));
 
     LOG_DEBUG_INF(
         "Succeed to replay rename file:%s, old_name:%s, name:%s.", data->name, data->old_name, vg_item->vg_name);

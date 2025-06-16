@@ -268,7 +268,7 @@ status_t wr_dl_dealloc(unsigned int lock_id)
 {
     int ret = cm_dl_dealloc(lock_id);
     if (ret != CM_SUCCESS) {
-        LOG_DEBUG_ERR("Failed to dealloc lock %u, ret %d", lock_id, ret);
+        LOG_RUN_ERR("Failed to dealloc lock %u, ret %d", lock_id, ret);
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -282,7 +282,7 @@ status_t wr_lock_share_disk_vg(const char *entry_path, wr_config_t *inst_cfg)
 
     lock_id = cm_dl_alloc(entry_path, WR_VG_LOCK_SHARE_DISK_OFFSET, (unsigned long long)inst_cfg->params.inst_id);
     if (lock_id == CM_INVALID_LOCK_ID) {
-        LOG_DEBUG_ERR("Failed to alloc lock.");
+        LOG_RUN_ERR("Failed to alloc lock.");
         return CM_ERROR;
     }
 
@@ -297,7 +297,7 @@ status_t wr_lock_share_disk_vg(const char *entry_path, wr_config_t *inst_cfg)
             LOG_DEBUG_INF("Lock vg timeout, get current lock info, entry_path %s.", entry_path);
             status_t status = cm_dl_getowner(lock_id, &disk_inst_id);
             if (status != CM_SUCCESS) {
-                LOG_DEBUG_ERR("Failed to get old lock info, entry path %s.", entry_path);
+                LOG_RUN_ERR("Failed to get old lock info, entry path %s.", entry_path);
                 WR_RETURN_IF_ERROR(wr_dl_dealloc(lock_id));
                 return status;
             }
@@ -308,7 +308,7 @@ status_t wr_lock_share_disk_vg(const char *entry_path, wr_config_t *inst_cfg)
                 continue;
             }
         }
-        LOG_DEBUG_ERR("Failed to lock %s, status %d.", entry_path, ret);
+        LOG_RUN_ERR("Failed to lock %s, status %d.", entry_path, ret);
         WR_RETURN_IF_ERROR(wr_dl_dealloc(lock_id));
         return ret;
     }

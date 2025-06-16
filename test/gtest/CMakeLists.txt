@@ -8,6 +8,10 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_BUILD_TYPE Debug)
 
+if(DEFINED ENABLE_WORM)
+    add_definitions(-DENABLE_WORM=${ENABLE_WORM})
+endif()
+
 find_package(GTest REQUIRED)
 
 # 包含头文件目录

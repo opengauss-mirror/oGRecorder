@@ -195,13 +195,13 @@ static int32_t oamap_rehash(cm_oamap_t *map, uint32_t new_capacity)
 
     uint64 size = new_capacity * (uint64)(sizeof(cm_oamap_bucket_t) + sizeof(void *) + sizeof(void *));
     if (size >= CM_INVALID_ID32) {
-        LOG_DEBUG_ERR("Invalid capacity value specified for rehashing map.");
+        LOG_RUN_ERR("Invalid capacity value specified for rehashing map.");
         return ERR_WR_INVALID_PARAM;
     }
 
     cm_oamap_bucket_t *new_buckets = (cm_oamap_bucket_t *)cm_malloc((uint32_t)size);
     if (new_buckets == NULL) {
-        LOG_DEBUG_ERR("Malloc failed");
+        LOG_RUN_ERR("Malloc failed");
         return CM_ERROR;
     }
     void **new_key = (void **)(new_buckets + new_capacity);
@@ -227,7 +227,7 @@ static int32_t oamap_rehash(cm_oamap_t *map, uint32_t new_capacity)
 void cm_oamap_init_mem(cm_oamap_t *map)
 {
     if (map == NULL) {
-        LOG_DEBUG_ERR("Null pointer specified");
+        LOG_RUN_ERR("Null pointer specified");
         return;
     }
 
@@ -246,25 +246,25 @@ int32_t cm_oamap_init(
     uint64 size;
     uint32_t i;
     if (map == NULL || compare_func == NULL) {
-        LOG_DEBUG_ERR("Null pointer specified");
+        LOG_RUN_ERR("Null pointer specified");
         return ERR_WR_INVALID_PARAM;
     }
     // The max oamap
     map->num = oamap_get_near_prime(init_capacity);
     if (map->num >= MAX_OAMAP_BUCKET_NUM) {
-        LOG_DEBUG_ERR("Invalid bucket num specified");
+        LOG_RUN_ERR("Invalid bucket num specified");
         return ERR_WR_INVALID_PARAM;
     }
     map->used = 0;
     size = map->num * (uint32_t)(sizeof(cm_oamap_bucket_t) + sizeof(void *) + sizeof(void *));
     if (size >= CM_INVALID_ID32) {
-        LOG_DEBUG_ERR("Invalid map size");
+        LOG_RUN_ERR("Invalid map size");
         return ERR_WR_INVALID_PARAM;
     }
     map->compare_func = compare_func;
     map->buckets = (cm_oamap_bucket_t *)cm_malloc((uint32_t)size);
     if (map->buckets == NULL) {
-        LOG_DEBUG_ERR("Malloc failed");
+        LOG_RUN_ERR("Malloc failed");
         return CM_ERROR;
     }
     map->key = (void **)(map->buckets + map->num);
@@ -318,7 +318,7 @@ static int32_t cm_oamap_find_pos_forward(cm_oamap_t *map, uint32_t hash, void *k
             }
         } else {
             if (cm_oamap_bucket->hash == hash && map->compare_func(map->key[start], key) == CM_TRUE) {
-                LOG_DEBUG_ERR("Duplicate key being inserted");
+                LOG_RUN_ERR("Duplicate key being inserted");
                 return ERR_WR_OAMAP_INSERT_DUP_KEY;
             }
         }
@@ -354,7 +354,7 @@ static int32_t cm_oamap_insert_core(cm_oamap_t *map, uint32_t hash, void *key, v
             }
         } else {
             if (cm_oamap_bucket->hash == hash && map->compare_func(map->key[i], key)) {
-                LOG_DEBUG_ERR("Duplicate key being inserted, i:%u, hash:%u", i, hash);
+                LOG_RUN_ERR("Duplicate key being inserted, i:%u, hash:%u", i, hash);
                 return ERR_WR_OAMAP_INSERT_DUP_KEY;
             }
         }
@@ -371,7 +371,7 @@ static int32_t cm_oamap_insert_core(cm_oamap_t *map, uint32_t hash, void *key, v
         map->value[insert_pos] = value;
         return CM_SUCCESS;
     }
-    LOG_DEBUG_ERR("Insertion failed");
+    LOG_RUN_ERR("Insertion failed");
     return ERR_WR_OAMAP_INSERT;
 }
 
@@ -380,18 +380,18 @@ int32_t cm_oamap_insert(cm_oamap_t *map, uint32_t hash, void *key, void *value)
     int32_t ret;
     uint32_t new_size;
     if (map == NULL) {
-        LOG_DEBUG_ERR("Pointer to map is NULL");
+        LOG_RUN_ERR("Pointer to map is NULL");
         return ERR_WR_INVALID_PARAM;
     }
     if ((map->used - map->deleted) * 3 > map->num * 2) {
         new_size = oamap_get_near_prime(map->num + 1);
         if (new_size > MAX_OAMAP_BUCKET_NUM) {
-            LOG_DEBUG_ERR("Invalid bucket num specified");
+            LOG_RUN_ERR("Invalid bucket num specified");
             return ERR_WR_INVALID_PARAM;
         }
         ret = oamap_rehash(map, new_size);
         if (ret != CM_SUCCESS) {
-            LOG_DEBUG_ERR("OAMAP rehash failed,%d.", ret);
+            LOG_RUN_ERR("OAMAP rehash failed,%d.", ret);
             return ret;
         }
     }
@@ -405,12 +405,12 @@ void *cm_oamap_lookup(cm_oamap_t *map, uint32_t hash, void *key)
     cm_oamap_bucket_t *bucket;
 
     if (map == NULL) {
-        LOG_DEBUG_ERR("Pointer to map is NULL");
+        LOG_RUN_ERR("Pointer to map is NULL");
         return NULL;
     }
 
     if (map->num == 0) {
-        LOG_DEBUG_ERR("The map is not initialized.");
+        LOG_RUN_ERR("The map is not initialized.");
         return NULL;
     }
 
@@ -452,7 +452,7 @@ void *cm_oamap_remove(cm_oamap_t *map, uint32_t hash, void *key)
     cm_oamap_bucket_t *bucket;
     void *value = NULL;
     if (map == NULL) {
-        LOG_DEBUG_ERR("Pointer to map is NULL");
+        LOG_RUN_ERR("Pointer to map is NULL");
         return NULL;
     }
 
@@ -496,7 +496,7 @@ void *cm_oamap_remove(cm_oamap_t *map, uint32_t hash, void *key)
             // for lint
         }
     }
-    LOG_DEBUG_ERR("Key to remove not found");
+    LOG_RUN_ERR("Key to remove not found");
     return value;
 }
 

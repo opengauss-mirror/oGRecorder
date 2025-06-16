@@ -147,7 +147,9 @@ TEST_F(WrApiTest, TestWrfileStat) {
     EXPECT_EQ(wr_file_stat(g_vfs_handle, TEST_FILE1, &offset, &size, &mode, &time), WR_SUCCESS);
     EXPECT_EQ(offset, ONE_GB);
     EXPECT_EQ(size, ONE_GB);
+#ifdef ENABLE_WORM
     EXPECT_EQ(mode, WR_FILE_APPEND);
+#endif
 }
 
 TEST_F(WrApiTest, TestWrfilePostpone) {
@@ -173,15 +175,34 @@ TEST_F(WrApiTest, TestWrVfsQueryFileNum) {
     EXPECT_EQ(wr_vfs_query_file_num(g_vfs_handle, &file_num), WR_SUCCESS);
     EXPECT_EQ(file_num, 200);
     EXPECT_EQ(wr_vfs_query_file_info(g_vfs_handle, file_info, true), WR_SUCCESS);
+
+    // 校验文件名唯一且格式正确（只校验前100个）
+    std::set<std::string> file_names;
     for (int i = 0; i < FILE_INFO_NUM; i++) {
-        printf("File %d: Name: %s\n", i + 1, file_info[i].name);
+        file_names.insert(file_info[i].name);
+        // 校验格式
+        EXPECT_EQ(strncmp(file_info[i].name, "TEST_FILE_", 10), 0);
+        int num = atoi(file_info[i].name + 10);
+        EXPECT_GE(num, 1);
+        EXPECT_LE(num, 200);
     }
+    // 校验无重复
+    EXPECT_EQ(file_names.size(), FILE_INFO_NUM);
+
+    // 可选：再次获取校验
     EXPECT_EQ(wr_vfs_query_file_info(g_vfs_handle, file_info, true), WR_SUCCESS);
+    file_names.clear();
     for (int i = 0; i < FILE_INFO_NUM; i++) {
-        printf("File %d: Name: %s\n", i + 1, file_info[i].name);
+        file_names.insert(file_info[i].name);
+        EXPECT_EQ(strncmp(file_info[i].name, "TEST_FILE_", 10), 0);
+        int num = atoi(file_info[i].name + 10);
+        EXPECT_GE(num, 1);
+        EXPECT_LE(num, 200);
     }
+    EXPECT_EQ(file_names.size(), FILE_INFO_NUM);
 }
 
+#ifdef ENABLE_WORM
 TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
     EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE1), WR_ERROR);
     EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE2), WR_ERROR);
@@ -190,6 +211,16 @@ TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
 TEST_F(WrApiTest, TestWrVfsForceDelete) {
     EXPECT_EQ(wr_vfs_delete(g_inst_handle, TEST_DIR, 1), WR_ERROR);
 }
+#else
+TEST_F(WrApiTest, TestWrVfsDeleteFiles) {
+    EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE1), WR_SUCCESS);
+    EXPECT_EQ(wr_file_delete(g_vfs_handle, TEST_FILE2), WR_SUCCESS);
+}
+
+TEST_F(WrApiTest, TestWrVfsForceDelete) {
+    EXPECT_EQ(wr_vfs_delete(g_inst_handle, TEST_DIR, 1), WR_SUCCESS);
+}
+#endif
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {
     EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle), WR_SUCCESS);
