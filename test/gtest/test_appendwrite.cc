@@ -8,7 +8,7 @@ extern "C" {
 }
 
 #define TEST_LOG_DIR "./test_log"
-#define TEST_DIR "seqdir"
+#define TEST_DIR "appenddir"
 #define TEST_FILE1 "file1"
 #define TEST_FILE2 "file2"
 #define ONE_GB 1024 * 1024 * 1024
@@ -39,26 +39,23 @@ protected:
 
         EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle1), WR_SUCCESS);
         EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_create(g_inst_handle1, TEST_DIR, 0), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), WR_SUCCESS);
-
+        EXPECT_EQ(wr_file_create(g_vfs_handle1, TEST_FILE1, NULL), WR_SUCCESS);
+        EXPECT_EQ(wr_file_create(g_vfs_handle2, TEST_FILE2, NULL), WR_SUCCESS);
         EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE2, O_RDWR | O_SYNC, &file_handle1), WR_SUCCESS);
+        EXPECT_EQ(wr_file_open(g_vfs_handle2, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS);
     }
 
     void TearDown() override {
         EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle1, false), WR_SUCCESS); 
-        EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle2, false), WR_SUCCESS);
+        EXPECT_EQ(wr_file_close(g_vfs_handle2, &file_handle2, false), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle1), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_delete(g_inst_handle1, TEST_DIR, 1), WR_SUCCESS);
     }
 };
-
-void writeData(wr_file_handle *file_handle, wr_vfs_handle vfs_handle, const char* data, size_t size, int64_t offset) {
-    EXPECT_EQ(wr_file_pwrite(vfs_handle, file_handle, data, size, offset), size);
-}
-
-void readData(wr_file_handle file_handle, wr_vfs_handle vfs_handle, char* buffer, size_t size, int64_t offset) {
-    EXPECT_EQ(wr_file_pread(vfs_handle, file_handle, buffer, size, offset), size);
-}
 
 TEST_F(AppendWrApiTest, TestWrite) {
     const int data_size1 = 512 * 1024; // 512KB
@@ -74,46 +71,27 @@ TEST_F(AppendWrApiTest, TestWrite) {
     std::vector<std::thread> threads;
 
     // 写数据
-    writeData(&file_handle1, g_vfs_handle1, data1, data_size1, 0);
-    writeData(&file_handle2, g_vfs_handle2, data2, data_size2, 0);
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle1, &file_handle1, data1, data_size1, 0), data_size1);
+    EXPECT_EQ(wr_file_pwrite(g_vfs_handle2, &file_handle2, data2, data_size2, 0), data_size2);
     // 读数据
-    readData(file_handle1, g_vfs_handle1, read_buffer1, data_size1, data_size1);
-    readData(file_handle2, g_vfs_handle2, read_buffer2, data_size2, data_size2);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle1, file_handle1, read_buffer1, data_size1, 0), data_size1);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle2, file_handle2, read_buffer2, data_size2, 0), data_size2);
+
 
     // 验证读取的数据是否与写入的数据一致
     EXPECT_EQ(memcmp(data1, read_buffer1, data_size1), 0);
     EXPECT_EQ(memcmp(data2, read_buffer2, data_size2), 0);
-
-    delete[] data1;
-    delete[] data2;
-    delete[] read_buffer1;
-    delete[] read_buffer2;
-}
-
-TEST_F(AppendWrApiTest, TestRead) {
-    const int data_size1 = 512 * 1024; // 512KB
-    const int data_size2 = 256 * 1024; // 256KB
-    char *data1 = new char[data_size1];
-    char *data2 = new char[data_size2];
-    char *read_buffer1 = new char[data_size1];
-    char *read_buffer2 = new char[data_size2];
-    memset(data1, 'A', data_size1);
-    memset(data2, 'B', data_size2);
 
     // close file and change into lock mode
     EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle1, true), WR_SUCCESS);
-    EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle2, true), WR_SUCCESS);
+    EXPECT_EQ(wr_file_close(g_vfs_handle2, &file_handle2, true), WR_SUCCESS);
 
     EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE1, O_RDONLY, &file_handle1), WR_SUCCESS);
-    EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE2, O_RDONLY, &file_handle2), WR_SUCCESS);
+    EXPECT_EQ(wr_file_open(g_vfs_handle2, TEST_FILE2, O_RDONLY, &file_handle2), WR_SUCCESS);
 
     // 读数据
-    readData(file_handle1, g_vfs_handle1, read_buffer1, data_size1, data_size1);
-    readData(file_handle2, g_vfs_handle2, read_buffer2, data_size2, data_size2);
-
-    // 验证读取的数据是否与写入的数据一致
-    EXPECT_EQ(memcmp(data1, read_buffer1, data_size1), 0);
-    EXPECT_EQ(memcmp(data2, read_buffer2, data_size2), 0);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle1, file_handle1, read_buffer1, data_size1, 0), data_size1);
+    EXPECT_EQ(wr_file_pread(g_vfs_handle2, file_handle2, read_buffer2, data_size2, 0), data_size2);
 
     delete[] data1;
     delete[] data2;

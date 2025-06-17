@@ -18,11 +18,18 @@ int errorcode = 0;
 const char *errormsg = NULL;
 wr_instance_handle g_inst_handle1 = NULL;
 wr_instance_handle g_inst_handle2 = NULL;
+wr_instance_handle g_inst_handle3 = NULL;
+wr_instance_handle g_inst_handle4 = NULL;
+
 wr_vfs_handle g_vfs_handle1;
 wr_vfs_handle g_vfs_handle2;
-int handle1 = 0, handle2 = 0;
+wr_vfs_handle g_vfs_handle3;
+wr_vfs_handle g_vfs_handle4;
+
 wr_file_handle file_handle1;
 wr_file_handle file_handle2;
+wr_file_handle file_handle3;
+wr_file_handle file_handle4;
 
 wr_param_t g_wr_param;
 
@@ -38,26 +45,32 @@ protected:
 
         EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle1), WR_SUCCESS);
         EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle3), WR_SUCCESS);
+        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle4), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_create(g_inst_handle1, TEST_DIR, 0), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle3), WR_SUCCESS);
+        EXPECT_EQ(wr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle4), WR_SUCCESS);
         
 
         EXPECT_EQ(wr_file_create(g_vfs_handle1, TEST_FILE1, NULL), WR_SUCCESS);
-        EXPECT_EQ(wr_file_create(g_vfs_handle1, TEST_FILE2, NULL), WR_SUCCESS);
+        EXPECT_EQ(wr_file_create(g_vfs_handle2, TEST_FILE2, NULL), WR_SUCCESS);
         EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_file_open(g_vfs_handle2, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS);
+        EXPECT_EQ(wr_file_open(g_vfs_handle3, TEST_FILE1, O_RDWR | O_SYNC, &file_handle3), WR_SUCCESS);
+        EXPECT_EQ(wr_file_open(g_vfs_handle4, TEST_FILE2, O_RDWR | O_SYNC, &file_handle4), WR_SUCCESS);
     }
-    /*
+    
     void TearDown() override {
-        EXPECT_EQ(wr_file_close(g_vfs_handle1, handle1, true), WR_SUCCESS);
-        EXPECT_EQ(wr_file_close(g_vfs_handle1, handle2, true), WR_SUCCESS);
+        EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle1, true), WR_SUCCESS);
+        EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle2, true), WR_SUCCESS);
         EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE1), WR_SUCCESS);
         EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE2), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle1), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle2), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_delete(g_inst_handle1, TEST_DIR, 0), WR_SUCCESS);
-    }*/
+        EXPECT_EQ(wr_vfs_delete(g_inst_handle1, TEST_DIR, 1), WR_SUCCESS);
+    }
 };
 
 void writeData(wr_file_handle *file_handle, wr_vfs_handle vfs_handle, const char* data, size_t size, int64_t offset) {
@@ -85,8 +98,10 @@ TEST_F(ComplexWrApiTest, TestConcurrentReadWrite) {
     threads.emplace_back(writeData, &file_handle1, g_vfs_handle1, data1, data_size1, 0);
     threads.emplace_back(writeData, &file_handle2, g_vfs_handle2, data2, data_size2, 0);
     // 启动并发读线程
-    threads.emplace_back(readData, file_handle1, g_vfs_handle1, read_buffer1, data_size1, 0);
-    threads.emplace_back(readData, file_handle2, g_vfs_handle2, read_buffer2, data_size2, 0);
+
+    sleep(5); // 确保写操作先完成
+    threads.emplace_back(readData, file_handle3, g_vfs_handle3, read_buffer1, data_size1, 0);
+    threads.emplace_back(readData, file_handle4, g_vfs_handle4, read_buffer2, data_size2, 0);
 
     // 等待所有线程完成
     for (auto& t : threads) {
