@@ -449,16 +449,16 @@ static status_t wr_process_open_file(wr_session_t *session)
 
 static status_t wr_process_close_file(wr_session_t *session)
 {
-    int fd;
+    int64 fd;
     int32 need_lock;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &fd));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &fd));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "fd:%d", fd));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &need_lock));
 
-    WR_LOG_DEBUG_OP("Begin to close file, fd:%d", fd);
+    WR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
     WR_RETURN_IF_ERROR(wr_filesystem_close(fd, need_lock));
-    LOG_DEBUG_INF("Succeed to close file, fd:%d", fd);
+    LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
     return CM_SUCCESS;
 }
 
