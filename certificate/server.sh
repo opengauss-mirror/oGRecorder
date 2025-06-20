@@ -25,7 +25,7 @@ generate_root_cert()
 {
     password=$(openssl rand -base64 32)
     cd $certs_path
-    export OPENSSL_CONF=$certs_path/openssl.cnf;echo password | openssl genrsa -aes256 --passout stdin -out demoCA/private/cakey.pem 2048
+    export OPENSSL_CONF=$certs_path/openssl.cnf;echo password | openssl genrsa -aes256 -passout stdin -out demoCA/private/cakey.pem 2048
     export OPENSSL_CONF=$certs_path/openssl.cnf;echo password | openssl req -new -x509 -passin stdin -days 10 -key demoCA/private/cakey.pem -out demoCA/cacert.pem -subj "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA"
     cp demoCA/cacert.pem .
     #chmod 400 cacert.pem

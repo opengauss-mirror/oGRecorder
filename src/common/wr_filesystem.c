@@ -293,6 +293,14 @@ status_t wr_filesystem_lock(int fd, int need_lock)
     if (need_lock == 0) {
         return CM_SUCCESS;
     }
+    struct stat fd_stat;
+    if (fstat(fd, &fd_stat) == -1) {
+        LOG_RUN_ERR("failed to get stat for file %d", fd);
+        return CM_ERROR;
+    }
+    if ((fd_stat.st_mode & S_IWUSR) == 0) {
+        return CM_SUCCESS;
+    }
     LOG_RUN_INF("[FS] current file need to enter lock mode");
     if (fchmod(fd, WR_LOCK_MODE) == CM_ERROR) {
         LOG_RUN_ERR("[FS] Failed to change current file to lock mode.");
@@ -330,11 +338,13 @@ status_t wr_filesystem_mode(char *file_path, time_t file_atime, wr_file_status_t
         LOG_RUN_ERR("Failed to get worm system time.");
         return CM_ERROR;
     }
-    if (w_mode == -1 && systime > file_atime) {
+    if (w_mode == 0 && systime >= file_atime) {
+        *mode = WR_FILE_INIT;
+    } else if (w_mode == -1 && systime < file_atime) {
         *mode = WR_FILE_LOCK;
-    } else if (w_mode == 0 && systime > file_atime) {
+    } else if (w_mode == 0 && systime < file_atime) {
         *mode = WR_FILE_APPEND;
-    } else if (systime <= file_atime) {
+    } else if (w_mode == -1 && systime >= file_atime) {
         *mode = WR_FILE_EXPIRED;
     }
     return CM_SUCCESS;
