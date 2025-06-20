@@ -222,7 +222,6 @@ status_t wr_alloc_conn(wr_conn_t **conn);
 void wr_free_conn(wr_conn_t *conn);
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
 void wr_disconnect(wr_conn_t *conn);
-status_t wr_init_ssl();
 
 // NOTE:just for wrcmd because not support many threads in one process.
 status_t wr_connect_ex(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);

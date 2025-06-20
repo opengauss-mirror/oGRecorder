@@ -172,26 +172,6 @@ status_t wr_check_device_path(const char *path)
     return wr_check_path_is_valid(path + 1, (WR_FILE_PATH_MAX_LENGTH - 1));
 }
 
-status_t wr_check_expire_time(const char *file_name, const char *new_time)
-{
-    int64 offset, size;
-    time_t cur_atime;
-    wr_file_status_t mode;
-    if (wr_filesystem_stat(file_name, &offset, &size, &mode, &cur_atime) != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS] Failed to get current file %s expire time.", file_name);
-        return CM_ERROR;
-    }
-
-    struct tm set_info;
-    strptime(new_time, "%Y-%m-%d %H:%M:%S", &set_info);
-    time_t set_time = mktime(&set_info);
-    if (set_time <= cur_atime) {
-        LOG_RUN_ERR("[FS] New expire time should be after current expire time. File %s current expire time: %s",
-            file_name, ctime(&cur_atime));
-    }
-    return CM_SUCCESS;
-}
-
 status_t wr_check_path_both(const char *path)
 {
     if (path == NULL || strlen(path) == 0) {

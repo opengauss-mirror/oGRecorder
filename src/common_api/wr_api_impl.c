@@ -237,6 +237,10 @@ static status_t wr_set_server_info(wr_conn_t *conn, char *home, uint32_t objecti
     status_t status = wr_init_client(max_open_file, home);
     WR_RETURN_IFERR3(status, LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client init failed."), wr_disconnect(conn));
 
+    status = cli_init_ssl(&conn->cli_ssl_inst);
+    WR_RETURN_IFERR3(status,
+                     LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client init ssl failed."), wr_disconnect(conn));
+
     status = wr_set_session_id(conn, objectid);
     WR_RETURN_IFERR3(status, LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client failed to initialize session."),
         wr_disconnect(conn));
@@ -280,7 +284,7 @@ status_t wr_cli_handshake(wr_conn_t *conn, uint32_t max_open_file)
 
 status_t wr_cli_ssl_connect(wr_conn_t *conn)
 {
-    status_t status = cli_ssl_connect(&conn->pipe);
+    status_t status = cli_ssl_connect(&conn->cli_ssl_inst, &conn->pipe);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to do cli ssl certification.");
         return CM_ERROR;
@@ -699,7 +703,6 @@ status_t wr_postpone_file_time_impl(wr_conn_t *conn, const char *file_name, cons
 {
     LOG_DEBUG_INF("wr extend file expired time, file name: %s, add time: %s", file_name, time);
     WR_RETURN_IF_ERROR(wr_check_device_path(file_name));
-    WR_RETURN_IF_ERROR(wr_check_expire_time(file_name, time));
     wr_postpone_file_time_t send_info;
     send_info.file_name = file_name;
     send_info.file_atime = time;
@@ -1198,6 +1201,11 @@ static status_t wr_init_shm(wr_env_t *wr_env, char *home)
         return wr_init_err_proc(wr_env, CM_FALSE, CM_FALSE, "load config failed", status);
     }
 
+    status = wr_load_cli_ssl(&wr_env->inst_cfg);
+    if (status != CM_SUCCESS) {
+        return wr_init_err_proc(wr_env, CM_FALSE, CM_FALSE, "load client ssl config failed", status);
+    }
+
     uint32_t shm_key = (uint32_t)(wr_env->inst_cfg.params.shm_key << (uint8)WR_MAX_SHM_KEY_BITS) +
                      (uint32_t)wr_env->inst_cfg.params.inst_id;
     status = cm_init_shm(shm_key);
@@ -1210,16 +1218,6 @@ static status_t wr_init_shm(wr_env_t *wr_env, char *home)
         return wr_init_err_proc(wr_env, CM_FALSE, CM_TRUE, "Failed to attach shared area", status);
     }
     return CM_SUCCESS;
-}
-
-status_t wr_init_ssl()
-{
-    status_t status = wr_load_cli_ssl();
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to load client ssl config.");
-        return CM_ERROR;
-    }
-    return cli_init_ssl();
 }
 
 static status_t wr_init_files(wr_env_t *wr_env, uint32_t max_open_files)

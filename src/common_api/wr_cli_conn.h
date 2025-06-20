@@ -33,6 +33,7 @@
 #include "wr_thv.h"
 #include "wr_protocol.h"
 #include "wr_session.h"
+#include "ssl_func.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,6 +47,7 @@ extern int32_t g_wr_tcp_conn_timeout;
 typedef struct st_wr_conn {
     wr_packet_t pack;  // for sending
     cs_pipe_t pipe;
+    ssl_instance_t cli_ssl_inst;
     void *cli_vg_handles;
     bool32 flag;
     void *session;

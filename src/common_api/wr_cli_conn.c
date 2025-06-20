@@ -133,12 +133,6 @@ static status_t wr_conn_sync(wr_conn_opt_t *options, wr_conn_t *conn, const char
     return ret;
 }
 
-status_t wr_init_cli_ssl()
-{
-    CM_RETURN_IFERR(wr_init_ssl());
-    return CM_SUCCESS;
-}
-
 status_t wr_conn_create(pointer_t *result, const char *addr)
 {
     wr_conn_t *conn = (wr_conn_t *)cm_malloc(sizeof(wr_conn_t));
@@ -151,11 +145,6 @@ status_t wr_conn_create(pointer_t *result, const char *addr)
 
     // init packet
     wr_init_packet(&conn->pack, conn->pipe.options);
-    // init client ssl params
-    if (wr_init_cli_ssl() != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to init client ssl params.");
-        return CM_ERROR;
-    }
     wr_conn_opt_t *options = NULL;
     (void)cm_get_thv(GLOBAL_THV_OBJ1, CM_FALSE, (pointer_t *)&options, addr);
     if (wr_conn_sync(options, conn, addr) != CM_SUCCESS) {
