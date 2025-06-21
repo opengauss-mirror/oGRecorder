@@ -38,24 +38,27 @@
 extern "C" {
 #endif
 
-errno_t iret_snprintf = 0;
-
-#define WR_FS_GET_PATH(name) ({ \
-    char _path[WR_FILE_PATH_MAX_LENGTH]; \
-    iret_snprintf = snprintf_s(_path, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1, \
-                               "%s/%s", g_inst_cfg->params.data_file_path, (name)); \
-    WR_SECUREC_SS_RETURN_IF_ERROR(iret_snprintf, CM_ERROR); \
-    _path; \
-})
+static void wr_get_fs_path(const char *name, char *buf, size_t buf_size)
+{
+    int ret = snprintf(buf, buf_size, "%s/%s", g_inst_cfg->params.data_file_path, name);
+    if (ret < 0 || (size_t)ret >= buf_size) {
+        LOG_RUN_ERR("[FS] wr_get_fs_path snprintf failed or truncated: %d", ret);
+        if (buf_size > 0) {
+            buf[0] = '\0';
+        }
+    }
+}
 
 status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
-    if (access(WR_FS_GET_PATH(name), F_OK) == 0) {
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(name, path, sizeof(path));
+    if (access(path, F_OK) == 0) {
         LOG_RUN_ERR("[FS] Directory already exists: %s", name);
         WR_THROW_ERROR(ERR_WR_DIR_CREATE_DUPLICATED, name);
         return CM_ERROR;
     }
 
-    if (mkdir(WR_FS_GET_PATH(name), mode) != 0) {
+    if (mkdir(path, mode) != 0) {
         LOG_RUN_ERR("[FS] Failed to create directory: %s", name);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
@@ -64,8 +67,10 @@ status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
 }
 
 status_t wr_filesystem_rmdir(const char *name, uint64 flag) {
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(name, path, sizeof(path));
     if (flag != 0) {
-        DIR *dir = opendir(WR_FS_GET_PATH(name));
+        DIR *dir = opendir(path);
         if (!dir) {
             LOG_RUN_ERR("[FS] Failed to open directory: %s", name);
             WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
@@ -73,21 +78,21 @@ status_t wr_filesystem_rmdir(const char *name, uint64 flag) {
         }
 
         struct dirent *entry;
-        char path[WR_FILE_PATH_MAX_LENGTH];
-        int32_t ret = 0;
+        char subpath[WR_FILE_PATH_MAX_LENGTH];
 
         while ((entry = readdir(dir)) != NULL) {
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
 
-            ret = snprintf_s(path, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1, "%s/%s", WR_FS_GET_PATH(name), entry->d_name);
+            int ret = snprintf_s(subpath, WR_FILE_PATH_MAX_LENGTH, WR_FILE_PATH_MAX_LENGTH - 1,
+                                 "%s/%s", path, entry->d_name);
             if (ret == -1) {
                 WR_THROW_ERROR(ERR_SYSTEM_CALL, ret);
                 return CM_ERROR;
             }
-            if (unlink(path) != 0) {
-                LOG_RUN_ERR("[FS] Failed to remove file: %s", path);
+            if (unlink(subpath) != 0) {
+                LOG_RUN_ERR("[FS] Failed to remove file: %s", subpath);
                 WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
                 closedir(dir);
                 return CM_ERROR;
@@ -97,7 +102,7 @@ status_t wr_filesystem_rmdir(const char *name, uint64 flag) {
         closedir(dir);
     }
 
-    if (rmdir(WR_FS_GET_PATH(name)) != 0) {
+    if (rmdir(path) != 0) {
         LOG_RUN_ERR("[FS] Failed to remove directory: %s", name);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
@@ -113,8 +118,9 @@ status_t wr_filesystem_opendir(const char *name, void **out_dir)
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-
-    DIR *dir = opendir(WR_FS_GET_PATH(name));
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(name, path, sizeof(path));
+    DIR *dir = opendir(path);
     if (!dir) {
         LOG_RUN_ERR("[FS] Failed to open directory: %s", name);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
@@ -144,7 +150,6 @@ status_t wr_filesystem_closedir(void *dir)
     return CM_SUCCESS;
 }
 
-
 #define WR_LOCK_MODE 0400
 #define WR_APPEND_MODE 0600
 status_t wr_filesystem_append(const char *name) {
@@ -153,10 +158,12 @@ status_t wr_filesystem_append(const char *name) {
         LOG_RUN_ERR("Failed to get file %s size.", name);
         return CM_ERROR;
     }
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(name, path, sizeof(path));
     // when file is null can be changed to append mode from lock mode or expired mode
-    if ((access(WR_FS_GET_PATH(name), W_OK) == -1) && (end_position == 0)) {
+    if ((access(path, W_OK) == -1) && (end_position == 0)) {
         LOG_RUN_INF("File %s can enter into append mode.", name);
-        if (chmod(WR_FS_GET_PATH(name), WR_APPEND_MODE) != CM_SUCCESS) {
+        if (chmod(path, WR_APPEND_MODE) != CM_SUCCESS) {
             return CM_ERROR;
         }
         return CM_SUCCESS;
@@ -165,20 +172,22 @@ status_t wr_filesystem_append(const char *name) {
 }
 
 status_t wr_filesystem_touch(const char *name) {
-    if (access(WR_FS_GET_PATH(name), F_OK) == 0) {
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(name, path, sizeof(path));
+    if (access(path, F_OK) == 0) {
         LOG_RUN_ERR("[FS] File already exists: %s", name);
         WR_THROW_ERROR(ERR_WR_DIR_CREATE_DUPLICATED, name);
         return CM_ERROR;
     }
 
-    FILE *file = fopen(WR_FS_GET_PATH(name), "w");
+    FILE *file = fopen(path, "w");
     if (!file) {
         LOG_RUN_ERR("[FS] Failed to create file: %s", name);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
     (void)fclose(file);
-    if (chmod(WR_FS_GET_PATH(name), WR_LOCK_MODE) != CM_SUCCESS) {
+    if (chmod(path, WR_LOCK_MODE) != CM_SUCCESS) {
         LOG_RUN_ERR("[FS] File %d enter lock mode failed", WR_LOCK_MODE);
         return CM_ERROR;
     }
@@ -186,7 +195,9 @@ status_t wr_filesystem_touch(const char *name) {
 }
 
 status_t wr_filesystem_rm(const char *name) {
-    if (unlink(WR_FS_GET_PATH(name)) != 0) {
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(name, path, sizeof(path));
+    if (unlink(path) != 0) {
         LOG_RUN_ERR("[FS] Failed to remove file: %s", name);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
@@ -194,24 +205,34 @@ status_t wr_filesystem_rm(const char *name) {
     return CM_SUCCESS;
 }
 
-int64 wr_filesystem_pwrite(int handle, int64 offset, int64 size, const char *buf) {
-    int64 res = pwrite(handle, buf, size, offset);
-    if (res == -1) {
+status_t wr_filesystem_pwrite(int handle, int64 offset, int64 size, const char *buf, int64 *rel_size) {
+    if (rel_size == NULL) {
+        LOG_RUN_ERR("[FS] Invalid rel_size pointer for write operation");
+        WR_THROW_ERROR(ERR_WR_INVALID_PARAM);
+        return CM_ERROR;
+    }
+    *rel_size = pwrite(handle, buf, size, offset);
+    if (*rel_size == -1) {
         LOG_RUN_ERR("[FS] Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-    return res;
+    return CM_SUCCESS;
 }
 
-int64 wr_filesystem_pread(int handle, int64 offset, int64 size, char *buf) {
-    int64 res = pread(handle, buf, size, offset);
-    if (res == -1) {
+status_t wr_filesystem_pread(int handle, int64 offset, int64 size, char *buf, int64 *rel_size) {
+    if (rel_size == NULL) {
+        LOG_RUN_ERR("[FS] Invalid rel_size pointer for read operation");
+        WR_THROW_ERROR(ERR_WR_INVALID_PARAM);
+        return CM_ERROR;
+    }
+    *rel_size = pread(handle, buf, size, offset);
+    if (*rel_size == -1) {
         LOG_RUN_ERR("[FS] Failed to read from handle: %d, offset: %lld, size: %lld", handle, offset, size);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-    return res;
+    return CM_SUCCESS;
 }
 
 status_t wr_filesystem_query_file_num(void *dir, uint32_t *file_num) {
@@ -262,9 +283,10 @@ status_t wr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
     if (!file_path || !end_position) {
         LOG_RUN_ERR("[FS] Invalid parameters: file_path or end_position is NULL");
     }
-
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(file_path, path, sizeof(path));
     struct stat file_stat;
-    if (stat(WR_FS_GET_PATH(file_path), &file_stat) != 0) {
+    if (stat(path, &file_stat) != 0) {
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         LOG_RUN_ERR("[FS] Failed to stat file: %s", file_path);
         return CM_ERROR;
@@ -279,7 +301,9 @@ status_t wr_filesystem_open(const char *file_path, int flag, int *fd) {
         LOG_RUN_ERR("[FS] Failed to change file %s to append mode", file_path);
         return CM_ERROR;
     }
-    *fd = open(WR_FS_GET_PATH(file_path), flag | O_APPEND, 0);
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(file_path, path, sizeof(path));
+    *fd = open(path, flag | O_APPEND, 0);
     if (*fd == -1) {
         LOG_RUN_ERR("[FS] Failed to open file: %s", file_path);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
@@ -341,9 +365,10 @@ status_t wr_filesystem_mode(char *file_path, time_t file_atime, wr_file_status_t
 }
 
 status_t wr_filesystem_stat(const char *name, int64 *offset, int64 *size, wr_file_status_t *mode, time_t *atime) {
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(name, path, sizeof(path));
     struct stat file_stat;
-    char *file_path = WR_FS_GET_PATH(name);
-    if (stat(file_path, &file_stat) != 0) {
+    if (stat(path, &file_stat) != 0) {
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         LOG_RUN_ERR("[FS] Failed to stat file: %s", name);
         return CM_ERROR;
@@ -351,7 +376,7 @@ status_t wr_filesystem_stat(const char *name, int64 *offset, int64 *size, wr_fil
     *offset = file_stat.st_size;
     *size = file_stat.st_size;
     *atime = file_stat.st_atime;
-    status_t status = wr_filesystem_mode(file_path, file_stat.st_atime, mode);
+    status_t status = wr_filesystem_mode(path, file_stat.st_atime, mode);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to get file %s mode", name);
         return CM_ERROR;
@@ -361,12 +386,14 @@ status_t wr_filesystem_stat(const char *name, int64 *offset, int64 *size, wr_fil
 
 status_t wr_filesystem_postpone(const char *file_path, const char *time)
 {
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(file_path, path, sizeof(path));
     status_t status;
     struct tm time_info;
     strptime(time, "%Y-%m-%d %H:%M:%S", &time_info);
     time_t new_time = mktime(&time_info);
     struct utimbuf new_utimes = {new_time, new_time};
-    status = utime(WR_FS_GET_PATH(file_path), &new_utimes);
+    status = utime(path, &new_utimes);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("[FS] Failed to extend file %s expired time", file_path);
         return CM_ERROR;
@@ -377,20 +404,22 @@ status_t wr_filesystem_postpone(const char *file_path, const char *time)
 status_t wr_filesystem_get_systime(time_t *sys_time)
 {
     const char *test_time = "test_time";
-    FILE *file = fopen(WR_FS_GET_PATH(test_time), "w");
+    char path[WR_FILE_PATH_MAX_LENGTH];
+    wr_get_fs_path(test_time, path, sizeof(path));
+    FILE *file = fopen(path, "w");
     if (!file) {
         LOG_RUN_ERR("[FS] Failed to create file: %s", test_time);
         return CM_ERROR;
     }
     struct stat buf;
-    if (stat(WR_FS_GET_PATH(test_time), &buf) != CM_SUCCESS) {
+    if (stat(path, &buf) != CM_SUCCESS) {
         LOG_RUN_ERR("[FS] Failed to get file %s time", test_time);
         fclose(file);
         return CM_ERROR;
     }
     *sys_time = buf.st_mtime;
     fclose(file);
-    unlink(WR_FS_GET_PATH(test_time));
+    unlink(path);
     return CM_SUCCESS;
 }
 

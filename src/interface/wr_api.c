@@ -870,6 +870,7 @@ int wr_init(const wr_param_t param)
 
 int wr_exit(void)
 {
+    CM_FREE_PTR(cm_log_param_instance()->log_compress_buf);
     return WR_SUCCESS;
 }
 
