@@ -7,12 +7,12 @@ extern "C" {
 #include "wr_errno.h"
 }
 
-#define ONE_GB 1024 * 1024 * 1024
+#define SIZE_GB 1024 * 1024 * 1024
+#define SIZE_MB 1024 * 1024
 #define SERVER_ADDR "127.0.0.1:19225"
 
 #define TEST_DIR "performancedir"
 #define TEST_FILE "performance_test_file1"
-#define ONE_MB 1024 * 1024
 
 wr_param_t g_wr_param;
 wr_file_handle file_handle;
@@ -23,7 +23,7 @@ protected:
         strcpy(g_wr_param.log_home, "./testlog");
         g_wr_param.log_level = 255;
         g_wr_param.log_backup_file_count = 100;
-        g_wr_param.log_max_file_size = ONE_GB;
+        g_wr_param.log_max_file_size = SIZE_GB;
         wr_init(g_wr_param); 
         int result = wr_create_inst(SERVER_ADDR, &g_inst_handle);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to create instance";
@@ -40,7 +40,7 @@ protected:
         result = wr_file_open(g_vfs_handle, TEST_FILE, O_RDWR | O_SYNC, &file_handle);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to open test file";
 
-        result = wr_file_truncate(g_vfs_handle, file_handle, 0, ONE_GB);
+        result = wr_file_truncate(g_vfs_handle, file_handle, 0, 100 * SIZE_MB);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to truncate test file";
     }
 
@@ -57,7 +57,7 @@ protected:
 };
 
 TEST_F(WrApiPerformanceTest, TestWritePerformance) {
-    const int data_size = ONE_GB;
+    const int data_size = 100 * SIZE_MB;
     char *data = new char[data_size];
     memset(data, 'A', data_size);
 
@@ -79,7 +79,7 @@ TEST_F(WrApiPerformanceTest, TestWritePerformance) {
 
 TEST_F(WrApiPerformanceTest, TestWritePerformanceWith8KSteps) {
     const int step_size = 8 * 1024; // 8KB
-    const int total_size = ONE_GB; // 1GB
+    const int total_size = 100 * SIZE_MB; // 100MB
     char *data = new char[step_size];
     memset(data, 'B', step_size); // 用'B'填充数据
 

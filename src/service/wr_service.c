@@ -331,7 +331,7 @@ static status_t wr_process_query_file_num(wr_session_t *session)
 static status_t wr_process_query_file_info(wr_session_t *session)
 {
     uint32_t file_count = 0;
-    bool is_continue = CM_FALSE;
+    bool32 is_continue = CM_FALSE;
     wr_file_item_t file_items[WR_MAX_FILE_NUM];
     void *dir = NULL;
 
@@ -503,6 +503,7 @@ static status_t wr_process_write_file(wr_session_t *session)
 {
     int64 offset = 0;
     int64 file_size = 0;
+    int64 rel_size = 0;
     int handle = 0;
     char *buf = NULL;
     unsigned char cli_hash[SHA256_DIGEST_LENGTH];
@@ -542,8 +543,9 @@ static status_t wr_process_write_file(wr_session_t *session)
         return CM_ERROR;
     }
 
-    int64 res = wr_filesystem_pwrite(handle, offset, file_size, buf);
-    if (res == -1) {
+    
+    status = wr_filesystem_pwrite(handle, offset, file_size, buf, &rel_size);
+    if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, file_size);
         return CM_ERROR;
     }
@@ -553,22 +555,27 @@ static status_t wr_process_write_file(wr_session_t *session)
         return CM_ERROR;
     }
 
-    WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, res));
+    WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, rel_size));
     return CM_SUCCESS;
 }
 
 static status_t wr_process_read_file(wr_session_t *session)
 {
-    int handle;
-    int64 offset;
-    int64 size;
+    int handle = 0;
+    int64 offset = 0;
+    int64 size = 0;
+    int64 rel_size = 0;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &offset));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &handle));
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &size));
 
-    // Allocate one extra byte for the null terminator
+    if (size <= 0) {
+        LOG_RUN_ERR("Invalid read size: %lld", size);
+        return CM_ERROR;
+    }
+
     char *buf = (char *)malloc(size);
     if (buf == NULL) {
         LOG_RUN_ERR("Failed to malloc buffer for read file.");
@@ -576,23 +583,17 @@ static status_t wr_process_read_file(wr_session_t *session)
     }
     memset(buf, 0, size);
 
-    // Read the file content into the buffer
-    int64 res = wr_filesystem_pread(handle, offset, size, buf);
-    if (res == -1) {
+    status_t res = wr_filesystem_pread(handle, offset, size, buf, &rel_size);
+    if (res == CM_ERROR) {
+        free(buf);
         LOG_RUN_ERR("Failed to read from handle: %d, offset: %lld, size: %lld", handle, offset, size);
         return CM_ERROR;
     }
 
-    // Convert the buffer to a text_t structure
-    text_t data;
-    data.str = buf;
-    data.len = res;
-
-    // Send the data
+    text_t data = { .str = buf, .len = rel_size };
     WR_RETURN_IF_ERROR(wr_put_text(&session->send_pack, &data));
 
     free(buf);
-
     return CM_SUCCESS;
 }
 

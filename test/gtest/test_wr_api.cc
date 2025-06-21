@@ -226,6 +226,10 @@ TEST_F(WrApiTest, TestWrVfsUnmount) {
     EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle), WR_SUCCESS);
 }
 
+TEST_F(WrApiTest, TestWrExit) {
+    EXPECT_EQ(wr_exit(), WR_SUCCESS);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();

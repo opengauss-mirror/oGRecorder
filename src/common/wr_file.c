@@ -303,7 +303,6 @@ static status_t wr_exist_item_core(
                                "%s/%s", g_inst_cfg->params.data_file_path, (dir_path));
     WR_SECUREC_SS_RETURN_IF_ERROR(err, CM_ERROR);
 
-
     if (lstat(path, &st) != 0) {
         LOG_RUN_ERR("failed to get stat for path %s, errno %d.\n", path, errno);
         return CM_ERROR;
