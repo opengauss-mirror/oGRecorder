@@ -6,6 +6,7 @@ conf_file=$WR_HOME/cfg/wr_cli_inst.ini
 cli_ca=$certs_path/cacert.pem
 cli_key=$certs_path/client.key
 cli_cert=$certs_path/client.crt
+cli_crl=$certs_path/client.crl
 last_day=2
 
 generate_client_certs()
@@ -30,6 +31,7 @@ create_client_conf()
 CLI_SSL_CA=$cli_ca
 CLI_SSL_KEY=$cli_key
 CLI_SSL_CERT=$cli_cert
+CLI_SSL_CRL=$cli_crl
 EOF
 }
 

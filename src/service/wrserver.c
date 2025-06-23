@@ -40,6 +40,7 @@
 #include "wr_meta_buf.h"
 #include "wr_syn_meta.h"
 #include "wr_thv.h"
+#include "ssl_func.h"
 
 #ifndef _NSIG
 #define MAX_SIG_NUM 32
@@ -89,6 +90,7 @@ static void wr_clean_server()
 {
     wr_close_thread(&g_wr_instance);
     wr_stop_mes();
+    ser_ssl_uninit();
     wr_uninit_cm(&g_wr_instance);
     wr_free_log_ctrl();
     if (g_wr_instance.lock_fd != CM_INVALID_INT32) {

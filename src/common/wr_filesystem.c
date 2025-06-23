@@ -394,6 +394,25 @@ status_t wr_filesystem_stat(const char *name, int64 *offset, int64 *size, wr_fil
     return CM_SUCCESS;
 }
 
+status_t wr_filesystem_check_postpone_time(const char *file_name, time_t new_time)
+{
+    int64 offset;
+    int64 size;
+    time_t atime;
+    wr_file_status_t mode;
+    if (wr_filesystem_stat(file_name, &offset, &size, &mode, &atime) != CM_SUCCESS) {
+        LOG_RUN_ERR("[FS] Failed to get current file %s expire time.", file_name);
+        return CM_ERROR;
+    }
+
+    if (atime >= new_time) {
+        LOG_RUN_ERR("[FS] new expire time should be later than current expire time, file %s current expire time is: %s",
+            file_name, ctime(&atime));
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
 status_t wr_filesystem_postpone(const char *file_path, const char *time)
 {
     char path[WR_FILE_PATH_MAX_LENGTH];
@@ -402,6 +421,11 @@ status_t wr_filesystem_postpone(const char *file_path, const char *time)
     struct tm time_info;
     strptime(time, "%Y-%m-%d %H:%M:%S", &time_info);
     time_t new_time = mktime(&time_info);
+    if (wr_filesystem_check_postpone_time(file_path, new_time) != CM_SUCCESS) {
+        LOG_RUN_ERR("[FS] Failed to change file %s expired time", file_path);
+        return CM_ERROR;
+    }
+
     struct utimbuf new_utimes = {new_time, new_time};
     status = utime(path, &new_utimes);
     if (status != CM_SUCCESS) {

@@ -6,6 +6,7 @@ conf_file=$WR_HOME/cfg/wr_ser_inst.ini
 ser_ca=$certs_path/cacert.pem
 ser_key=$certs_path/server.key
 ser_cert=$certs_path/server.crt
+ser_crl=$certs_path/server.crl
 last_day=2
 
 prepare_certs_path()
@@ -28,7 +29,6 @@ generate_root_cert()
     export OPENSSL_CONF=$certs_path/openssl.cnf;echo password | openssl genrsa -aes256 -passout stdin -out demoCA/private/cakey.pem 2048
     export OPENSSL_CONF=$certs_path/openssl.cnf;echo password | openssl req -new -x509 -passin stdin -days 10 -key demoCA/private/cakey.pem -out demoCA/cacert.pem -subj "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA"
     cp demoCA/cacert.pem .
-    #chmod 400 cacert.pem
 }
 
 create_server_certs()
@@ -42,6 +42,7 @@ create_server_certs()
     export OPENSSL_CONF=$certs_path/openssl.cnf;echo password | openssl x509 -req -days 10 -in server.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin stdin -CAcreateserial -out server.crt -extfile server/openssl.cnf
     export OPENSSL_CONF=$certs_path/openssl.cnf;echo password | openssl rsa -in server.key -out server.key -passin stdin
     chmod 400 server.*
+    echo '00' >./demoCA/crlnumber
 }
 
 create_server_conf()
@@ -53,6 +54,7 @@ create_server_conf()
 SER_SSL_CA=$ser_ca
 SER_SSL_KEY=$ser_key
 SER_SSL_CERT=$ser_cert
+SER_SSL_CRL=$ser_crl
 EOF
 }
 

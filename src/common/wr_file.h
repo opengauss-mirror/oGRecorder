@@ -107,7 +107,6 @@ status_t wr_check_path(const char *path);
 status_t wr_check_volume_path(const char *path);
 status_t wr_check_device_path(const char *path);
 status_t wr_check_path_both(const char *path);
-status_t wr_check_expire_time(const char *file_name, const char *new_time);
 
 /* AU is usually NOT serial/continuous within a single file, judged from R/W file behaviors */
 status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, uint64 ftid, bool32 *is_open);
