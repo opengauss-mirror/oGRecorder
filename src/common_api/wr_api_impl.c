@@ -694,6 +694,7 @@ status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, wr_
 {
     LOG_DEBUG_INF("wr begin to open file, file path:%s, flag:%d", file_path, flag);
     WR_RETURN_IF_ERROR(wr_check_device_path(file_path));
+    WR_RETURN_IF_ERROR(wr_check_file_flag(flag));
     WR_RETURN_IF_ERROR(wr_open_file_on_server(conn, file_path, flag, file_handle));
     LOG_DEBUG_INF("wr open file successfully, file_path:%s, flag:%d, handle:%d", file_path, flag, file_handle->fd);
     return CM_SUCCESS;
@@ -803,6 +804,15 @@ status_t wr_check_file_exist(wr_conn_t *conn, const char *path, bool *is_exist)
         *is_exist = false;
     }
     *is_exist = true;
+    return CM_SUCCESS;
+}
+
+status_t wr_check_file_flag(int flag)
+{
+    if ((flag & O_CREAT) == O_CREAT || (flag & O_TRUNC) == O_TRUNC) {
+        WR_THROW_ERROR(ERR_WR_FILE_INVALID_FLAG);
+        return CM_ERROR;
+    }
     return CM_SUCCESS;
 }
 
