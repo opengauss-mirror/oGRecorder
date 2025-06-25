@@ -68,6 +68,7 @@ const char *g_wr_error_desc[WR_ERROR_COUNT] = {
     [ERR_WR_FILE_TYPE_MISMATCH] = "The type of directory link or file %s is not matched.",
     [ERR_WR_FILE_PATH_ILL] = "Path %s decode error %s",
     [ERR_WR_FILE_INVALID_SIZE] = "Invalid extend offset %lld, size %d.",
+    [ERR_WR_FILE_INVALID_FLAG] = "Invalid wr file flag, O_CREAT and O_TRUNC not supported.",
     [ERR_WR_DIR_REMOVE_NOT_EMPTY] = "The dir is not empty, can not remove.",
     [ERR_WR_DIR_CREATE_DUPLICATED] = "Make dir or Create file failed, %s has already existed",
     [ERR_WR_LINK_READ_NOT_LINK] = "The path %s is not a soft link.",

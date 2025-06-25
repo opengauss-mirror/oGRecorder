@@ -242,6 +242,7 @@ status_t wr_close_file_impl(wr_conn_t *conn, int handle, bool need_lock);
 status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_item_type_t *type);
 status_t wr_check_path_exist(wr_conn_t *conn, const char *path);
 status_t wr_check_file_exist(wr_conn_t *conn, const char *path, bool *is_exist);
+status_t wr_check_file_flag(int flag);
 int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin);
 status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst);
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType);
