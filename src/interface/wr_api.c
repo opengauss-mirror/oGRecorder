@@ -110,6 +110,8 @@ int wr_delete_inst(wr_instance_handle inst_handle)
 
     st_wr_instance_handle *hdl = (st_wr_instance_handle *)inst_handle;
     if (hdl->conn != NULL) {
+        wr_disconnect(hdl->conn);
+        cli_ssl_uninit(&hdl->conn->cli_ssl_inst);
         free(hdl->conn);
         hdl->conn = NULL;
     }
@@ -466,7 +468,7 @@ int wr_set_main_inst(const char *storageServerAddr)
         return (int)ret;
     }
 
-    ret = wr_set_main_inst_on_server(hdl.conn);
+    ret = wr_set_main_inst_impl(hdl.conn);
     return (int)ret;
 }
 

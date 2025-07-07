@@ -357,9 +357,9 @@ status_t wr_filesystem_truncate(int fd, int64 length) {
 
 status_t wr_filesystem_mode(char *file_path, time_t file_atime, wr_file_status_t *mode) {
     int w_mode = access(file_path, W_OK);
-    time_t systime;
-    if (wr_filesystem_get_systime(&systime) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to get worm system time.");
+    time_t systime = time(NULL);
+    if (systime == ((time_t)-1)) {
+        LOG_RUN_ERR("Failed to get system time.");
         return CM_ERROR;
     }
     if (w_mode == 0 && systime >= file_atime) {

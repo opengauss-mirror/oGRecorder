@@ -1383,7 +1383,7 @@ status_t wr_get_time_stat_on_server(wr_conn_t *conn, wr_stat_item_t *time_stat, 
     return CM_SUCCESS;
 }
 
-status_t wr_set_main_inst_on_server(wr_conn_t *conn)
+status_t wr_set_main_inst_impl(wr_conn_t *conn)
 {
     return wr_msg_interact(conn, WR_CMD_SET_MAIN_INST, NULL, NULL);
 }
