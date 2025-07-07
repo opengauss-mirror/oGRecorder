@@ -47,9 +47,8 @@
 #include "wr_api_impl.h"
 #include "wrcmd_inq.h"
 #include "wrcmd_encrypt.h"
-#include "wrcmd_conn_opt.h"
-#include "wrcmd_interactive.h"
 #include "wr_cli_conn.h"
+#include "wr_args_parse.h"
 #ifndef WIN32
 #include "config.h"
 #endif
@@ -61,108 +60,38 @@
 // cmd format : cmd subcmd [-f val]
 #define CMD_COMMAND_INJECTION_COUNT 22
 #define WR_DEFAULT_MEASURE "B"
-#define WR_SUBSTR_UDS_PATH "UDS:"
 #define WR_DEFAULT_VG_TYPE 't' /* show vg information in table format by default */
+
+#define VERSION_SHORT       ("-v")
+#define VERSION_LONG        ("--version")
+#define ALL_SHORT           ("-a")
+#define ALL_LONG            ("--all")
+#define HELP_SHORT          ("h")
+#define HELP_LONG           ("--help")
 
 typedef struct st_wr_print_help_t {
     char fmt;
     uint32_t bytes;
 } wr_print_help_t;
 
-// add uni-check function after here
-// ------------------------
+wr_conn_t* g_cmd_conn= NULL;  // global connection for wrCmd
 
-static status_t cmd_check_uds(const char *uds)
+wr_conn_t *wr_get_connection_for_cmd()
 {
-    const char *uds_prefix = "UDS:";
-    /* if uds path only has "UDS:", it is invalid */
-    if (strlen(uds) <= strlen(uds_prefix) || memcmp(uds, uds_prefix, strlen(uds_prefix)) != 0) {
-        WR_PRINT_ERROR("uds name should start with %s, also it should not be empty.\n", uds_prefix);
-        return CM_ERROR;
+    wr_config_t *inst_cfg = wr_get_g_inst_cfg();
+    char server_path[CM_MAX_IP_LEN] = {0};
+    errno_t err = sprintf_s(server_path, CM_MAX_IP_LEN, "%s:%u",
+                            inst_cfg->params.listen_addr.host, inst_cfg->params.listen_addr.port);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        WR_PRINT_ERROR("Failed to get server_path.\n");
+        return NULL;
     }
-    return wr_check_path(uds + strlen(uds_prefix));
-}
-
-static status_t wr_fetch_uds_path(char *server_path, char *path, char **file)
-{
-    char *pos = strrchr(server_path, '/');
-    if (pos == NULL) {
-        *file = server_path;
-        path[0] = '.';
-        path[1] = '\0';
-        return CM_SUCCESS;
-    }
-
-    if (pos[1] == 0x00) {
-        WR_PRINT_ERROR("the format of UDS is wrong.\n");
-        return CM_ERROR;
-    }
-
-    if (pos == server_path) {
-        *file = (char *)(server_path + 1);
-        path[0] = '/';
-        path[1] = '\0';
-    } else {
-        *file = pos;
-        errno_t errcode = memcpy_sp(path, (size_t)WR_MAX_PATH_BUFFER_SIZE, server_path, (size_t)(pos - server_path));
-        if (SECUREC_UNLIKELY(errcode != EOK)) {
-            CM_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
-            return CM_ERROR;
-        }
-        path[(int)(pos - server_path)] = '\0';
-    }
-    return CM_SUCCESS;
-}
-
-static status_t cmd_check_convert_uds_home(const char *input_args, void **convert_result, int *convert_size)
-{
-    const char *server_path = (const char *)(input_args + strlen(WR_SUBSTR_UDS_PATH));
-    char path[WR_MAX_PATH_BUFFER_SIZE];
-    char *file = NULL;
-    status_t status = wr_fetch_uds_path((char *)server_path, (char *)path, (char **)&file);
+    status_t status = wr_enter_api(&g_cmd_conn, server_path);
     if (status != CM_SUCCESS) {
-        WR_PRINT_ERROR("Fetch uds path failed.\n");
-        return CM_ERROR;
+        WR_PRINT_ERROR("Failed to get conn.\n");
+        return NULL;
     }
-
-    status = cmd_realpath_home(path, (char **)convert_result, convert_size);
-    if (status != CM_SUCCESS) {
-        WR_PRINT_ERROR("home realpath failed, home: %s.\n", input_args);
-        return status;
-    }
-
-    errno_t errcode = strcat_sp((char *)*convert_result, CM_FILE_NAME_BUFFER_SIZE, file);
-    if (SECUREC_UNLIKELY(errcode != EOK)) {
-        CM_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
-        free(*convert_result);
-        *convert_result = NULL;
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
-
-static status_t cmd_check_inst_id(const char *inst_str)
-{
-    uint32_t inst_id;
-    status_t ret = cm_str2uint32(inst_str, &inst_id);
-    if (ret != CM_SUCCESS) {
-        WR_PRINT_ERROR("The value of inst_id is invalid.\n");
-        return CM_ERROR;
-    }
-    if (inst_id < WR_MIN_INST_ID || inst_id >= WR_MAX_INST_ID) {
-        WR_PRINT_ERROR("The value of inst_id should be in [%u, %u).\n", WR_MIN_INST_ID, WR_MAX_INST_ID);
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
-
-static status_t cmd_check_inq_type(const char *inq_type)
-{
-    if (strcmp(inq_type, "lun") != 0 && strcmp(inq_type, "reg") != 0) {
-        WR_PRINT_ERROR("The show type should be [lun|reg].\n");
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
+    return g_cmd_conn;
 }
 
 static status_t cmd_check_cfg_name(const char *name)
@@ -212,12 +141,6 @@ static inline void help_param_wrhome(void)
     (void)printf("-D/--WR_HOME <WR_HOME>, [optional], the run path of wrserver, default value is $WR_HOME\n");
 }
 
-static inline void help_param_uds(void)
-{
-    (void)printf("-U/--UDS <UDS:socket_domain>, [optional], the unix socket path of wrserver, "
-                 "default value is UDS:$WR_HOME/.wr_unix_d_socket\n");
-}
-
 double wr_convert_size(double size, const char *measure)
 {
     double result = size;
@@ -240,10 +163,7 @@ double wr_convert_size(double size, const char *measure)
     return result;
 }
 
-static wr_args_t cmd_ts_args[] = {
-    {'U', "UDS", CM_FALSE, CM_TRUE, cmd_check_uds, cmd_check_convert_uds_home, cmd_clean_check_convert, 0, NULL, NULL,
-        0},
-};
+static wr_args_t cmd_ts_args[] = {};
 
 static wr_args_set_t cmd_ts_args_set = {
     cmd_ts_args,
@@ -258,14 +178,12 @@ static void ts_help(const char *prog_name, int print_flag)
     if (print_flag == WR_HELP_SIMPLE) {
         return;
     }
-    help_param_uds();
 }
 
 static status_t ts_proc(void)
 {
     status_t status = CM_SUCCESS;
-    const char *input_args = cmd_ts_args[WR_ARG_IDX_0].input_args;
-    wr_conn_t *conn = wr_get_connection_opt(input_args);
+    wr_conn_t *conn = wr_get_connection_for_cmd();
     if (conn == NULL) {
         return CM_ERROR;
     }
@@ -288,61 +206,6 @@ static status_t ts_proc(void)
             time_stat[i].max_single_time);
     }
     (void)printf("+------------------------+-----------+-----------------+---------------+-----------------\n");
-    return CM_SUCCESS;
-}
-
-static wr_args_t cmd_inq_args[] = {
-    {'t', "inq_type", CM_TRUE, CM_TRUE, cmd_check_inq_type, NULL, NULL, 0, NULL, NULL, 0},
-    {'D', "WR_HOME", CM_FALSE, CM_TRUE, cmd_check_wr_home, cmd_check_convert_wr_home, cmd_clean_check_convert, 0,
-        NULL, NULL, 0},
-};
-static wr_args_set_t cmd_inq_args_set = {
-    cmd_inq_args,
-    sizeof(cmd_inq_args) / sizeof(wr_args_t),
-    NULL,
-};
-
-static void inq_help(const char *prog_name, int print_flag)
-{
-    (void)printf("\nUsage:%s inq <-t inq_type> [-D WR_HOME]\n", prog_name);
-    (void)printf("[raid command] inquiry LUN information or reservations\n");
-    if (print_flag == WR_HELP_SIMPLE) {
-        return;
-    }
-    (void)printf("-t/--type <inq_type>, <required>, the type need to inquiry, values [lun|reg]"
-                 "lun :inquiry LUN information, reg:inquiry reservations\n");
-    help_param_wrhome();
-}
-
-static status_t inq_proc(void)
-{
-    return CM_SUCCESS;
-}
-
-static wr_args_t cmd_inq_req_args[] = {
-    {'i', "inst_id", CM_TRUE, CM_TRUE, cmd_check_inst_id, NULL, NULL, 0, NULL, NULL, 0},
-    {'D', "WR_HOME", CM_FALSE, CM_TRUE, cmd_check_wr_home, cmd_check_convert_wr_home, cmd_clean_check_convert, 0,
-        NULL, NULL, 0},
-};
-static wr_args_set_t cmd_inq_req_args_set = {
-    cmd_inq_req_args,
-    sizeof(cmd_inq_req_args) / sizeof(wr_args_t),
-    NULL,
-};
-
-static void inq_reg_help(const char *prog_name, int print_flag)
-{
-    (void)printf("\nUsage:%s inq_reg <-i inst_id> [-D WR_HOME]\n", prog_name);
-    (void)printf("[raid command]check whether the node is registered\n");
-    if (print_flag == WR_HELP_SIMPLE) {
-        return;
-    }
-    (void)printf("-i/--inst_id <inst_id>, <required>, the id of the host need to reg\n");
-    help_param_wrhome();
-}
-
-static status_t inq_reg_proc(void)
-{
     return CM_SUCCESS;
 }
 
@@ -382,85 +245,6 @@ static status_t lscli_proc(void)
     return CM_SUCCESS;
 }
 
-static wr_args_t cmd_kickh_args[] = {
-    {'i', "inst_id", CM_TRUE, CM_TRUE, cmd_check_inst_id, NULL, NULL, 0, NULL, NULL, 0},
-    {'D', "WR_HOME", CM_FALSE, CM_TRUE, cmd_check_wr_home, cmd_check_convert_wr_home, cmd_clean_check_convert, 0,
-        NULL, NULL, 0},
-};
-static wr_args_set_t cmd_kickh_args_set = {
-    cmd_kickh_args,
-    sizeof(cmd_kickh_args) / sizeof(wr_args_t),
-    NULL,
-};
-
-static void kickh_help(const char *prog_name, int print_flag)
-{
-    (void)printf("\nUsage:%s kickh <-i inst_id> [-D WR_HOME]\n", prog_name);
-    (void)printf("[client command] kick off the host from the array\n");
-    if (print_flag == WR_HELP_SIMPLE) {
-        return;
-    }
-    (void)printf("-i/--inst_id <inst_id>, <required>, the id of the host need to kick off\n");
-    help_param_wrhome();
-}
-
-static status_t kickh_proc(void)
-{
-    return CM_SUCCESS;
-}
-
-static wr_args_t cmd_reghl_args[] = {
-    {'D', "WR_HOME", CM_FALSE, CM_TRUE, cmd_check_wr_home, cmd_check_convert_wr_home, cmd_clean_check_convert, 0,
-        NULL, NULL, 0},
-};
-static wr_args_set_t cmd_reghl_args_set = {
-    cmd_reghl_args,
-    sizeof(cmd_reghl_args) / sizeof(wr_args_t),
-    NULL,
-};
-
-static void reghl_help(const char *prog_name, int print_flag)
-{
-    (void)printf("\nUsage:%s reghl [-D WR_HOME]\n", prog_name);
-    (void)printf("[manage command] register host to array\n");
-    if (print_flag == WR_HELP_SIMPLE) {
-        return;
-    }
-    help_param_wrhome();
-}
-
-static status_t reghl_proc(void)
-{
-    return CM_SUCCESS;
-}
-
-static wr_args_t cmd_unreghl_args[] = {
-    {'t', "type", CM_FALSE, CM_TRUE, NULL, NULL, NULL, 0, NULL, NULL, 0},
-    {'D', "WR_HOME", CM_FALSE, CM_TRUE, cmd_check_wr_home, cmd_check_convert_wr_home, cmd_clean_check_convert, 0,
-        NULL, NULL, 0},
-};
-static wr_args_set_t cmd_unreghl_args_set = {
-    cmd_unreghl_args,
-    sizeof(cmd_unreghl_args) / sizeof(wr_args_t),
-    NULL,
-};
-
-static void unreghl_help(const char *prog_name, int print_flag)
-{
-    (void)printf("\nUsage:%s unreghl [-t type] [-D WR_HOME]\n", prog_name);
-    (void)printf("[manage command] unregister host from array\n");
-    if (print_flag == WR_HELP_SIMPLE) {
-        return;
-    }
-    (void)printf("-t/--type <type>, [optional], value is int, 0 without lock, otherwise with lock\n");
-    help_param_wrhome();
-}
-
-static status_t unreghl_proc(void)
-{
-    return CM_SUCCESS;
-}
-
 static inline char escape_char(char c)
 {
     if (c > 0x1f && c < 0x7f) {
@@ -468,26 +252,6 @@ static inline char escape_char(char c)
     } else {
         return '.';
     }
-}
-
-int32_t wr_open_memory_file(const char *file_name)
-{
-    int32_t file_fd;
-    uint32_t mode = O_RDONLY | O_BINARY;
-    char realpath[CM_FILE_NAME_BUFFER_SIZE] = {0};
-    if (realpath_file(file_name, realpath, CM_FILE_NAME_BUFFER_SIZE) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to find realpath file %s", file_name);
-        return -1;
-    }
-    if (!cm_file_exist(realpath)) {
-        WR_THROW_ERROR_EX(ERR_WR_FILE_NOT_EXIST, "%s not exist, please check", realpath);
-        return -1;
-    }
-    if (cm_open_file(realpath, mode, &file_fd) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to open memory file %s", realpath);
-        return -1;
-    }
-    return file_fd;
 }
 
 bool32 wr_check_software_version(int32_t file_fd, int64_t *offset)
@@ -588,8 +352,6 @@ static wr_args_t cmd_setcfg_args[] = {
     {'n', "name", CM_TRUE, CM_TRUE, cmd_check_cfg_name, NULL, NULL, 0, NULL, NULL, 0},
     {'v', "value", CM_TRUE, CM_TRUE, cmd_check_cfg_value, NULL, NULL, 0, NULL, NULL, 0},
     {'s', "scope", CM_FALSE, CM_TRUE, cmd_check_cfg_scope, NULL, NULL, 0, NULL, NULL, 0},
-    {'U', "UDS", CM_FALSE, CM_TRUE, cmd_check_uds, cmd_check_convert_uds_home, cmd_clean_check_convert, 0, NULL, NULL,
-        0},
 };
 static wr_args_set_t cmd_setcfg_args_set = {
     cmd_setcfg_args,
@@ -599,7 +361,7 @@ static wr_args_set_t cmd_setcfg_args_set = {
 
 static void setcfg_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s setcfg <-n name> <-v value> [-s scope] [-U UDS:socket_domain]\n", prog_name);
+    (void)printf("\nUsage:%s setcfg <-n name> <-v value> [-s scope]\n", prog_name);
     (void)printf("[client command] set config value by name\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
@@ -611,18 +373,16 @@ static void setcfg_help(const char *prog_name, int print_flag)
                  "Memory indicates that the modification is made in memory and takes effect immediately;\n"
                  "Pfile indicates that the modification is performed in the pfile. \n"
                  "The database must be restarted for the modification to take effect.\n");
-    help_param_uds();
 }
 
 static status_t setcfg_proc(void)
 {
     char *name = cmd_setcfg_args[WR_ARG_IDX_0].input_args;
     char *value = cmd_setcfg_args[WR_ARG_IDX_1].input_args;
-    char *scope =
-        cmd_setcfg_args[WR_ARG_IDX_2].input_args != NULL ? cmd_setcfg_args[WR_ARG_IDX_2].input_args : "both";
+    char *scope = cmd_setcfg_args[WR_ARG_IDX_2].input_args != NULL ?
+                  cmd_setcfg_args[WR_ARG_IDX_2].input_args : "both";
 
-    const char *input_args = cmd_setcfg_args[WR_ARG_IDX_3].input_args;
-    wr_conn_t *conn = wr_get_connection_opt(input_args);
+    wr_conn_t *conn = wr_get_connection_for_cmd();
     if (conn == NULL) {
         return CM_ERROR;
     }
@@ -633,13 +393,12 @@ static status_t setcfg_proc(void)
     } else {
         WR_PRINT_INF("Succeed to set cfg, name is %s, value is %s.\n", name, value);
     }
+    wr_disconnect_ex(conn);
     return status;
 }
 
 static wr_args_t cmd_getcfg_args[] = {
     {'n', "name", CM_TRUE, CM_TRUE, cmd_check_cfg_name, NULL, NULL, 0, NULL, NULL, 0},
-    {'U', "UDS", CM_FALSE, CM_TRUE, cmd_check_uds, cmd_check_convert_uds_home, cmd_clean_check_convert, 0, NULL, NULL,
-        0},
 };
 static wr_args_set_t cmd_getcfg_args_set = {
     cmd_getcfg_args,
@@ -649,20 +408,18 @@ static wr_args_set_t cmd_getcfg_args_set = {
 
 static void getcfg_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s getcfg <-n name> [-U UDS:socket_domain]\n", prog_name);
+    (void)printf("\nUsage:%s getcfg <-n name> \n", prog_name);
     (void)printf("[client command] get config value by name\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
     }
     (void)printf("-n/--name <name>, <required>, the config name to set\n");
-    help_param_uds();
 }
 
 static status_t getcfg_proc(void)
 {
     char *name = cmd_getcfg_args[WR_ARG_IDX_0].input_args;
-    const char *input_args = cmd_getcfg_args[1].input_args;
-    wr_conn_t *conn = wr_get_connection_opt(input_args);
+    wr_conn_t *conn = wr_get_connection_for_cmd();
     if (conn == NULL) {
         return CM_ERROR;
     }
@@ -686,13 +443,11 @@ static status_t getcfg_proc(void)
             WR_PRINT_INF("Succeed to get cfg, name is %s, value is %s.\n", name, (strlen(value) == 0) ? NULL : value);
         }
     }
+    wr_disconnect_ex(conn);
     return status;
 }
 
-static wr_args_t cmd_getstatus_args[] = {
-    {'U', "UDS", CM_FALSE, CM_TRUE, cmd_check_uds, cmd_check_convert_uds_home, cmd_clean_check_convert, 0, NULL, NULL,
-        0},
-};
+static wr_args_t cmd_getstatus_args[] = {};
 
 static wr_args_set_t cmd_getstatus_args_set = {
     cmd_getstatus_args,
@@ -702,18 +457,16 @@ static wr_args_set_t cmd_getstatus_args_set = {
 
 static void getstatus_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s getstatus [-U UDS:socket_domain]\n", prog_name);
+    (void)printf("\nUsage:%s getstatus \n", prog_name);
     (void)printf("[client command] get wr server status\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
     }
-    help_param_uds();
 }
 
 static status_t getstatus_proc(void)
 {
-    const char *input_args = cmd_getstatus_args[WR_ARG_IDX_0].input_args;
-    wr_conn_t *conn = wr_get_connection_opt(input_args);
+    wr_conn_t *conn = wr_get_connection_for_cmd();
     if (conn == NULL) {
         return CM_ERROR;
     }
@@ -727,13 +480,11 @@ static status_t getstatus_proc(void)
             wr_status.local_instance_id, wr_status.instance_status, wr_status.server_status, wr_status.master_id,
             (wr_status.is_maintain ? "TRUE" : "FALSE"));
     }
+    wr_disconnect_ex(conn);
     return status;
 }
 
-static wr_args_t cmd_stopwr_args[] = {
-    {'U', "UDS", CM_FALSE, CM_TRUE, cmd_check_uds, cmd_check_convert_uds_home, cmd_clean_check_convert, 0, NULL, NULL,
-        0},
-};
+static wr_args_t cmd_stopwr_args[] = {};
 static wr_args_set_t cmd_stopwr_args_set = {
     cmd_stopwr_args,
     sizeof(cmd_stopwr_args) / sizeof(wr_args_t),
@@ -742,30 +493,28 @@ static wr_args_set_t cmd_stopwr_args_set = {
 
 static void stopwr_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s stopwr [-U UDS:socket_domain]\n", prog_name);
+    (void)printf("\nUsage:%s stopwr\n", prog_name);
     (void)printf("[client command] stop wr server\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
     }
-    help_param_uds();
 }
 
 static status_t stopwr_proc(void)
 {
-    const char *input_args = cmd_stopwr_args[WR_ARG_IDX_0].input_args;
-    wr_conn_t *conn = wr_get_connection_opt(input_args);
+    wr_conn_t *conn = wr_get_connection_for_cmd();
     if (conn == NULL) {
         return CM_ERROR;
     }
 
-    status_t status = wr_stop_server_impl(conn);
-    if (status != CM_SUCCESS) {
+    status_t ret = wr_stop_server_impl(conn);
+    if (ret != CM_SUCCESS) {
         WR_PRINT_ERROR("Failed to stop server.\n");
     } else {
         WR_PRINT_INF("Succeed to stop server.\n");
     }
-    wr_conn_opt_exit();
-    return status;
+    wr_disconnect_ex(conn);
+    return ret;
 }
 
 static wr_args_t cmd_switchover_args[] = {};
@@ -777,42 +526,34 @@ static wr_args_set_t cmd_switchover_args_set = {
 
 static void switchover_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s stopwr [-U UDS:socket_domain]\n", prog_name);
+    (void)printf("\nUsage:%s stopwr\n", prog_name);
     (void)printf("[client command] stop wr server\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
     }
-    help_param_uds();
 }
 
 static status_t switchover_proc(void)
 {
-    wr_config_t *inst_cfg = wr_get_g_inst_cfg();
-    char server_path[CM_MAX_IP_LEN] = {0};
-    errno_t err = sprintf_s(server_path, CM_MAX_IP_LEN, "%s:%u",
-                            inst_cfg->params.listen_addr.host, inst_cfg->params.listen_addr.port);
-    if (SECUREC_UNLIKELY(err < 0)) {
-        WR_PRINT_ERROR("Failed to get server_path.\n");
-        return WR_ERROR;
+    wr_conn_t *conn = wr_get_connection_for_cmd();
+    if (conn == NULL) {
+        return CM_ERROR;
     }
-    status_t status = wr_set_main_inst(server_path);
+    
+    status_t status = wr_set_main_inst_impl(conn);
     if (status != CM_SUCCESS) {
         WR_PRINT_ERROR("Failed to switchover server.\n");
     } else {
         WR_PRINT_INF("Succeed to switchover server.\n");
     }
+    wr_disconnect_ex(conn);
     return status;
 }
 
 // clang-format off
 wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"ts", ts_help, ts_proc, &cmd_ts_args_set, false},
-    {"inq", inq_help, inq_proc, &cmd_inq_args_set, false},
-    {"inq_reg", inq_reg_help, inq_reg_proc, &cmd_inq_req_args_set, false},
     {"lscli", lscli_help, lscli_proc, &cmd_lscli_args_set, false},
-    {"kickh", kickh_help, kickh_proc, &cmd_kickh_args_set, true},
-    {"reghl", reghl_help, reghl_proc, &cmd_reghl_args_set, true},
-    {"unreghl", unreghl_help, unreghl_proc, &cmd_unreghl_args_set, true},
     {"encrypt", encrypt_help, encrypt_proc, &cmd_encrypt_args_set, true},
     {"setcfg", setcfg_help, setcfg_proc, &cmd_setcfg_args_set, true},
     {"getcfg", getcfg_help, getcfg_proc, &cmd_getcfg_args_set, false},
@@ -823,7 +564,6 @@ wr_admin_cmd_t g_wr_admin_cmd[] = {
 
 void clean_cmd()
 {
-    wr_conn_opt_exit();
     wr_free_vg_info();
     ga_reset_app_pools();
 }
@@ -839,7 +579,6 @@ static void help(char *prog_name, wr_help_type help_type)
     for (uint32_t i = 0; i < sizeof(g_wr_admin_cmd) / sizeof(g_wr_admin_cmd[0]); ++i) {
         g_wr_admin_cmd[i].help(prog_name, help_type);
     }
-    cmd_print_interactive_help(prog_name, help_type);
     (void)printf("\n\n");
 }
 
@@ -920,10 +659,6 @@ bool8 cmd_check_run_interactive(int argc, char **argv)
     if (argc < CMD_ARGS_AT_LEAST) {
         return CM_FALSE;
     }
-    if (cm_str_equal(argv[1], "-i") || cm_str_equal(argv[1], "--interactive")) {
-        g_run_interatively = CM_TRUE;
-        return CM_TRUE;
-    }
     return CM_FALSE;
 }
 
@@ -953,10 +688,8 @@ void print_help_hint()
 int32_t execute_help_cmd(int argc, char **argv, uint32_t *idx, bool8 *go_ahead)
 {
     if (argc < CMD_ARGS_AT_LEAST) {
-        if (!g_run_interatively) {
-            (void)printf("wrcmd: no operation specified.\n");
-            print_help_hint();
-        }
+        (void)printf("wrcmd: no operation specified.\n");
+        print_help_hint();
         *go_ahead = CM_FALSE;
         return EXIT_FAILURE;
     }
@@ -1033,6 +766,7 @@ int main(int argc, char **argv)
     ret = wr_load_local_server_config(inst_cfg);
     WR_RETURN_IFERR2(ret, WR_PRINT_ERROR("Failed to load local server config, status(%d).\n", ret));
     ret = cm_start_timer(g_timer());
+
     WR_RETURN_IFERR2(ret, WR_PRINT_ERROR("Aborted due to starting timer thread.\n"));
     ret = wr_init_loggers(inst_cfg, wr_get_cmd_log_def(), wr_get_cmd_log_def_count(), "wrcmd");
     if (ret != CM_SUCCESS && is_log_necessary(argc, argv)) {

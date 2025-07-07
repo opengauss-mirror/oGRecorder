@@ -278,7 +278,7 @@ status_t wr_msg_interact_with_stat(wr_conn_t *conn, uint8 cmd, void *send_info, 
 status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd, bool need_lock);
 status_t wr_get_inst_status_on_server(wr_conn_t *conn, wr_server_status_t *wr_status);
 status_t wr_get_time_stat_on_server(wr_conn_t *conn, wr_stat_item_t *time_stat, uint64 size);
-status_t wr_set_main_inst_on_server(wr_conn_t *conn);
+status_t wr_set_main_inst_impl(wr_conn_t *conn);
 
 #define WR_SET_PTR_VALUE_IF_NOT_NULL(ptr, value) \
     do {                                          \

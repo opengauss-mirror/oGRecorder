@@ -220,6 +220,7 @@ status_t wr_create_session(const cs_pipe_t *pipe, wr_session_t **session)
     WR_RETURN_IF_ERROR(wr_init_session(*session, pipe));
     return CM_SUCCESS;
 }
+
 void wr_destroy_session_inner(wr_session_t *session)
 {
     if (session->connected == CM_TRUE) {
@@ -235,6 +236,7 @@ void wr_destroy_session_inner(wr_session_t *session)
     session->proto_version = WR_PROTO_VERSION;
     session->put_log = CM_FALSE;
     session->is_holding_hotpatch_latch = CM_FALSE;
+    CM_FREE_PTR(session->hash_mgr.hash_items);
 }
 void wr_destroy_session(wr_session_t *session)
 {

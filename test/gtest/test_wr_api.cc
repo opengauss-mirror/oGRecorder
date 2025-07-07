@@ -52,6 +52,10 @@ protected:
         int result = wr_init(g_wr_param);
         ASSERT_EQ(result, WR_SUCCESS) << "Failed to initialize logger";
     }
+
+    void TearDown() override {
+        wr_exit();
+    }
 };
 
 TEST_F(WrApiTest, TestWrCreateInstance) {
@@ -224,10 +228,6 @@ TEST_F(WrApiTest, TestWrVfsForceDelete) {
 
 TEST_F(WrApiTest, TestWrVfsUnmount) {
     EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle), WR_SUCCESS);
-}
-
-TEST_F(WrApiTest, TestWrExit) {
-    EXPECT_EQ(wr_exit(), WR_SUCCESS);
 }
 
 int main(int argc, char **argv) {
