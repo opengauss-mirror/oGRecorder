@@ -1388,6 +1388,11 @@ status_t wr_set_main_inst_impl(wr_conn_t *conn)
     return wr_msg_interact(conn, WR_CMD_SET_MAIN_INST, NULL, NULL);
 }
 
+status_t wr_reload_certs_impl(wr_conn_t *conn)
+{
+    return wr_msg_interact(conn, WR_CMD_RELOAD_CERTS, NULL, NULL);
+}
+
 status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd, bool need_lock)
 {
     wr_close_file_info_t send_info;

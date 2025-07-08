@@ -1013,6 +1013,12 @@ static status_t wr_process_postpone_file_time(wr_session_t *session)
     return CM_SUCCESS;
 }
 
+static status_t wr_process_reload_certs(wr_session_t *session)
+{
+    WR_RETURN_IF_ERROR(ser_cert_reload());
+    return CM_SUCCESS;
+}
+
 static status_t wr_process_set_main_inst(wr_session_t *session)
 {
     status_t status = CM_ERROR;
@@ -1101,6 +1107,7 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_SWITCH_LOCK)] = {WR_CMD_SWITCH_LOCK, wr_process_switch_lock, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_POSTPONE_FILE_TIME)] = {WR_CMD_POSTPONE_FILE_TIME, wr_process_postpone_file_time, NULL,
         CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_RELOAD_CERTS)] = {WR_CMD_RELOAD_CERTS, wr_process_reload_certs, NULL, CM_FALSE},
     // query
     [WR_CMD_TYPE_OFFSET(WR_CMD_HANDSHAKE)] = {WR_CMD_HANDSHAKE, wr_process_handshake, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXIST)] = {WR_CMD_EXIST, wr_process_exist, NULL, CM_FALSE},

@@ -550,6 +550,39 @@ static status_t switchover_proc(void)
     return status;
 }
 
+static wr_args_t cmd_reload_certs_args[] = {};
+static wr_args_set_t cmd_reload_certs_args_set = {
+    cmd_reload_certs_args,
+    sizeof(cmd_reload_certs_args) / sizeof(wr_args_t),
+    NULL,
+};
+
+static void reload_certs_help(const char *prog_name, int print_flag)
+{
+    (void)printf("\nUsage:%s reload_certs\n", prog_name);
+    (void)printf("[client command] reload wr server certs\n");
+    if (print_flag == WR_HELP_SIMPLE) {
+        return;
+    }
+}
+
+static status_t reload_certs_proc(void)
+{
+    wr_conn_t *conn = wr_get_connection_for_cmd();
+    if (conn == NULL) {
+        return CM_ERROR;
+    }
+
+    status_t status = wr_reload_certs_impl(conn);
+    if (status != CM_SUCCESS) {
+        WR_PRINT_ERROR("Failed to switchover server.\n");
+    } else {
+        WR_PRINT_INF("Succeed to switchover server.\n");
+    }
+    wr_disconnect_ex(conn);
+    return status;
+}
+
 // clang-format off
 wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"ts", ts_help, ts_proc, &cmd_ts_args_set, false},
@@ -560,6 +593,7 @@ wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"getstatus", getstatus_help, getstatus_proc, &cmd_getstatus_args_set, false},
     {"stopwr", stopwr_help, stopwr_proc, &cmd_stopwr_args_set, true},
     {"switchover", switchover_help, switchover_proc, &cmd_switchover_args_set, true},
+    {"reload_certs", reload_certs_help, reload_certs_proc, &cmd_reload_certs_args_set, false},
 };
 
 void clean_cmd()
