@@ -58,6 +58,18 @@ wr_config_t *wr_get_inst_cfg(void)
         return &wr_env->inst_cfg;
     }
 }
+
+int wr_check_readwrite(const char* name)
+{
+    if (wr_is_readwrite()) {
+        return CM_SUCCESS;
+    } else {
+        WR_THROW_ERROR(ERR_WR_READONLY, name);
+        LOG_RUN_ERR("The instance is in read-only mode, cannot execute %s command.", name);
+        return CM_ERROR;
+    }
+}
+
 //    return 1 is letter
 //    return 0 is not letter
 int is_letter(char c)

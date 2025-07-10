@@ -259,6 +259,7 @@ static status_t wr_process_mkdir(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &dir));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", dir));
     WR_LOG_DEBUG_OP("Begin to mkdir:%s", dir);
+    WR_RETURN_IF_ERROR(wr_check_readwrite("mkdir"));
     status_t status = wr_make_dir(session, (const char *)dir);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to mkdir:%s", dir);
@@ -277,6 +278,7 @@ static status_t wr_process_rmdir(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", dir));
     WR_LOG_DEBUG_OP("Begin to rmdir:%s.", dir);
+    WR_RETURN_IF_ERROR(wr_check_readwrite("rmdir"));
     status_t status = wr_filesystem_rmdir(dir, flag);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to rmdir:%s", dir);
@@ -363,7 +365,7 @@ static status_t wr_process_create_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &file_ptr));
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &flag));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", file_ptr));
-
+    
     cm_str2text(file_ptr, &text);
     bool32 result = cm_fetch_rtext(&text, '/', '\0', &sub);
     WR_RETURN_IF_FALSE2(
@@ -381,6 +383,7 @@ static status_t wr_process_create_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(cm_text2str(&text, name_str, sizeof(name_str)));
 
     WR_LOG_DEBUG_OP("Begin to create file:%s in path:%s.", name_str, parent_str);
+    WR_RETURN_IF_ERROR(wr_check_readwrite("create file"));
     status_t status = wr_create_file(session, (const char *)parent_str, (const char *)name_str, flag);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to create file:%s in path:%s", name_str, parent_str);
@@ -399,6 +402,7 @@ static status_t wr_process_delete_file(wr_session_t *session)
     WR_RETURN_IFERR2(status, LOG_RUN_ERR("delete file get file name failed."));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
     WR_LOG_DEBUG_OP("Begin to rm file:%s", name);
+    WR_RETURN_IF_ERROR(wr_check_readwrite("delete file"));
     status = wr_filesystem_rm(name);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to rm file:%s", name);
@@ -518,6 +522,7 @@ static status_t wr_process_write_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &file_size));
     WR_RETURN_IF_ERROR(wr_get_sha256(&session->recv_pack, cli_hash));
     WR_RETURN_IF_ERROR(wr_get_data(&session->recv_pack, file_size, (void**)&buf));
+    WR_RETURN_IF_ERROR(wr_check_readwrite("write file"));
 
     status_t status = calculate_data_hash(buf, file_size, data_hash);
     if (status != CM_SUCCESS) {
@@ -611,7 +616,7 @@ static status_t wr_process_extending_file(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
         "extend vg_name:%s, fid:%llu, ftid:%llu, offset:%lld, size:%lld", node_data.vg_name, node_data.fid,
         *(uint64 *)&node_data.ftid, node_data.offset, node_data.size));
-
+    
     return wr_extend(session, &node_data);
 }
 
@@ -1082,38 +1087,37 @@ static status_t wr_process_set_main_inst(wr_session_t *session)
 
 static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     // modify
-    [WR_CMD_TYPE_OFFSET(WR_CMD_MKDIR)] = {WR_CMD_MKDIR, wr_process_mkdir, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_RMDIR)] = {WR_CMD_RMDIR, wr_process_rmdir, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_MOUNT_VFS)] = {WR_CMD_MOUNT_VFS, wr_process_mount_vfs, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_UNMOUNT_VFS)] = {WR_CMD_UNMOUNT_VFS, wr_process_unmount_vfs, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_NUM)] = {WR_CMD_QUERY_FILE_NUM, wr_process_query_file_num, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_INFO)] = {WR_CMD_QUERY_FILE_INFO, wr_process_query_file_info, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_MKDIR)] = {WR_CMD_MKDIR, wr_process_mkdir, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_RMDIR)] = {WR_CMD_RMDIR, wr_process_rmdir, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_MOUNT_VFS)] = {WR_CMD_MOUNT_VFS, wr_process_mount_vfs, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_UNMOUNT_VFS)] = {WR_CMD_UNMOUNT_VFS, wr_process_unmount_vfs, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_NUM)] = {WR_CMD_QUERY_FILE_NUM, wr_process_query_file_num, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_INFO)] = {WR_CMD_QUERY_FILE_INFO, wr_process_query_file_info, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_DIR)] = {WR_CMD_OPEN_DIR, wr_process_open_dir, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_DIR)] = {WR_CMD_CLOSE_DIR, wr_process_close_dir, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_FILE)] = {WR_CMD_OPEN_FILE, wr_process_open_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_FILE)] = {WR_CMD_CLOSE_FILE, wr_process_close_file, NULL, CM_FALSE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_CREATE_FILE)] = {WR_CMD_CREATE_FILE, wr_process_create_file, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_DELETE_FILE)] = {WR_CMD_DELETE_FILE, wr_process_delete_file, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_WRITE_FILE)] = {WR_CMD_WRITE_FILE, wr_process_write_file, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_READ_FILE)] = {WR_CMD_READ_FILE, wr_process_read_file, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_EXTEND_FILE)] = {WR_CMD_EXTEND_FILE, wr_process_extending_file, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_RENAME_FILE)] = {WR_CMD_RENAME_FILE, wr_process_rename, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_TRUNCATE_FILE)] = {WR_CMD_TRUNCATE_FILE, wr_process_truncate_file, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_STAT_FILE)] = {WR_CMD_STAT_FILE, wr_process_stat_file, NULL, CM_TRUE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_FALLOCATE_FILE)] = {WR_CMD_FALLOCATE_FILE, wr_process_fallocate_file, NULL, CM_TRUE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_CREATE_FILE)] = {WR_CMD_CREATE_FILE, wr_process_create_file, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_DELETE_FILE)] = {WR_CMD_DELETE_FILE, wr_process_delete_file, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_WRITE_FILE)] = {WR_CMD_WRITE_FILE, wr_process_write_file, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_READ_FILE)] = {WR_CMD_READ_FILE, wr_process_read_file, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_EXTEND_FILE)] = {WR_CMD_EXTEND_FILE, wr_process_extending_file, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_RENAME_FILE)] = {WR_CMD_RENAME_FILE, wr_process_rename, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_TRUNCATE_FILE)] = {WR_CMD_TRUNCATE_FILE, wr_process_truncate_file, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_STAT_FILE)] = {WR_CMD_STAT_FILE, wr_process_stat_file, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_FALLOCATE_FILE)] = {WR_CMD_FALLOCATE_FILE, wr_process_fallocate_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_STOP_SERVER)] = {WR_CMD_STOP_SERVER, wr_process_stop_server, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SETCFG)] = {WR_CMD_SETCFG, wr_process_setcfg, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SET_MAIN_INST)] = {WR_CMD_SET_MAIN_INST, wr_process_set_main_inst, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SWITCH_LOCK)] = {WR_CMD_SWITCH_LOCK, wr_process_switch_lock, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_POSTPONE_FILE_TIME)] = {WR_CMD_POSTPONE_FILE_TIME, wr_process_postpone_file_time, NULL,
-        CM_TRUE},
+        CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RELOAD_CERTS)] = {WR_CMD_RELOAD_CERTS, wr_process_reload_certs, NULL, CM_FALSE},
     // query
     [WR_CMD_TYPE_OFFSET(WR_CMD_HANDSHAKE)] = {WR_CMD_HANDSHAKE, wr_process_handshake, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXIST)] = {WR_CMD_EXIST, wr_process_exist, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_GETCFG)] = {WR_CMD_GETCFG, wr_process_getcfg, NULL, CM_FALSE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_GET_INST_STATUS)] = {WR_CMD_GET_INST_STATUS, wr_process_get_inst_status, NULL,
-        CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_GET_INST_STATUS)] = {WR_CMD_GET_INST_STATUS, wr_process_get_inst_status, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_GET_TIME_STAT)] = {WR_CMD_GET_TIME_STAT, wr_process_get_time_stat, NULL, CM_FALSE},
 };
 
