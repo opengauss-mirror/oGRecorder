@@ -46,6 +46,7 @@ typedef struct st_wr_node_data {
     char *vg_name;
 } wr_node_data_t;
 
+int wr_check_readwrite(const char *name);
 status_t wr_make_dir(wr_session_t *session, const char *dir_name);
 status_t wr_open_dir(wr_session_t *session, const char *dir_path, bool32 is_refresh, wr_find_node_t *find_info);
 void wr_close_dir(wr_session_t *session, char *vg_name, uint64 ftid);
