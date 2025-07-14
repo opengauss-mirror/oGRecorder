@@ -23,10 +23,8 @@
  */
 
 #include "wr_meta_buf.h"
-#include "wr_alloc_unit.h"
 #include "wr_file.h"
 #include "cm_bilist.h"
-#include "wr_fs_aux.h"
 #include "wr_syn_meta.h"
 
 #ifdef __cplusplus
@@ -49,14 +47,9 @@ bool32 wr_enter_shm_time_x(wr_session_t *session, wr_vg_info_item_t *vg_item, ui
 void wr_enter_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item, bool32 is_force, int32_t timeout)
 {
     CM_ASSERT(session != NULL);
-    if (wr_is_server()) {
-        (void)wr_lock_shm_meta_s_without_stack(session, vg_item->vg_latch, is_force, timeout);
-        return;
-    }
 
     wr_latch_offset_t latch_offset;
     latch_offset.type = WR_LATCH_OFFSET_SHMOFFSET;
-    latch_offset.offset.shm_offset = wr_get_vg_latch_shm_offset(vg_item);
     (void)wr_lock_shm_meta_s_with_stack(session, &latch_offset, vg_item->vg_latch, timeout);
 }
 
@@ -208,46 +201,6 @@ status_t shm_hashmap_move_bucket_node(
     return CM_SUCCESS;
 }
 
-status_t wr_hashmap_extend_and_redistribute_batch(
-    wr_session_t *session, shm_hash_ctrl_t *hash_ctrl, uint32_t extend_num)
-{
-    uint32_t i = 0;
-    while (i < extend_num) {
-        if (hash_ctrl->bucket_num == hash_ctrl->bucket_limits && hash_ctrl->max_bucket == hash_ctrl->high_mask) {
-            LOG_DEBUG_WAR("[HASHMAP]No need to extend hashmap for it has reached the upper limit.");
-            return CM_SUCCESS;
-        }
-        status_t status = wr_hashmap_extend_and_redistribute(session, hash_ctrl);
-        if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("[HASHMAP]Failed to extend hashmap, extend_num is %u, i is %u.", extend_num, i);
-            return status;
-        }
-        i++;
-    }
-    return CM_SUCCESS;
-}
-
-void wr_hashmap_dynamic_extend_and_redistribute_per_vg(wr_vg_info_item_t *vg_item, wr_session_t *session)
-{
-    shm_hash_ctrl_t *hash_ctrl = &vg_item->buffer_cache->hash_ctrl;
-    if (shm_hashmap_need_extend_and_redistribute(hash_ctrl)) {
-        wr_enter_shm_x(session, vg_item);
-        LOG_DEBUG_INF("[HASHMAP]Begin to extend hashmap of vg %s.", vg_item->vg_name);
-        status_t status = wr_hashmap_extend_and_redistribute_batch(session, hash_ctrl, WR_EXTEND_BATCH);
-        if (status != CM_SUCCESS) {
-            LOG_RUN_ERR(
-                "[HASHMAP]Failed to extend hashmap of vg %s, nsegments is %u, max_bucket is %u, bucket_num is %u.",
-                vg_item->vg_name, hash_ctrl->nsegments, hash_ctrl->max_bucket, hash_ctrl->bucket_num);
-            wr_leave_shm(session, vg_item);
-            return;
-        }
-        LOG_DEBUG_INF(
-            "[HASHMAP]Succeed to extend hashmap of vg %s, nsegments is %u, max_bucket is %u, bucket_num is %u.",
-            vg_item->vg_name, hash_ctrl->nsegments, hash_ctrl->max_bucket, hash_ctrl->bucket_num);
-        wr_leave_shm(session, vg_item);
-    }
-}
-
 status_t wr_hashmap_redistribute(wr_session_t *session, shm_hash_ctrl_t *hash_ctrl, uint32_t old_bucket)
 {
     hash_ctrl->max_bucket++;
@@ -352,22 +305,6 @@ void wr_unregister_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_ite
 status_t wr_get_block_from_disk(
     wr_vg_info_item_t *vg_item, wr_block_id_t block_id, char *buf, int64_t offset, int32_t size, bool32 calc_checksum)
 {
-    bool32 remote = calc_checksum;
-    CM_ASSERT(block_id.volume < WR_MAX_VOLUMES);
-    status_t status = wr_check_read_volume(vg_item, (uint32_t)block_id.volume, offset, buf, size, &remote);
-    if (status != CM_SUCCESS) {
-        return status;
-    }
-
-    // check the checksum when read the file table block and file space block.
-    if ((calc_checksum) && (remote == CM_FALSE)) {
-        cm_panic((uint32_t)size == WR_BLOCK_SIZE || (uint32_t)size == WR_FILE_SPACE_BLOCK_SIZE ||
-                 (uint32_t)size == WR_FS_AUX_SIZE);
-        uint32_t checksum = wr_get_checksum(buf, (uint32_t)size);
-        wr_common_block_t *block = (wr_common_block_t *)buf;
-        wr_check_checksum(checksum, block->checksum);
-    }
-
     return CM_SUCCESS;
 }
 

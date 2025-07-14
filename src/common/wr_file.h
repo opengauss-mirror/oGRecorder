@@ -27,7 +27,6 @@
 
 #include "wr_file_def.h"
 #include "wr_diskgroup.h"
-#include "wr_alloc_unit.h"
 #include "wr_param.h"
 #include "wr_meta_buf.h"
 #include "wr_session.h"
@@ -47,23 +46,17 @@ typedef struct st_wr_node_data {
 } wr_node_data_t;
 
 int wr_check_readwrite(const char *name);
-status_t wr_make_dir(wr_session_t *session, const char *dir_name);
-status_t wr_open_dir(wr_session_t *session, const char *dir_path, bool32 is_refresh, wr_find_node_t *find_info);
-void wr_close_dir(wr_session_t *session, char *vg_name, uint64 ftid);
-
 void wr_lock_vg_mem_and_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item);
 void wr_lock_vg_mem_and_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item);
 void wr_lock_vg_mem_and_shm_s_force(wr_session_t *session, wr_vg_info_item_t *vg_item);
 void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item);
 
-status_t wr_create_file(wr_session_t *session, const char *parent, const char *name, int32_t flag);
 status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type);
 status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int *fd);
 status_t wr_close_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid);
 status_t wr_extend(wr_session_t *session, wr_node_data_t *node_data);
 status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data);
 status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64 length, char *vg_name);
-status_t wr_refresh_file(wr_session_t *session, uint64 fid, ftid_t ftid, char *vg_name, int64 offset);
 status_t wr_update_file_written_size(
     wr_session_t *session, uint32_t vg_id, int64 offset, int64 size, wr_block_id_t ftid, uint64 fid);
 void wr_check_ft_node_free(gft_node_t *node);
@@ -78,8 +71,6 @@ gft_node_t *wr_get_ft_node_by_ftid(
 status_t wr_update_ft_block_disk(wr_vg_info_item_t *vg_item, wr_ft_block_t *block, ftid_t id);
 status_t wr_refresh_root_ft(wr_vg_info_item_t *vg_item, bool32 check_version, bool32 active_refresh);
 
-status_t wr_update_au_disk(
-    wr_vg_info_item_t *vg_item, auid_t auid, ga_pool_id_e pool_id, uint32_t first, uint32_t count, uint32_t size);
 // for tool or instance
 void wr_init_ft_root(wr_ctrl_t *wr_ctrl, gft_node_t **out_node);
 status_t wr_update_ft_root(wr_vg_info_item_t *vg_item);
@@ -92,7 +83,6 @@ typedef struct st_wr_alloc_fs_block_info {
     gft_node_t *node;
 } wr_alloc_fs_block_info_t;
 void wr_free_fs_block_addr(wr_session_t *session, wr_vg_info_item_t *vg_item, char *block, ga_obj_id_t obj_id);
-status_t wr_format_bitmap_node(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t auid);
 
 status_t wr_check_rename_path(wr_session_t *session, const char *src_path, const char *dst_path, text_t *dst_name);
 status_t wr_get_name_from_path(const char *path, uint32_t *beg_pos, char *name);
@@ -115,11 +105,6 @@ status_t wr_check_file(wr_vg_info_item_t *vg_item);
 
 status_t wr_check_rm_file(
     wr_session_t *session, wr_vg_info_item_t *vg_item, ftid_t ftid, bool32 *should_rm_file, gft_node_t **file_node);
-
-void wr_set_node_flag(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, bool32 is_set, uint32_t flags);
-void wr_validate_fs_meta(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node);
-status_t wr_invalidate_fs_meta(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node);
 
 static inline bool32 wr_is_node_deleted(gft_node_t *node)
 {

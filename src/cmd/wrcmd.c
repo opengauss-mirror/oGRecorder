@@ -45,7 +45,6 @@
 #include "wr_io_fence.h"
 #include "wr_api.h"
 #include "wr_api_impl.h"
-#include "wrcmd_inq.h"
 #include "wrcmd_encrypt.h"
 #include "wr_cli_conn.h"
 #include "wr_args_parse.h"

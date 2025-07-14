@@ -177,7 +177,6 @@ WR_DECLARE int wr_vfs_create(wr_instance_handle inst_handle, const char *vfs_nam
 WR_DECLARE int wr_vfs_delete(wr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
 WR_DECLARE int wr_vfs_mount(wr_instance_handle inst_handle, const char *vfs_name, wr_vfs_handle *vfs_handle);
 WR_DECLARE int wr_vfs_unmount(wr_vfs_handle *vfs_handle);
-WR_DECLARE int wr_vfs_control(void);
 WR_DECLARE int wr_vfs_query_file_info(wr_vfs_handle vfs_handle, wr_file_item_t *result, bool is_continue);
 WR_DECLARE int wr_vfs_query_file_num(wr_vfs_handle vfs_handle, int *file_num);
 
@@ -200,9 +199,6 @@ WR_DECLARE int wr_file_postpone(wr_vfs_handle vfs_handle, const char *file, cons
 // aio
 WR_DECLARE int wr_file_pwrite_async();
 WR_DECLARE int wr_file_pread_async();
-WR_DECLARE int wr_aio_prep_pread(void *iocb, int handle, void *buf, size_t count, long long offset);
-WR_DECLARE int wr_aio_prep_pwrite(void *iocb, int handle, void *buf, size_t count, long long offset);
-WR_DECLARE int wr_aio_post_pwrite(void *iocb, int handle, size_t count, long long offset);
 
 // log
 WR_DECLARE int wr_get_error(int *errcode, const char **errmsg);

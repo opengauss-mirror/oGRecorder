@@ -104,24 +104,9 @@ status_t wr_lock_vg_storage_r(wr_vg_info_item_t *vg_item, const char *entry_path
 status_t wr_unlock_vg_storage(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
 status_t wr_lock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
 status_t wr_unlock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry_path, wr_config_t *inst_cfg);
-status_t wr_add_volume(wr_session_t *session, const char *vg_name, const char *volume_name);
-status_t wr_remove_volume(wr_session_t *session, const char *vg_name, const char *volume_name);
-status_t wr_refresh_meta_info(wr_session_t *session);
 
-status_t wr_write_ctrl_to_disk(wr_vg_info_item_t *vg_item, int64 offset, void *buf, uint32_t size);
-status_t wr_update_core_ctrl_disk(wr_vg_info_item_t *vg_item);
-status_t wr_update_volume_ctrl(wr_vg_info_item_t *vg_item);
-status_t wr_update_volume_id_info(wr_vg_info_item_t *vg_item, uint32_t id);
-
-status_t wr_write_volume_inst(
-    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64 offset, const void *buf, uint32_t size);
-status_t wr_read_volume_inst(
-    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64 offset, void *buf, int32_t size, bool32 *remote);
-status_t wr_init_vol_handle(wr_vg_info_item_t *vg_item, int32_t flags, wr_vol_handles_t *vol_handles);
-void wr_destroy_vol_handle(wr_vg_info_item_t *vg_item, wr_vol_handles_t *vol_handles, uint32_t size);
 extern wr_vg_info_t *g_vgs_info;
 #define VGS_INFO (g_vgs_info)
-status_t wr_check_volume(wr_vg_info_item_t *vg_item, uint32_t volumeid);
 uint32_t wr_find_volume(wr_vg_info_item_t *vg_item, const char *volume_name);
 uint32_t wr_find_free_volume_id(const wr_vg_info_item_t *vg_item);
 status_t wr_cmp_volume_head(wr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id);
@@ -170,8 +155,6 @@ static inline bool32 wr_read_remote_checksum(void *buf, int32_t size)
     return sum1 == sum2;
 }
 
-uint64 wr_get_vg_latch_shm_offset(wr_vg_info_item_t *vg_item);
-
 static inline uint64 wr_get_vg_au_size(wr_ctrl_t *ctrl)
 {
     return (uint64)(ctrl->core.au_size);
@@ -213,12 +196,9 @@ void wr_set_recover_thread_id(uint32_t thread_id);
 uint32_t wr_get_recover_thread_id(void);
 
 status_t wr_check_write_volume(wr_vg_info_item_t *vg_item, uint32_t volumeid, int64 offset, void *buf, uint32_t size);
-status_t wr_check_read_volume(
-    wr_vg_info_item_t *vg_item, uint32_t volumeid, int64 offset, void *buf, int32_t size, bool32 *remote);
 typedef status_t (*wr_remote_read_proc_t)(
     const char *vg_name, wr_volume_t *volume, int64 offset, void *buf, int size);
 void regist_remote_read_proc(wr_remote_read_proc_t proc);
-status_t wr_read_volume_4standby(const char *vg_name, uint32_t volume_id, int64 offset, void *buf, uint32_t size);
 status_t wr_add_volume_vg_ctrl(
     wr_ctrl_t *vg_ctrl, uint32_t id, uint64 vol_size, const char *volume_name, volume_slot_e volume_flag);
 status_t wr_gen_volume_head(

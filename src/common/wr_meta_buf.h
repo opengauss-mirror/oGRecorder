@@ -108,10 +108,6 @@ static inline int64 wr_get_block_offset(wr_vg_info_item_t *vg_item, uint64 block
 void wr_init_wr_fs_block_cache_info(wr_fs_block_cache_info_t *fs_block_cache_info);
 void wr_init_vg_cache_node_info(wr_vg_info_item_t *vg_item);
 status_t wr_hashmap_extend_and_redistribute(wr_session_t *session, shm_hash_ctrl_t *hash_ctrl);
-status_t wr_hashmap_extend_and_redistribute_batch(
-    wr_session_t *session, shm_hash_ctrl_t *hash_ctrl, uint32_t extend_num);
-void wr_hashmap_dynamic_extend_and_redistribute_per_vg(wr_vg_info_item_t *vg_item, wr_session_t *session);
-
 // do not need control concurrence
 void wr_inc_meta_ref_hot(wr_block_ctrl_t *block_ctrl);
 // do not need control concurrence
