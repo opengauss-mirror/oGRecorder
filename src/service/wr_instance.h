@@ -122,8 +122,6 @@ void wr_get_cm_lock_and_recover(thread_t *thread);
 void wr_delay_clean_proc(thread_t *thread);
 void wr_hashmap_dynamic_extend_and_redistribute_proc(thread_t *thread);
 bool32 wr_check_join_cluster();
-void wr_meta_syn_proc(thread_t *thread);
-void wr_recycle_meta_proc(thread_t *thread);
 void wr_alarm_check_proc(thread_t *thread);
 
 #ifdef __cplusplus

@@ -204,40 +204,6 @@ int wr_vfs_unmount(wr_vfs_handle *vfs_handle)
     return ret; 
 }
 
-int wr_vfs_control(void)
-{
-    return WR_SUCCESS;
-}
-
-int wr_stat(const char *path, wr_stat_info_t item, wr_instance_handle inst_handle)
-{
-    if (item == NULL) {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "wr_stat_info_t");
-        return WR_ERROR;
-    }
-    timeval_t begin_tv;
-    wr_begin_stat(&begin_tv);
-
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("stat get conn error.");
-        return WR_ERROR;
-    }
-
-    gft_node_t *node = wr_get_node_by_path_impl(hdl->conn, path);
-    if (node == NULL) {
-        return WR_ERROR;
-    }
-
-    int ret = wr_set_stat_info(item, node);
-    wr_session_end_stat(hdl->conn->session, &begin_tv, WR_STAT);
-    return ret;
-}
-
 int wr_vfs_query_file_num(wr_vfs_handle vfs_handle, int *file_num)
 {
     if (file_num == NULL) {
@@ -489,7 +455,8 @@ int wr_file_close(wr_vfs_handle vfs_handle, wr_file_handle *file_handle, bool ne
     return (int)ret;
 }
 
-long long int wr_file_pwrite(wr_vfs_handle vfs_handle, wr_file_handle *file_handle, const void *buf, unsigned long long count, long long offset)
+long long int wr_file_pwrite(
+    wr_vfs_handle vfs_handle, wr_file_handle *file_handle, const void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -520,7 +487,8 @@ long long int wr_file_pwrite(wr_vfs_handle vfs_handle, wr_file_handle *file_hand
     return ret;
 }
 
-long long int wr_file_pread(wr_vfs_handle vfs_handle, wr_file_handle file_handle, void *buf, unsigned long long count, long long offset)
+long long int wr_file_pread(
+    wr_vfs_handle vfs_handle, wr_file_handle file_handle, void *buf, unsigned long long count, long long offset)
 {
     timeval_t begin_tv;
     wr_begin_stat(&begin_tv);
@@ -616,23 +584,8 @@ int wr_file_performance()
 int wr_get_error(int *errcode, const char **errmsg)
 {
     cm_get_error(errcode, errmsg);
+    cm_reset_error();
     return CM_SUCCESS;
-}
-
-int wr_fallocate(int handle, int mode, long long offset, long long length, wr_instance_handle inst_handle)
-{
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return WR_ERROR;
-    }
-    st_wr_instance_handle *hdl = (st_wr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("fallocate get conn error.");
-        return WR_ERROR;
-    }
-    status_t ret = wr_fallocate_impl(hdl->conn, HANDLE_VALUE(handle), mode, offset, length);
-
-    return (int)ret;
 }
 
 void wr_register_log_callback(wr_log_output cb_log_output, unsigned int log_level)
@@ -738,21 +691,6 @@ int wr_set_conn_opts(wr_conn_opt_key_e key, void *value, const char *addr)
             WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "invalid key when set connection options");
             return CM_ERROR;
     }
-}
-
-int wr_aio_prep_pread(void *iocb, int handle, void *buf, size_t count, long long offset)
-{
-    return CM_SUCCESS;
-}
-
-int wr_aio_prep_pwrite(void *iocb, int handle, void *buf, size_t count, long long offset)
-{
-    return CM_SUCCESS;
-}
-
-int wr_aio_post_pwrite(void *iocb, int handle, size_t count, long long offset)
-{
-    return CM_SUCCESS;
 }
 
 int wr_set_conf(wr_instance_handle inst_handle, const char *name, const char *value)

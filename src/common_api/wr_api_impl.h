@@ -72,17 +72,6 @@ typedef struct st_wr_create_file_info {
     uint32_t flag;
 } wr_create_file_info_t;
 
-typedef struct st_wr_open_dir_info {
-    const char *dir_path;
-    bool32 refresh_recursive;
-} wr_open_dir_info_t;
-
-typedef struct st_wr_close_dir_info {
-    uint64 pftid;
-    const char *vg_name;
-    uint32_t vg_id;
-} wr_close_dir_info_t;
-
 typedef struct st_wr_add_or_remove_info {
     const char *vg_name;
     const char *volume_name;
@@ -217,7 +206,6 @@ typedef struct st_wr_postpone_file_time {
 #define WR_DEFAULT_UDS_PATH "UDS:/tmp/.wr_unix_d_socket"
 #define SESSION_LOCK_TIMEOUT 500 // tickets
 
-status_t wr_kick_host_sync(wr_conn_t *conn, int64 kick_hostid);
 status_t wr_alloc_conn(wr_conn_t **conn);
 void wr_free_conn(wr_conn_t *conn);
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
@@ -232,9 +220,7 @@ status_t wr_vfs_create_impl(wr_conn_t *conn, const char *dir_name, unsigned long
 status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir, unsigned long long attrFlag);
 status_t wr_vfs_mount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle, unsigned long long attrFlag);
 status_t wr_vfs_unmount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle);
-wr_vfs_t *wr_open_dir_impl(wr_conn_t *conn, const char *dir_path, bool32 refresh_recursive);
 gft_node_t *wr_read_dir_impl(wr_conn_t *conn, wr_vfs_t *dir, bool32 skip_delete);
-status_t wr_close_dir_impl(wr_conn_t *conn, wr_vfs_t *dir);
 status_t wr_create_file_impl(wr_conn_t *conn, const char *file_path, int flag);
 status_t wr_remove_file_impl(wr_conn_t *conn, const char *file_path);
 status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, wr_file_handle* file_handle);
@@ -243,7 +229,6 @@ status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_it
 status_t wr_check_path_exist(wr_conn_t *conn, const char *path);
 status_t wr_check_file_exist(wr_conn_t *conn, const char *path, bool *is_exist);
 status_t wr_check_file_flag(int flag);
-int64 wr_seek_file_impl(wr_conn_t *conn, int handle, int64 offset, int origin);
 status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst);
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType);
 status_t wr_stat_file_impl(
@@ -261,15 +246,11 @@ status_t wr_vfs_query_file_info_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, 
 
 int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset);
 int64 wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);
-status_t wr_get_addr_impl(wr_conn_t *conn, int32_t handle, long long offset, char *pool_name, char *image_name,
-    char *obj_addr, unsigned int *obj_id, unsigned long int *obj_offset);
-gft_node_t *wr_get_node_by_path_impl(wr_conn_t *conn, const char *path);
 status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, const char *scope);
 status_t wr_getcfg_impl(wr_conn_t *conn, const char *name, char *out_str, size_t str_len);
 status_t wr_stop_server_impl(wr_conn_t *conn);
 void wr_get_api_volume_error(void);
 status_t wr_msg_interact(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack);
-status_t wr_fallocate_impl(wr_conn_t *conn, int handle, int mode, long long int offset, long long int length);
 
 void wr_set_conn_wait_event(wr_conn_t *conn, wr_wait_event_e event);
 void wr_unset_conn_wait_event(wr_conn_t *conn);

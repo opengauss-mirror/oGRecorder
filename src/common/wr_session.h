@@ -178,8 +178,6 @@ wr_session_t *wr_get_session(uint32_t sid);
 
 status_t wr_lock_shm_meta_s_with_stack(
     wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch, int32_t timeout);
-status_t wr_lock_shm_meta_s_without_stack(
-    wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_force, int32_t timeout);
 status_t wr_cli_lock_shm_meta_s(wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch,
     latch_should_exit should_exit);
 void wr_lock_shm_meta_x(const wr_session_t *session, wr_shared_latch_t *shared_latch);

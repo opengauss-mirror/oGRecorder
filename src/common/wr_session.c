@@ -27,7 +27,6 @@
 #include "wr_diskgroup.h"
 #include "wr_malloc.h"
 #include "wr_file.h"
-#include "wr_redo.h"
 #include "cm_system.h"
 #include "wr_thv.h"
 
@@ -267,56 +266,6 @@ static bool32 wr_is_timeout(int32_t timeout, int32_t sleep_times, int32_t sleeps
     return (bool32)(((timeout * 1000) / (sleeps)) < sleep_times);
 }
 
-status_t wr_lock_shm_meta_s_without_stack(
-    wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_force, int32_t timeout)
-{
-    cm_panic_log(wr_is_server(), "can not op shared latch without session latch stack in client");
-    int32_t sleep_times = 0;
-    latch_statis_t *stat = NULL;
-    uint32_t count = 0;
-    uint32_t sid = WR_SESSIONID_IN_LOCK(session->id);
-    do {
-        cm_spin_lock_by_sid(sid, &shared_latch->latch.lock, (stat != NULL) ? &stat->s_spin : NULL);
-        if (shared_latch->latch.stat == LATCH_STATUS_IDLE) {
-            shared_latch->latch.stat = LATCH_STATUS_S;
-            shared_latch->latch.shared_count = 1;
-            shared_latch->latch.sid = (uint16)sid;
-            shared_latch->latch_extent.shared_sid_count += sid;
-            cm_spin_unlock(&shared_latch->latch.lock);
-            cm_latch_stat_inc(stat, count);
-            return CM_SUCCESS;
-        }
-        if ((shared_latch->latch.stat == LATCH_STATUS_S) || (shared_latch->latch.stat == LATCH_STATUS_IX && is_force)) {
-            shared_latch->latch.shared_count++;
-            shared_latch->latch_extent.shared_sid_count += sid;
-            cm_spin_unlock(&shared_latch->latch.lock);
-            cm_latch_stat_inc(stat, count);
-            return CM_SUCCESS;
-        }
-
-        cm_spin_unlock(&shared_latch->latch.lock);
-        if (stat != NULL) {
-            stat->misses++;
-        }
-        while (shared_latch->latch.stat != LATCH_STATUS_IDLE && shared_latch->latch.stat != LATCH_STATUS_S) {
-            count++;
-            if (count < GS_SPIN_COUNT) {
-                continue;
-            }
-
-            SPIN_STAT_INC(stat, s_sleeps);
-            cm_usleep(SPIN_SLEEP_TIME);
-            sleep_times++;
-
-            if (wr_is_timeout(timeout, sleep_times, SPIN_SLEEP_TIME)) {
-                return CM_ERROR;
-            }
-            count = 0;
-        }
-    } while (1);
-    return CM_SUCCESS;
-}
-
 // only used by api-client
 status_t wr_lock_shm_meta_s_with_stack(
     wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch, int32_t timeout)
@@ -405,9 +354,6 @@ status_t wr_lock_shm_meta_s_with_stack(
 status_t wr_lock_shm_meta_bucket_s(wr_session_t *session, uint32_t id, wr_shared_latch_t *shared_latch)
 {
     CM_ASSERT(session != NULL);
-    if (wr_is_server()) {
-        return wr_lock_shm_meta_s_without_stack(session, shared_latch, CM_FALSE, SPIN_WAIT_FOREVER);
-    }
     wr_latch_offset_t latch_offset;
     latch_offset.type = WR_LATCH_OFFSET_SHMOFFSET;
     cm_shm_key_t key = ga_object_key(GA_SEGMENT_POOL, id);

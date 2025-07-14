@@ -29,7 +29,6 @@
 #include "wr_malloc.h"
 #include "wr_open_file.h"
 #include "wr_filesystem.h"
-#include "wr_srv_proc.h"
 #include "wr_mes.h"
 #include "wr_api.h"
 #include "wr_thv.h"
@@ -253,6 +252,7 @@ static status_t wr_set_audit_resource(char *resource, uint32_t audit_type, const
 
 static status_t wr_process_mkdir(wr_session_t *session)
 {
+#define MKDIR_MODE 0700
     char *dir = NULL;
 
     wr_init_get(&session->recv_pack);
@@ -260,7 +260,8 @@ static status_t wr_process_mkdir(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", dir));
     WR_LOG_DEBUG_OP("Begin to mkdir:%s", dir);
     WR_RETURN_IF_ERROR(wr_check_readwrite("mkdir"));
-    status_t status = wr_make_dir(session, (const char *)dir);
+    
+    status_t status = wr_filesystem_mkdir((const char *)dir, MKDIR_MODE);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to mkdir:%s", dir);
         return status;
@@ -384,7 +385,10 @@ static status_t wr_process_create_file(wr_session_t *session)
 
     WR_LOG_DEBUG_OP("Begin to create file:%s in path:%s.", name_str, parent_str);
     WR_RETURN_IF_ERROR(wr_check_readwrite("create file"));
-    status_t status = wr_create_file(session, (const char *)parent_str, (const char *)name_str, flag);
+
+    char full_path[WR_FILE_PATH_MAX_LENGTH];
+    sprintf_s(full_path, sizeof(full_path), "%s/%s", parent_str, name_str);
+    status_t status = wr_filesystem_touch((const char *)full_path);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to create file:%s in path:%s", name_str, parent_str);
         return status;
@@ -463,43 +467,6 @@ static status_t wr_process_close_file(wr_session_t *session)
     WR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
     WR_RETURN_IF_ERROR(wr_filesystem_close(fd, need_lock));
     LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
-    return CM_SUCCESS;
-}
-
-static status_t wr_process_open_dir(wr_session_t *session)
-{
-    char *name = NULL;
-    int32 refresh_recursive;
-    wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &name));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, &refresh_recursive));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s", name));
-    wr_find_node_t find_info;
-    WR_LOG_DEBUG_OP("Begin to open dir:%s, is_refresh:%d", name, refresh_recursive);
-    status_t status = wr_open_dir(session, (const char *)name, (bool32)refresh_recursive, &find_info);
-    if (status == CM_SUCCESS) {
-        WR_RETURN_IF_ERROR(wr_put_data(&session->send_pack, &find_info, sizeof(wr_find_node_t)));
-        LOG_DEBUG_INF("Succeed to open dir:%s, ftid: %s", name, wr_display_metaid(find_info.ftid));
-        return status;
-    }
-    LOG_RUN_ERR("Failed to open dir:%s", name);
-    return status;
-}
-
-static status_t wr_process_close_dir(wr_session_t *session)
-{
-    uint64 ftid;
-    char *vg_name = NULL;
-    uint32_t vgid;
-
-    wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
-    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vg_name));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&vgid));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(
-        session->audit_info.resource, WR_AUDIT_MODIFY, "vg_name:%s, ftid:%llu", vg_name, *(uint64 *)&ftid));
-    WR_LOG_DEBUG_OP("Begin to close dir, ftid:%llu, vg:%s.", ftid, vg_name);
-    wr_close_dir(session, vg_name, ftid);
     return CM_SUCCESS;
 }
 
@@ -602,45 +569,6 @@ static status_t wr_process_read_file(wr_session_t *session)
     return CM_SUCCESS;
 }
 
-static status_t wr_process_extending_file(wr_session_t *session)
-{
-    wr_node_data_t node_data;
-
-    wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.ftid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.offset));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.size));
-    WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &node_data.vg_name));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&node_data.vgid));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "extend vg_name:%s, fid:%llu, ftid:%llu, offset:%lld, size:%lld", node_data.vg_name, node_data.fid,
-        *(uint64 *)&node_data.ftid, node_data.offset, node_data.size));
-    
-    return wr_extend(session, &node_data);
-}
-
-static status_t wr_process_fallocate_file(wr_session_t *session)
-{
-    wr_node_data_t node_data;
-
-    wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&node_data.ftid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.offset));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, &node_data.size));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&node_data.vgid));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&node_data.mode));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "fallocate vg_id:%u, fid:%llu, ftid:%llu, offset:%lld, size:%lld, mode:%d", node_data.vgid, node_data.fid,
-        *(uint64 *)&node_data.ftid, node_data.offset, node_data.size, node_data.mode));
-
-    LOG_DEBUG_INF("fallocate vg_id:%u, fid:%llu, ftid:%llu, offset:%lld, size:%lld, mode:%d", node_data.vgid,
-        node_data.fid, *(uint64 *)&node_data.ftid, node_data.offset, node_data.size, node_data.mode);
-
-    return wr_do_fallocate(session, &node_data);
-}
-
 static status_t wr_process_truncate_file(wr_session_t *session)
 {
     int handle;
@@ -717,26 +645,7 @@ static status_t wr_process_rename(wr_session_t *session)
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &src));
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &dst));
     WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY, "%s, %s", src, dst));
-    return wr_rename_file(session, src, dst);
-}
-
-status_t wr_process_update_file_written_size(wr_session_t *session)
-{
-    uint64 fid;
-    int64 offset;
-    int64 size;
-    wr_block_id_t ftid;
-    uint32_t vg_id;
-
-    wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&fid));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&ftid));
-    WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32_t *)&vg_id));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&offset));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&size));
-    WR_RETURN_IF_ERROR(wr_set_audit_resource(session->audit_info.resource, WR_AUDIT_MODIFY,
-        "vg_id:%u, fid:%llu, ftid:%llu, offset:%lld, size:%lld", vg_id, fid, *(uint64 *)&ftid, offset, size));
-    return wr_update_file_written_size(session, vg_id, offset, size, ftid, fid);
+    return CM_SUCCESS;
 }
 
 #define WR_SERVER_STATUS_OFFSET(i) ((uint32_t)(i) - (uint32_t)WR_STATUS_NORMAL)
@@ -1067,14 +976,7 @@ static status_t wr_process_set_main_inst(wr_session_t *session)
     wr_set_recover_thread_id(wr_get_current_thread_id());
     g_wr_instance.status = WR_STATUS_RECOVERY;
     wr_set_master_id(curr_id);
-    status = wr_refresh_meta_info(session);
-    if (status != CM_SUCCESS) {
-        g_wr_instance.status = WR_STATUS_OPEN;
-        cm_unlatch(&g_wr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
-        LOG_RUN_ERR("[WR][SWITCH] ABORT INFO: wr instance %u refresh meta failed, result(%d).", curr_id, status);
-        cm_fync_logfile();
-        wr_exit_error();
-    }
+
     wr_set_server_status_flag(WR_STATUS_READWRITE);
     LOG_RUN_INF("[SWITCH] inst %u set status flag %u when set main inst.", curr_id, WR_STATUS_READWRITE);
     g_wr_instance.status = WR_STATUS_OPEN;
@@ -1093,19 +995,15 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_UNMOUNT_VFS)] = {WR_CMD_UNMOUNT_VFS, wr_process_unmount_vfs, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_NUM)] = {WR_CMD_QUERY_FILE_NUM, wr_process_query_file_num, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_QUERY_FILE_INFO)] = {WR_CMD_QUERY_FILE_INFO, wr_process_query_file_info, NULL, CM_FALSE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_DIR)] = {WR_CMD_OPEN_DIR, wr_process_open_dir, NULL, CM_FALSE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_DIR)] = {WR_CMD_CLOSE_DIR, wr_process_close_dir, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_OPEN_FILE)] = {WR_CMD_OPEN_FILE, wr_process_open_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_CLOSE_FILE)] = {WR_CMD_CLOSE_FILE, wr_process_close_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_CREATE_FILE)] = {WR_CMD_CREATE_FILE, wr_process_create_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_DELETE_FILE)] = {WR_CMD_DELETE_FILE, wr_process_delete_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_WRITE_FILE)] = {WR_CMD_WRITE_FILE, wr_process_write_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_READ_FILE)] = {WR_CMD_READ_FILE, wr_process_read_file, NULL, CM_FALSE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_EXTEND_FILE)] = {WR_CMD_EXTEND_FILE, wr_process_extending_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RENAME_FILE)] = {WR_CMD_RENAME_FILE, wr_process_rename, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_TRUNCATE_FILE)] = {WR_CMD_TRUNCATE_FILE, wr_process_truncate_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_STAT_FILE)] = {WR_CMD_STAT_FILE, wr_process_stat_file, NULL, CM_FALSE},
-    [WR_CMD_TYPE_OFFSET(WR_CMD_FALLOCATE_FILE)] = {WR_CMD_FALLOCATE_FILE, wr_process_fallocate_file, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_STOP_SERVER)] = {WR_CMD_STOP_SERVER, wr_process_stop_server, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SETCFG)] = {WR_CMD_SETCFG, wr_process_setcfg, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_SET_MAIN_INST)] = {WR_CMD_SET_MAIN_INST, wr_process_set_main_inst, NULL, CM_FALSE},

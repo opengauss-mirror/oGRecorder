@@ -23,7 +23,6 @@
  */
 
 #include "wr_api.h"
-#include "wr_alloc_unit.h"
 #include "wr_file.h"
 #include "wr_malloc.h"
 #include "cm_dlock.h"
@@ -37,7 +36,6 @@
 #include <sys/file.h>
 #endif
 #include "wr_meta_buf.h"
-#include "wr_fs_aux.h"
 #include "wr_syn_meta.h"
 #include "wr_thv.h"
 
@@ -163,22 +161,6 @@ wr_vg_info_item_t *wr_find_vg_item_by_id(uint32_t vg_id)
     return &g_vgs_info->volume_group[vg_id];
 }
 
-status_t wr_alloc_vg_item_redo_log_buf(wr_vg_info_item_t *vg_item)
-{
-    LOG_RUN_INF("Begin to alloc redo log buf of vg %s.", vg_item->vg_name);
-    char *log_buf = (char *)cm_malloc_align(WR_ALIGN_SIZE, WR_VG_LOG_SPLIT_SIZE);
-    if (log_buf == NULL) {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_ALLOC_MEMORY, WR_VG_LOG_SPLIT_SIZE, "global log buffer"));
-    }
-    errno_t rc = memset_s(log_buf, WR_DISK_UNIT_SIZE, 0, WR_DISK_UNIT_SIZE);
-    if (rc != EOK) {
-        WR_RETURN_IFERR4(
-            CM_ERROR, LOG_RUN_ERR("Memset failed."), WR_FREE_POINT(log_buf), CM_THROW_ERROR(ERR_SYSTEM_CALL, rc));
-    }
-    vg_item->log_file_ctrl.log_buf = log_buf;
-    return CM_SUCCESS;
-}
-
 status_t wr_check_entry_path(char *entry_path1, char *entry_path2, bool32 *result)
 {
     if (cm_str_equal_ins(entry_path1, entry_path2)) {
@@ -192,25 +174,6 @@ status_t wr_check_entry_path(char *entry_path1, char *entry_path2, bool32 *resul
     if (cm_str_equal_ins(real_path1, real_path2)) {
         *result = CM_TRUE;
         return CM_SUCCESS;
-    }
-    *result = CM_FALSE;
-    return CM_SUCCESS;
-}
-
-status_t wr_check_dup_vg(wr_vg_info_t *config, uint32_t vg_no, bool32 *result)
-{
-    char *last_vg_name = config->volume_group[vg_no - 1].vg_name;
-    char *last_entry_path = config->volume_group[vg_no - 1].entry_path;
-
-    for (uint32_t i = 0; i < vg_no - 1; i++) {
-        if (cm_str_equal_ins(last_vg_name, config->volume_group[i].vg_name)) {
-            *result = CM_TRUE;
-            return CM_SUCCESS;
-        }
-        CM_RETURN_IFERR(wr_check_entry_path(last_entry_path, config->volume_group[i].entry_path, result));
-        if (*result) {
-            return CM_SUCCESS;
-        }
     }
     *result = CM_FALSE;
     return CM_SUCCESS;
@@ -314,29 +277,6 @@ status_t wr_lock_share_disk_vg(const char *entry_path, wr_config_t *inst_cfg)
     }
 }
 
-
-
-status_t wr_write_volume_inst(
-    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64 offset, const void *buf, uint32_t size)
-{
-    void *temp_buf = (void *)buf;
-    CM_ASSERT(offset % WR_DISK_UNIT_SIZE == 0);
-    CM_ASSERT(size % WR_DISK_UNIT_SIZE == 0);
-    if (((uint64)temp_buf) % WR_DISK_UNIT_SIZE != 0 && size <= WR_FILE_SPACE_BLOCK_SIZE) {
-#ifndef WIN32
-        char align_buf[WR_FILE_SPACE_BLOCK_SIZE] __attribute__((__aligned__(WR_DISK_UNIT_SIZE)));
-#else
-        char align_buf[WR_FILE_SPACE_BLOCK_SIZE];
-#endif
-        // some redo logs about free can not align. rp_redo_free_fs_block
-        errno_t errcode = memcpy_s(align_buf, size, buf, size);
-        securec_check_ret(errcode);
-        return wr_write_volume(volume, offset, align_buf, (int32_t)size);
-    }
-    CM_ASSERT(((uint64)temp_buf) % WR_DISK_UNIT_SIZE == 0);
-    return wr_write_volume(volume, offset, temp_buf, (int32_t)size);
-}
-
 uint32_t wr_find_free_volume_id(const wr_vg_info_item_t *vg_item)
 {
     for (uint32_t i = 0; i < WR_MAX_VOLUMES; i++) {
@@ -345,50 +285,6 @@ uint32_t wr_find_free_volume_id(const wr_vg_info_item_t *vg_item)
         }
     }
     return CM_INVALID_ID32;
-}
-
-status_t wr_gen_volume_head(
-    wr_volume_header_t *vol_head, wr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id)
-{
-    vol_head->vol_type.id = id;
-    errno_t errcode = strcpy_s(vol_head->vol_type.entry_volume_name, WR_MAX_VOLUME_PATH_LEN, volume_name);
-    WR_SECUREC_SS_RETURN_IF_ERROR(errcode, CM_ERROR);
-    vol_head->vol_type.type = WR_VOLUME_TYPE_NORMAL;
-    vol_head->valid_flag = WR_CTRL_VALID_FLAG;
-    errcode = strcpy_s(vol_head->vg_name, WR_MAX_NAME_LEN, vg_item->vg_name);
-    WR_SECUREC_SS_RETURN_IF_ERROR(errcode, CM_ERROR);
-    wr_set_software_version((wr_vg_header_t *)vol_head, (uint32_t)WR_SOFTWARE_VERSION);
-    (void)cm_gettimeofday(&vol_head->create_time);
-    vol_head->checksum = wr_get_checksum((char *)vol_head, WR_VG_DATA_SIZE);
-    return CM_SUCCESS;
-}
-
-status_t wr_cmp_volume_head(wr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id)
-{
-#ifndef WIN32
-    char buf[WR_ALIGN_SIZE] __attribute__((__aligned__(WR_DISK_UNIT_SIZE)));
-#else
-    char buf[WR_ALIGN_SIZE];
-#endif
-    status_t status = CM_ERROR;
-    wr_volume_header_t *vol_cmp_head = (wr_volume_header_t *)buf;
-    do {
-        WR_BREAK_IF_ERROR(wr_read_volume(&vg_item->volume_handle[id], 0, vol_cmp_head, (int32_t)WR_ALIGN_SIZE));
-        if (vol_cmp_head->valid_flag == WR_CTRL_VALID_FLAG) {
-            // cannot add a exists volume
-            WR_THROW_ERROR(
-                ERR_WR_VOLUME_ADD, volume_name, "please check volume is used in cluster, if not need to dd manually");
-            break;
-        }
-        status = CM_SUCCESS;
-    } while (0);
-    return status;
-}
-
-status_t wr_add_volume_vg_ctrl(
-    wr_ctrl_t *vg_ctrl, uint32_t id, uint64 vol_size, const char *volume_name, volume_slot_e volume_flag)
-{
-    return CM_SUCCESS;
 }
 
 uint32_t wr_find_volume(wr_vg_info_item_t *vg_item, const char *volume_name)
@@ -405,44 +301,6 @@ uint32_t wr_find_volume(wr_vg_info_item_t *vg_item, const char *volume_name)
     }
 
     return CM_INVALID_ID32;
-}
-
-status_t wr_refresh_meta_info(wr_session_t *session)
-{
-    return CM_SUCCESS;
-}
-
-uint64 wr_get_vg_latch_shm_offset(wr_vg_info_item_t *vg_item)
-{
-    cm_shm_key_t key = ga_object_key(GA_INSTANCE_POOL, vg_item->objectid);
-    sh_mem_p offset = cm_trans_shm_offset(key, vg_item->vg_latch);
-    return offset;
-}
-
-// NOTE:use in server.
-status_t wr_check_volume(wr_vg_info_item_t *vg_item, uint32_t volumeid)
-{
-    return CM_SUCCESS;
-}
-
-// first check volume is valid.
-status_t wr_check_write_volume(wr_vg_info_item_t *vg_item, uint32_t volumeid, int64 offset, void *buf, uint32_t size)
-{
-    wr_volume_t *volume;
-    WR_RETURN_IF_ERROR(wr_check_volume(vg_item, volumeid));
-    volume = &vg_item->volume_handle[volumeid];
-    return wr_write_volume_inst(vg_item, volume, offset, buf, size);
-}
-
-// first check volume is valid.
-status_t wr_check_read_volume(
-    wr_vg_info_item_t *vg_item, uint32_t volumeid, int64 offset, void *buf, int32_t size, bool32 *remote)
-{
-    wr_volume_t *volume;
-    WR_RETURN_IF_ERROR(wr_check_volume(vg_item, volumeid));
-    volume = &vg_item->volume_handle[volumeid];
-    LOG_DEBUG_INF("Begin to read volume %s when check, offset:%lld,size:%d.", vg_item->entry_path, offset, size);
-    return wr_read_volume_inst(vg_item, volume, offset, buf, size, remote);
 }
 
 wr_remote_read_proc_t remote_read_proc = NULL;
@@ -462,111 +320,6 @@ bool32 wr_need_exec_local(void)
     uint32_t master_id = wr_get_master_id();
     uint32_t curr_id = (uint32_t)(cfg->params.inst_id);
     return ((curr_id == master_id));
-}
-
-status_t wr_read_volume_inst(
-    wr_vg_info_item_t *vg_item, wr_volume_t *volume, int64 offset, void *buf, int32_t size, bool32 *remote_chksum)
-{
-    status_t status = CM_ERROR;
-    CM_ASSERT(offset % WR_DISK_UNIT_SIZE == 0);
-    CM_ASSERT(size % WR_DISK_UNIT_SIZE == 0);
-    CM_ASSERT(((uint64)buf) % WR_DISK_UNIT_SIZE == 0);
-    while (get_instance_status_proc != NULL && get_instance_status_proc() != WR_STATUS_RECOVERY &&
-           wr_need_load_remote(size) == CM_TRUE && status != CM_SUCCESS) {
-        if (size == (int32_t)sizeof(wr_ctrl_t)) {
-            LOG_RUN_INF("Try to load wrctrl from remote.");
-        }
-        status = remote_read_proc(vg_item->vg_name, volume, offset, buf, size);
-        if (status != CM_SUCCESS) {
-            if (status == WR_READ4STANDBY_ERR || get_instance_status_proc() == WR_STATUS_PREPARE) {
-                LOG_RUN_ERR("Failed to load disk(%s) data from the active node, result:%d", volume->name_p, status);
-                return CM_ERROR;
-            }
-            LOG_RUN_WAR("Failed to load disk(%s) data from the active node, result:%d", volume->name_p, status);
-            cm_sleep(WR_READ_REMOTE_INTERVAL);
-            continue;
-        }
-
-        if (*remote_chksum == CM_TRUE) {
-            if (wr_read_remote_checksum(buf, size) != CM_TRUE) {
-                LOG_RUN_WAR("Failed to load disk(%s) data from the active node, checksum error", volume->name_p);
-                status = CM_ERROR;
-                continue;
-            }
-        }
-        return status;
-    }
-
-    if (wr_is_server()) {
-        uint32_t recover_thread_id = wr_get_recover_thread_id();
-        uint32_t curr_thread_id = wr_get_current_thread_id();
-        uint32_t recover_status = get_instance_status_proc();
-        if (recover_status != WR_STATUS_OPEN && recover_thread_id != curr_thread_id &&
-            vg_item->status == WR_VG_STATUS_OPEN) {
-            WR_THROW_ERROR(ERR_WR_RECOVER_CAUSE_BREAK);
-            LOG_RUN_INF("Read volume inst break by recovery");
-            return CM_ERROR;
-        }
-    }
-
-    *remote_chksum = CM_FALSE;
-    status = wr_read_volume(volume, offset, buf, size);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to load disk(%s) data, result:%d", volume->name_p, status);
-        return status;
-    }
-
-    return CM_SUCCESS;
-}
-
-status_t wr_read_volume_4standby(const char *vg_name, uint32_t volume_id, int64 offset, void *buf, uint32_t size)
-{
-    wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
-    if (vg_item == NULL) {
-        LOG_RUN_ERR("Read volume for standby failed, find vg(%s) error.", vg_name);
-        return CM_ERROR;
-    }
-
-    if (volume_id >= WR_MAX_VOLUMES) {
-        LOG_RUN_ERR("Read volume for standby failed, vg(%s) volume id[%u] error.", vg_name, volume_id);
-        return CM_ERROR;
-    }
-
-    wr_volume_t *volume = &vg_item->volume_handle[volume_id];
-    if (volume->handle == WR_INVALID_HANDLE) {
-        if (wr_open_volume(volume->name_p, NULL, WR_INSTANCE_OPEN_FLAG, volume) != CM_SUCCESS) {
-            LOG_RUN_ERR("Read volume for standby failed, failed to open volume(%s).", volume->name_p);
-            return CM_ERROR;
-        }
-    }
-
-    uint64 volumesize = vg_item->wr_ctrl->core.volume_attrs[volume_id].size;
-    if (((uint64)offset > volumesize) || ((uint64)size > (volumesize - (uint64)offset))) {
-        LOG_RUN_ERR(
-            "Read volume for standby failed, params err, vg(%s) voiume id[%u] offset[%llu] size[%u] volume size[%llu].",
-            vg_name, volume_id, offset, size, volumesize);
-        return CM_ERROR;
-    }
-
-    if (wr_read_volume(volume, offset, buf, (int32_t)size) != CM_SUCCESS) {
-        LOG_RUN_ERR("Read volume for standby failed, failed to load disk(%s) data.", volume->name_p);
-        return CM_ERROR;
-    }
-
-    LOG_DEBUG_INF("load disk(%s) data for standby success.", volume->name_p);
-    return CM_SUCCESS;
-}
-
-bool32 wr_meta_syn(wr_session_t *session, wr_bg_task_info_t *bg_task_info)
-{
-    bool32 finish = CM_TRUE;
-    for (uint32_t i = bg_task_info->vg_id_beg; i < bg_task_info->vg_id_end; i++) {
-        bool32 cur_finish = wr_syn_buffer_cache(session, &g_vgs_info->volume_group[i]);
-        if (!cur_finish && !finish) {
-            finish = CM_FALSE;
-        }
-    }
-    return finish;
 }
 
 #ifdef __cplusplus

@@ -196,7 +196,6 @@ status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint
 
     ga_obj_id_t out_obj_id;
     wr_block_id_t meta_block_id;
-    wr_set_blockid(&meta_block_id, meta_syn->meta_block_id);
     char *block = wr_find_block_in_shm_no_refresh_ex(session, vg_item, meta_block_id, &out_obj_id);
     if (block == NULL) {
         LOG_DEBUG_INF(
