@@ -70,7 +70,6 @@ typedef struct st_wr_recycle_meta {
 void wr_enter_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item);
 bool32 wr_enter_shm_time_x(wr_session_t *session, wr_vg_info_item_t *vg_item, uint32_t wait_ticks);
 void wr_enter_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item, bool32 is_force, int32_t timeout);
-void wr_leave_shm(wr_session_t *session, wr_vg_info_item_t *vg_item);
 
 wr_block_ctrl_t *wr_buffer_get_block_ctrl_addr(ga_pool_id_e pool_id, uint32_t object_id);
 char *wr_buffer_get_meta_addr(ga_pool_id_e pool_id, uint32_t object_id);
@@ -81,14 +80,8 @@ bool32 wr_buffer_cache_key_compare(void *key, void *key2);
 status_t wr_register_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, const wr_block_id_t block_id,
     ga_obj_id_t obj_id, char *meta_addr, wr_block_type_t type);
 void wr_unregister_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id);
-status_t wr_find_block_objid_in_shm(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id,
-    wr_block_type_t type, ga_obj_id_t *objid);
-char *wr_find_block_in_shm(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id,
-    wr_block_type_t type, bool32 check_version, ga_obj_id_t *out_obj_id, bool32 active_refresh);
 char *wr_find_block_from_disk_and_refresh_shm(wr_session_t *session, wr_vg_info_item_t *vg_item,
     wr_block_id_t block_id, wr_block_type_t type, ga_obj_id_t *out_obj_id);
-char *wr_find_block_in_shm_no_refresh(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id, ga_obj_id_t *out_obj_id);
 // do not care content change, just care about exist
 char *wr_find_block_in_shm_no_refresh_ex(
     wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id, ga_obj_id_t *out_obj_id);
@@ -114,8 +107,6 @@ void wr_inc_meta_ref_hot(wr_block_ctrl_t *block_ctrl);
 void wr_desc_meta_ref_hot(wr_block_ctrl_t *block_ctrl);
 
 void wr_buffer_recycle_disable(wr_block_ctrl_t *block_ctrl, bool8 recycle_disable);
-void wr_set_recycle_meta_args_to_vg(wr_bg_task_info_t *bg_task_info);
-void wr_recycle_meta(wr_session_t *session, wr_bg_task_info_t *bg_task_info, date_t *clean_time);
 void wr_trigger_recycle_meta(wr_vg_info_item_t *vg_item);
 
 #ifdef __cplusplus

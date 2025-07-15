@@ -152,7 +152,6 @@ void cm_destroy_shm(void);
 void *cm_get_shm(cm_shm_type_e type, uint32_t id, uint64 size, uint32_t flag);
 bool32 cm_del_shm(cm_shm_type_e type, uint32_t id);
 void *cm_attach_shm(cm_shm_type_e type, uint32_t id, uint64 size, uint32_t flag);
-uint64 cm_get_shm_ctrl_flag(void);
 bool32 cm_detach_shm(cm_shm_type_e type, uint32_t id);
 bool32 cm_native_del_shm(cm_shm_handle_t handle);
 cm_shm_key_t cm_shm_key_of(cm_shm_type_e type, uint32_t id);
@@ -160,7 +159,6 @@ sh_mem_p cm_trans_shm_offset(uint32_t key, void *ptr);
 void *cm_do_attach_shm_without_register(cm_shm_key_t key, uint64 size, uint32_t flag, bool32 logging_open_err);
 void cm_set_shm_ctrl_flag(uint64 value);
 bool32 del_shm_by_key(cm_shm_key_t key);
-sh_mem_p cm_trans_shm_offset_from_malloc(uint32_t key, void *ptr);
 typedef struct tagcm_shm_map_entry {
     cm_shm_handle_t handle;
     void *addr;     /* Attached address of the block */

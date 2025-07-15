@@ -42,7 +42,6 @@
 #include "wr_defs.h"
 #include "wr_malloc.h"
 #include "wr_file.h"
-#include "wr_io_fence.h"
 #include "wr_api.h"
 #include "wr_api_impl.h"
 #include "wrcmd_encrypt.h"
@@ -131,13 +130,6 @@ static status_t cmd_check_cfg_scope(const char *scope)
         return CM_ERROR;
     }
     return CM_SUCCESS;
-}
-
-// ------------------------
-// add uni-check function before here
-static inline void help_param_wrhome(void)
-{
-    (void)printf("-D/--WR_HOME <WR_HOME>, [optional], the run path of wrserver, default value is $WR_HOME\n");
 }
 
 double wr_convert_size(double size, const char *measure)

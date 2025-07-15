@@ -73,9 +73,6 @@ typedef struct st_wr_remote_ack_hdl {
 } wr_remote_ack_hdl_t;
 void wr_process_remote_ack_for_get_ftid_by_path(wr_session_t *session, wr_remote_exec_succ_ack_t *remote_ack)
 {
-    wr_find_node_t *ft_node = (wr_find_node_t *)(remote_ack->body_buf + sizeof(uint32_t));
-    wr_vg_info_item_t *vg_item = wr_find_vg_item(ft_node->vg_name);
-    (void)wr_get_ft_node_by_ftid(session, vg_item, ft_node->ftid, CM_TRUE, CM_FALSE);
 }
 static wr_remote_ack_hdl_t g_wr_remote_ack_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_GET_FTID_BY_PATH)] = {wr_process_remote_ack_for_get_ftid_by_path},
