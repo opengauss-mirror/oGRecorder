@@ -28,7 +28,6 @@
 #include "cm_dlock.h"
 #include "cm_disklock.h"
 #include "cm_utils.h"
-#include "wr_io_fence.h"
 #include "wr_open_file.h"
 #include "wr_diskgroup.h"
 
@@ -130,11 +129,6 @@ wr_get_instance_status_proc_t get_instance_status_proc = NULL;
 void regist_get_instance_status_proc(wr_get_instance_status_proc_t proc)
 {
     get_instance_status_proc = proc;
-}
-
-void vg_destroy_env(wr_vg_info_item_t *vg_item)
-{
-    cm_oamap_destroy(&vg_item->au_map);
 }
 
 void wr_free_vg_info()

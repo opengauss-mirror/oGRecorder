@@ -15,15 +15,13 @@
  *
  * wr_file.h
  *
- *
  * IDENTIFICATION
  *    src/common/wr_file.h
- *
  * -------------------------------------------------------------------------
  */
 
-#ifndef __WR_FILE_H_
-#define __WR_FILE_H_
+#ifndef __WR_FILE_H__
+#define __WR_FILE_H__
 
 #include "wr_file_def.h"
 #include "wr_diskgroup.h"
@@ -53,28 +51,13 @@ void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item)
 
 status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type);
 status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int *fd);
-status_t wr_close_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid);
-status_t wr_extend(wr_session_t *session, wr_node_data_t *node_data);
-status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data);
 status_t wr_truncate(wr_session_t *session, uint64 fid, ftid_t ftid, int64 length, char *vg_name);
 status_t wr_update_file_written_size(
     wr_session_t *session, uint32_t vg_id, int64 offset, int64 size, wr_block_id_t ftid, uint64 fid);
 void wr_check_ft_node_free(gft_node_t *node);
 status_t wr_postpone_file(wr_session_t *session, const char *file, const char *time);
 
-status_t wr_format_ft_node(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t auid);
-gft_node_t *wr_get_next_node(wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node);
-bool32 wr_is_last_tree_node(gft_node_t *node);
 void wr_delay_clean_all_vg(wr_session_t *session);
-gft_node_t *wr_get_ft_node_by_ftid(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, ftid_t id, bool32 check_version, bool32 active_refresh);
-status_t wr_update_ft_block_disk(wr_vg_info_item_t *vg_item, wr_ft_block_t *block, ftid_t id);
-status_t wr_refresh_root_ft(wr_vg_info_item_t *vg_item, bool32 check_version, bool32 active_refresh);
-
-// for tool or instance
-void wr_init_ft_root(wr_ctrl_t *wr_ctrl, gft_node_t **out_node);
-status_t wr_update_ft_root(wr_vg_info_item_t *vg_item);
-status_t wr_check_refresh_ft(wr_vg_info_item_t *vg_item);
 
 typedef struct st_wr_alloc_fs_block_info {
     bool8 is_extend;
@@ -82,7 +65,6 @@ typedef struct st_wr_alloc_fs_block_info {
     uint16_t index;
     gft_node_t *node;
 } wr_alloc_fs_block_info_t;
-void wr_free_fs_block_addr(wr_session_t *session, wr_vg_info_item_t *vg_item, char *block, ga_obj_id_t obj_id);
 
 status_t wr_check_rename_path(wr_session_t *session, const char *src_path, const char *dst_path, text_t *dst_name);
 status_t wr_get_name_from_path(const char *path, uint32_t *beg_pos, char *name);
@@ -101,10 +83,6 @@ status_t wr_check_path_both(const char *path);
 
 /* AU is usually NOT serial/continuous within a single file, judged from R/W file behaviors */
 status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, uint64 ftid, bool32 *is_open);
-status_t wr_check_file(wr_vg_info_item_t *vg_item);
-
-status_t wr_check_rm_file(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, ftid_t ftid, bool32 *should_rm_file, gft_node_t **file_node);
 
 static inline bool32 wr_is_node_deleted(gft_node_t *node)
 {
@@ -118,6 +96,8 @@ static inline bool32 wr_is_fs_meta_valid(gft_node_t *node)
 
 static inline void wr_set_fs_block_file_ver(gft_node_t *node, wr_fs_block_t *fs_block)
 {
+    (void)node;
+    (void)fs_block;
     return;
 }
 
@@ -230,20 +210,24 @@ static inline void wr_unlatch_node(gft_node_t *node)
     WR_ASSERT_LOG(block_ctrl != NULL, "block_ctrl is NULL when unlatch node because node is root block");
     wr_unlatch(&block_ctrl->latch);
 }
+
 static inline wr_file_context_t *wr_get_file_context_by_handle(wr_file_run_ctx_t *file_run_ctx, int32_t handle)
 {
     return &file_run_ctx->files.files_group[handle / WR_FILE_CONTEXT_PER_GROUP][handle % WR_FILE_CONTEXT_PER_GROUP];
 }
-// this is need to re-consturct the code-file-place
+
+// 回调函数类型定义及注册
 typedef status_t (*wr_invalidate_other_nodes_proc_t)(
     wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
+
 status_t wr_invalidate_other_nodes_proc(
     wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
 void regist_invalidate_other_nodes_proc(wr_invalidate_other_nodes_proc_t proc);
+
 typedef status_t (*wr_broadcast_check_file_open_proc_t)(wr_vg_info_item_t *vg_item, uint64 ftid, bool32 *cmd_ack);
 void regist_broadcast_check_file_open_proc(wr_broadcast_check_file_open_proc_t proc);
 
-void wr_clean_all_sessions_latch();
+void wr_clean_all_sessions_latch(void);
 
 status_t wr_block_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *vg_item, wr_block_id_t block_id,
     uint64 offset, char *data_buf, int32_t size);
@@ -253,7 +237,8 @@ status_t wr_write_zero2au(char *op_desc, wr_vg_info_item_t *vg_item, uint64 fid,
 status_t wr_try_write_zero_one_au(
     char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 offset);
 void wr_alarm_check_vg_usage(wr_session_t *session);
+
 #ifdef __cplusplus
 }
 #endif
-#endif
+#endif  // __WR_FILE_H__

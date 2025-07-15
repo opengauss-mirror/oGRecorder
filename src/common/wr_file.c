@@ -28,7 +28,6 @@
 #include "wr_defs.h"
 #include "wr_hashmap.h"
 #include "wr_shm.h"
-#include "wr_io_fence.h"
 #include "wr_malloc.h"
 #include "wr_open_file.h"
 #include "cm_system.h"
@@ -38,6 +37,7 @@
 #include "wr_syn_meta.h"
 #include "wr_thv.h"
 #include "wr_filesystem.h"
+#include "wr_file.h"
 
 wr_env_t g_wr_env;
 wr_env_t *wr_get_env(void)
@@ -79,11 +79,6 @@ int is_letter(char c)
 int is_number(char c)
 {
     return (c >= '0' && c <= '9');
-}
-
-static inline bool32 compare_auid(auid_t a, auid_t b)
-{
-    return ((a.volume == b.volume) && (a.au == b.au) && (a.block == b.block) && (a.item == b.item));
 }
 
 static status_t wr_is_valid_name_char(char name)
@@ -146,11 +141,6 @@ status_t wr_check_name(const char *name)
     return wr_check_name_is_valid(name, WR_MAX_NAME_LEN);
 }
 
-status_t wr_check_attr_flag(uint64 attrFlag)
-{
-    return CM_SUCCESS;
-}
-
 status_t wr_check_path(const char *path)
 {
     if (path == NULL || strlen(path) == 0) {
@@ -159,16 +149,6 @@ status_t wr_check_path(const char *path)
     }
 
     return wr_check_path_is_valid(path, WR_FILE_PATH_MAX_LENGTH);
-}
-
-status_t wr_check_volume_path(const char *path)
-{
-    if (path == NULL || strlen(path) == 0) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, "[null]", ", path cannot be a null string."));
-    }
-
-    return wr_check_path_is_valid(path, WR_MAX_VOLUME_PATH_LEN);
 }
 
 status_t wr_check_device_path(const char *path)
@@ -269,7 +249,6 @@ void wr_lock_vg_mem_and_shm_s_force(wr_session_t *session, wr_vg_info_item_t *vg
 
 void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item)
 {
-    wr_leave_shm(session, vg_item);
     wr_unlock_vg_mem(vg_item);
 }
 
@@ -339,11 +318,6 @@ status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, 
     return status;
 }
 
-status_t wr_check_file(wr_vg_info_item_t *vg_item)
-{
-    return CM_SUCCESS;
-}
-
 status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int *fd)
 {
     status_t status;
@@ -355,90 +329,6 @@ status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int
     }
     WR_LOG_DEBUG_OP("Succeed to open file:%s, fd:%d, session:%u.", file, *fd, session->id);
     return CM_SUCCESS;
-}
-
-status_t wr_close_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid)
-{
-    status_t status =
-        wr_delete_open_file_index(session, vg_item, ftid, session->cli_info.cli_pid, session->cli_info.start_time);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to delete open file index, ftid:%llu.", ftid));
-    return CM_SUCCESS;
-}
-
-status_t wr_check_rm_file(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, ftid_t ftid, bool32 *should_rm_file, gft_node_t **file_node)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_format_ft_node(wr_session_t *session, wr_vg_info_item_t *vg_item, auid_t auid)
-{
-    return CM_SUCCESS;
-}
-
-gft_node_t *wr_get_ft_node_by_ftid(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, ftid_t id, bool32 check_version, bool32 active_refresh)
-{
-    return NULL;
-}
-
-status_t wr_update_ft_block_disk(wr_vg_info_item_t *vg_item, wr_ft_block_t *block, ftid_t id)
-{
-    return CM_SUCCESS;
-}
-
-
-
-status_t wr_extend_from_offset(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, wr_node_data_t *node_data)
-{
-    return CM_SUCCESS;
-}
-
-static status_t wr_extend_with_updt_written_size(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, wr_node_data_t *node_data)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_extend(wr_session_t *session, wr_node_data_t *node_data)
-{
-    return CM_SUCCESS;
-}
-
-status_t wr_do_fallocate(wr_session_t *session, wr_node_data_t *node_data)
-{
-    status_t status;
-    if (node_data->size < 0) {
-        WR_THROW_ERROR(ERR_WR_FILE_INVALID_SIZE, node_data->offset, node_data->size);
-        LOG_RUN_ERR("Invalid fallocate offset:%lld, size:%lld.", node_data->offset, node_data->size);
-        return CM_ERROR;
-    }
-
-    if (node_data->mode != 0) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("Failed to check mode,vg id %d.", node_data->mode),
-            WR_THROW_ERROR(ERR_WR_INVALID_ID, "fallocate mode", (uint64)node_data->mode));
-    }
-
-    wr_vg_info_item_t *vg_item = wr_find_vg_item_by_id(node_data->vgid);
-    if (vg_item == NULL) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("Failed to find vg, vg id:%u.", node_data->vgid),
-            WR_THROW_ERROR(ERR_WR_INVALID_ID, "vg id", (uint64)node_data->vgid));
-    }
-    node_data->vg_name = (char *)vg_item->vg_name;
-
-    wr_lock_vg_mem_and_shm_x(session, vg_item);
-    gft_node_t *node = wr_get_ft_node_by_ftid(session, vg_item, node_data->ftid, CM_TRUE, CM_FALSE);
-    if (node == NULL) {
-        wr_unlock_vg_mem_and_shm(session, vg_item);
-        WR_RETURN_IFERR2(
-            CM_ERROR, LOG_RUN_ERR("Failed to find ftid, ftid:%s.", wr_display_metaid(node_data->ftid)));
-    }
-
-    status = wr_extend_with_updt_written_size(session, vg_item, node, node_data);
-    wr_unlock_vg_mem_and_shm(session, vg_item);
-
-    return status;
 }
 
 wr_invalidate_other_nodes_proc_t invalidate_other_nodes_proc = NULL;

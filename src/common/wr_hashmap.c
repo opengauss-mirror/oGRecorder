@@ -240,60 +240,6 @@ void cm_oamap_init_mem(cm_oamap_t *map)
     map->compare_func = NULL;
 }
 
-int32_t cm_oamap_init(
-    cm_oamap_t *map, uint32_t init_capacity, cm_oamap_compare_t compare_func /* , memory_context_t *mem_ctx */)
-{
-    uint64 size;
-    uint32_t i;
-    if (map == NULL || compare_func == NULL) {
-        LOG_RUN_ERR("Null pointer specified");
-        return ERR_WR_INVALID_PARAM;
-    }
-    // The max oamap
-    map->num = oamap_get_near_prime(init_capacity);
-    if (map->num >= MAX_OAMAP_BUCKET_NUM) {
-        LOG_RUN_ERR("Invalid bucket num specified");
-        return ERR_WR_INVALID_PARAM;
-    }
-    map->used = 0;
-    size = map->num * (uint32_t)(sizeof(cm_oamap_bucket_t) + sizeof(void *) + sizeof(void *));
-    if (size >= CM_INVALID_ID32) {
-        LOG_RUN_ERR("Invalid map size");
-        return ERR_WR_INVALID_PARAM;
-    }
-    map->compare_func = compare_func;
-    map->buckets = (cm_oamap_bucket_t *)cm_malloc((uint32_t)size);
-    if (map->buckets == NULL) {
-        LOG_RUN_ERR("Malloc failed");
-        return CM_ERROR;
-    }
-    map->key = (void **)(map->buckets + map->num);
-    map->value = (void **)(map->key + map->num);
-
-    for (i = 0; i < map->num; i++) {
-        map->buckets[i].state = (uint32_t)FREE;
-        map->key[i] = NULL;
-        map->value[i] = NULL;
-    }
-    map->deleted = 0;
-    return CM_SUCCESS;
-}
-
-void cm_oamap_destroy(cm_oamap_t *map)
-{
-    CM_ASSERT(map != NULL);
-    map->num = 0;
-    map->deleted = 0;
-    map->used = 0;
-
-    if (map->buckets != NULL) {
-        cm_free(map->buckets);
-        map->buckets = NULL;
-    }
-
-    map->compare_func = NULL;
-}
-
 static int32_t cm_oamap_find_pos_forward(cm_oamap_t *map, uint32_t hash, void *key, bool32 *found_pos, uint32_t *insert_pos)
 {
     cm_oamap_bucket_t *cm_oamap_bucket;

@@ -25,7 +25,6 @@
 #include "wr_service.h"
 #include "cm_system.h"
 #include "wr_instance.h"
-#include "wr_io_fence.h"
 #include "wr_malloc.h"
 #include "wr_open_file.h"
 #include "wr_filesystem.h"

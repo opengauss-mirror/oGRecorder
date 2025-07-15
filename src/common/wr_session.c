@@ -38,7 +38,6 @@ wr_session_ctrl_t g_wr_session_ctrl = {0};
 
 status_t wr_extend_session(uint32_t extend_num)
 {
-    uint32_t objectid;
     uint32_t old_alloc_sessions = g_wr_session_ctrl.alloc_sessions;
     uint32_t new_alloc_sessions = g_wr_session_ctrl.alloc_sessions + extend_num;
     if (new_alloc_sessions > g_wr_session_ctrl.total) {
@@ -49,7 +48,7 @@ status_t wr_extend_session(uint32_t extend_num)
         return CM_ERROR;
     }
     for (uint32_t i = old_alloc_sessions; i < new_alloc_sessions; i++) {
-        objectid = ga_alloc_object(GA_SESSION_POOL, WR_INVALID_ID32);
+        uint32_t objectid = ga_alloc_object(GA_SESSION_POOL, WR_INVALID_ID32);
         if (objectid == WR_INVALID_ID32) {
             LOG_RUN_ERR("Failed to alloc object for session %u.", i);
             WR_THROW_ERROR(ERR_WR_SESSION_EXTEND, "Failed to alloc object for session %u.", i);

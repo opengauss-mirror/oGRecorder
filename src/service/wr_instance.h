@@ -28,7 +28,6 @@
 #include "cm_spinlock.h"
 #include "cs_listener.h"
 #include "wr_defs.h"
-#include "wr_volume.h"
 #include "wr_file.h"
 #include "wr_session.h"
 #include "wr_diskgroup.h"

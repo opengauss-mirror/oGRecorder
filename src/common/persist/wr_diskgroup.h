@@ -26,7 +26,6 @@
 #define __WR_DISK_GROUP_H__
 
 #include "wr_defs.h"
-#include "wr_volume.h"
 #include "cm_types.h"
 #include "wr_hashmap.h"
 #include "wr_latch.h"
