@@ -139,9 +139,11 @@ TEST_F(WrApiTest, TestWrfileWriteRead) {
     EXPECT_EQ(wr_file_pread(g_vfs_handle, file_handle3, buf3, strlen(data3), 0), strlen(data3));
 }
 
+#ifndef ENABLE_WORM
 TEST_F(WrApiTest, TestWrfileTruncate) {
     EXPECT_EQ(wr_file_truncate(g_vfs_handle, file_handle1, 0, ONE_GB), WR_SUCCESS);
 }
+#endif
 
 TEST_F(WrApiTest, TestWrfileStat) {
     long long offset = 0;
@@ -149,9 +151,10 @@ TEST_F(WrApiTest, TestWrfileStat) {
     int mode = 0;
     char *time = NULL;
     EXPECT_EQ(wr_file_stat(g_vfs_handle, TEST_FILE1, &offset, &size, &mode, &time), WR_SUCCESS);
+#ifndef ENABLE_WORM
     EXPECT_EQ(offset, ONE_GB);
     EXPECT_EQ(size, ONE_GB);
-#ifdef ENABLE_WORM
+#else
     EXPECT_EQ(mode, WR_FILE_APPEND);
 #endif
 }

@@ -66,48 +66,9 @@ typedef struct st_wr_recycle_meta {
 } wr_recycle_meta_t;
 
 #define WR_LOCK_SHM_META_TIMEOUT 200
-#define WR_BUFFER_CACHE_HASH(block_id) cm_hash_int64((int64)WR_BLOCK_ID_IGNORE_UNINITED((block_id)))
-void wr_enter_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item);
-bool32 wr_enter_shm_time_x(wr_session_t *session, wr_vg_info_item_t *vg_item, uint32_t wait_ticks);
-void wr_enter_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item, bool32 is_force, int32_t timeout);
 
-wr_block_ctrl_t *wr_buffer_get_block_ctrl_addr(ga_pool_id_e pool_id, uint32_t object_id);
-char *wr_buffer_get_meta_addr(ga_pool_id_e pool_id, uint32_t object_id);
-
-uint32_t wr_buffer_cache_get_block_size(uint32_t block_type);
-bool32 wr_buffer_cache_key_compare(void *key, void *key2);
-
-status_t wr_register_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, const wr_block_id_t block_id,
-    ga_obj_id_t obj_id, char *meta_addr, wr_block_type_t type);
-void wr_unregister_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id);
 char *wr_find_block_from_disk_and_refresh_shm(wr_session_t *session, wr_vg_info_item_t *vg_item,
     wr_block_id_t block_id, wr_block_type_t type, ga_obj_id_t *out_obj_id);
-// do not care content change, just care about exist
-char *wr_find_block_in_shm_no_refresh_ex(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id, ga_obj_id_t *out_obj_id);
-
-status_t wr_refresh_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item, shm_hashmap_t *map);
-status_t wr_get_block_from_disk(
-    wr_vg_info_item_t *vg_item, wr_block_id_t block_id, char *buf, int64_t offset, int32_t size, bool32 calc_checksum);
-status_t wr_check_block_version(wr_vg_info_item_t *vg_item, wr_block_id_t block_id, wr_block_type_t type,
-    char *meta_addr, bool32 *is_changed, bool32 force_refresh);
-status_t wr_refresh_block_in_shm(wr_session_t *session, wr_vg_info_item_t *vg_item, wr_block_id_t block_id,
-    wr_block_type_t type, char *buf, char **shm_buf);
-static inline int64 wr_get_block_offset(wr_vg_info_item_t *vg_item, uint64 block_size, uint64 blockid, uint64 auid)
-{
-    return (int64)(block_size * blockid + wr_get_vg_au_size(vg_item->wr_ctrl) * auid);
-}
-
-void wr_init_wr_fs_block_cache_info(wr_fs_block_cache_info_t *fs_block_cache_info);
-void wr_init_vg_cache_node_info(wr_vg_info_item_t *vg_item);
-status_t wr_hashmap_extend_and_redistribute(wr_session_t *session, shm_hash_ctrl_t *hash_ctrl);
-// do not need control concurrence
-void wr_inc_meta_ref_hot(wr_block_ctrl_t *block_ctrl);
-// do not need control concurrence
-void wr_desc_meta_ref_hot(wr_block_ctrl_t *block_ctrl);
-
-void wr_buffer_recycle_disable(wr_block_ctrl_t *block_ctrl, bool8 recycle_disable);
-void wr_trigger_recycle_meta(wr_vg_info_item_t *vg_item);
 
 #ifdef __cplusplus
 }

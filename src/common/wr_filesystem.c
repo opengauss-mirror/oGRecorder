@@ -435,28 +435,6 @@ status_t wr_filesystem_postpone(const char *file_path, const char *time)
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_get_systime(time_t *sys_time)
-{
-    const char *test_time = "test_time";
-    char path[WR_FILE_PATH_MAX_LENGTH];
-    wr_get_fs_path(test_time, path, sizeof(path));
-    FILE *file = fopen(path, "w");
-    if (!file) {
-        LOG_RUN_ERR("[FS] Failed to create file: %s", test_time);
-        return CM_ERROR;
-    }
-    struct stat buf;
-    if (stat(path, &buf) != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS] Failed to get file %s time", test_time);
-        fclose(file);
-        return CM_ERROR;
-    }
-    *sys_time = buf.st_mtime;
-    fclose(file);
-    unlink(path);
-    return CM_SUCCESS;
-}
-
 #ifdef __cplusplus
 }
 #endif

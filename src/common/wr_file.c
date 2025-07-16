@@ -141,16 +141,6 @@ status_t wr_check_name(const char *name)
     return wr_check_name_is_valid(name, WR_MAX_NAME_LEN);
 }
 
-status_t wr_check_path(const char *path)
-{
-    if (path == NULL || strlen(path) == 0) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, "[null]", ", path cannot be a null string."));
-    }
-
-    return wr_check_path_is_valid(path, WR_FILE_PATH_MAX_LENGTH);
-}
-
 status_t wr_check_device_path(const char *path)
 {
     if (path == NULL || strlen(path) == 0) {
@@ -159,19 +149,6 @@ status_t wr_check_device_path(const char *path)
     }
 
     return wr_check_path_is_valid(path + 1, (WR_FILE_PATH_MAX_LENGTH - 1));
-}
-
-status_t wr_check_path_both(const char *path)
-{
-    if (path == NULL || strlen(path) == 0) {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, "[null]", "path cannot be a null string."));
-    }
-
-    if (path[0] == '+') {
-        return wr_check_path_is_valid(path + 1, WR_FILE_PATH_MAX_LENGTH - 1);
-    } else {
-        return wr_check_path_is_valid(path, WR_FILE_PATH_MAX_LENGTH);
-    }
 }
 
 status_t wr_postpone_file(wr_session_t *session, const char *file, const char *time)
@@ -185,71 +162,6 @@ status_t wr_postpone_file(wr_session_t *session, const char *file, const char *t
     }
     WR_LOG_DEBUG_OP("Succeed to extend file %s expired time to %s.", file, time);
     return CM_SUCCESS;
-}
-
-status_t wr_get_name_from_path(const char *path, uint32_t *beg_pos, char *name)
-{
-    CM_ASSERT(path != NULL);
-    CM_ASSERT(beg_pos != NULL);
-    CM_ASSERT(name != NULL);
-    uint32_t name_len = 0;
-    size_t len = strlen(path);
-    if (len == 0) {
-        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, "[null]", "path cannot be a null string.");
-        return CM_ERROR;
-    }
-    if (*beg_pos > len) {
-        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, path, "begin pos is larger than string length.");
-        return CM_ERROR;
-    }
-    if (path[*beg_pos] == '/' || (*beg_pos == 0 && path[*beg_pos] == '+')) {
-        (*beg_pos)++;
-        if (path[*beg_pos - 1] == '/') {
-            while (path[*beg_pos] == '/') {
-                (*beg_pos)++;
-            }
-        }
-        while (path[*beg_pos] != '/' && path[*beg_pos] != 0) {
-            name[name_len] = path[*beg_pos];
-            if (wr_is_valid_name_char(name[name_len]) != CM_SUCCESS) {
-                WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, path, ", name should be [0~9,a~z,A~Z,-,_,.]");
-                return CM_ERROR;
-            }
-            (*beg_pos)++;
-            name_len++;
-            if (name_len >= WR_MAX_NAME_LEN) {
-                char *err_msg = "name length should less than 64.";
-                WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, (char *)path + *beg_pos, err_msg));
-            }
-        }
-        name[name_len] = 0;
-    } else if (path[*beg_pos] == 0) {
-        name[0] = 0;
-    } else {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, path, ", name should be [0~9,a~z,A~Z,-,_,.]"));
-    }
-    return CM_SUCCESS;
-}
-
-void wr_lock_vg_mem_and_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item)
-{
-    wr_lock_vg_mem_x(vg_item);
-}
-
-void wr_lock_vg_mem_and_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item)
-{
-    wr_lock_vg_mem_s(vg_item);
-}
-
-void wr_lock_vg_mem_and_shm_s_force(wr_session_t *session, wr_vg_info_item_t *vg_item)
-{
-    wr_lock_vg_mem_s_force(vg_item);
-}
-
-void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item)
-{
-    wr_unlock_vg_mem(vg_item);
 }
 
 static status_t wr_exist_item_core(
@@ -286,12 +198,6 @@ static status_t wr_exist_item_core(
     }
     *result = true;
 
-    return CM_SUCCESS;
-}
-
-status_t wr_check_dir(wr_session_t *session, const char *dir_path, gft_item_type_t type,
-    wr_check_dir_output_t *output_info, bool32 is_throw_err)
-{
     return CM_SUCCESS;
 }
 
@@ -334,12 +240,6 @@ status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int
 wr_invalidate_other_nodes_proc_t invalidate_other_nodes_proc = NULL;
 wr_broadcast_check_file_open_proc_t broadcast_check_file_open_proc = NULL;
 
-status_t wr_invalidate_other_nodes_proc(
-    wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack)
-{
-    return CM_SUCCESS;
-}
-
 void regist_invalidate_other_nodes_proc(wr_invalidate_other_nodes_proc_t proc)
 {
     invalidate_other_nodes_proc = proc;
@@ -348,28 +248,6 @@ void regist_invalidate_other_nodes_proc(wr_invalidate_other_nodes_proc_t proc)
 void regist_broadcast_check_file_open_proc(wr_broadcast_check_file_open_proc_t proc)
 {
     broadcast_check_file_open_proc = proc;
-}
-
-status_t wr_check_rename_path(wr_session_t *session, const char *src_path, const char *dst_path, text_t *dst_name)
-{
-    text_t src_dir;
-    text_t src_name;
-    cm_str2text((char *)src_path, &src_name);
-    if (!cm_fetch_rtext(&src_name, '/', '\0', &src_dir)) {
-        WR_RETURN_IFERR3(CM_ERROR, LOG_RUN_ERR("not a complete absolute path name(%s %s)", T2S(&src_dir), src_path),
-            WR_THROW_ERROR(ERR_WR_FILE_RENAME, "can not change path."));
-    }
-
-    text_t dst_dir;
-    cm_str2text((char *)dst_path, dst_name);
-    if (!cm_fetch_rtext(dst_name, '/', '\0', &dst_dir)) {
-        WR_RETURN_IFERR2(CM_ERROR, LOG_RUN_ERR("not a complete absolute path name(%s %s)", T2S(&dst_dir), dst_path));
-    }
-
-    if (cm_text_equal(&src_dir, &dst_dir) == CM_FALSE) {
-        WR_RETURN_IFERR2(CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_RENAME, "can not change path."));
-    }
-    return CM_SUCCESS;
 }
 
 status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, uint64 ftid, bool32 *is_open)
@@ -436,9 +314,4 @@ void wr_clean_all_sessions_latch()
         wr_clean_session_latch(session, CM_TRUE);
         wr_server_session_unlock(session);
     }
-}
-
-void wr_alarm_check_vg_usage(wr_session_t *session)
-{
-    return;
 }

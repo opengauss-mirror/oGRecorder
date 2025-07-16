@@ -145,13 +145,12 @@ status_t wr_put_text(wr_packet_t *pack, text_t *text)
 status_t wr_put_str_with_cutoff(wr_packet_t *pack, const char *str)
 {
     uint32_t size;
-    char *addr = NULL;
     errno_t errcode = 0;
 
     CM_ASSERT(pack != NULL);
     CM_ASSERT(str != NULL);
     size = (uint32_t)strlen(str);
-    addr = WR_WRITE_ADDR(pack);
+    char *addr = WR_WRITE_ADDR(pack);
     if (size != 0) {
         // for such as err msg , len max is 2K, too long for wr packet, which is fixed len at present, so cut it off
         // for '\0'

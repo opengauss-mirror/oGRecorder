@@ -97,10 +97,8 @@ status_t cm_launch_thv(thv_ctrl_t *thv_ctrls, uint32_t thv_ctrl_cnt);
 
 uint32_t wr_get_current_thread_id();
 void wr_set_thv_run_ctx_item(wr_thv_run_ctx_item_e item, void *item_addr);
-void *wr_get_thv_run_ctx_item(wr_thv_run_ctx_item_e item);
 
 void wr_exit_error();
-void wr_destroy_thv(thv_type_e type);
 #ifdef __cplusplus
 }
 #endif

@@ -44,10 +44,6 @@ typedef struct st_wr_node_data {
 } wr_node_data_t;
 
 int wr_check_readwrite(const char *name);
-void wr_lock_vg_mem_and_shm_x(wr_session_t *session, wr_vg_info_item_t *vg_item);
-void wr_lock_vg_mem_and_shm_s(wr_session_t *session, wr_vg_info_item_t *vg_item);
-void wr_lock_vg_mem_and_shm_s_force(wr_session_t *session, wr_vg_info_item_t *vg_item);
-void wr_unlock_vg_mem_and_shm(wr_session_t *session, wr_vg_info_item_t *vg_item);
 
 status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type);
 status_t wr_open_file(wr_session_t *session, const char *file, int32_t flag, int *fd);
@@ -66,20 +62,13 @@ typedef struct st_wr_alloc_fs_block_info {
     gft_node_t *node;
 } wr_alloc_fs_block_info_t;
 
-status_t wr_check_rename_path(wr_session_t *session, const char *src_path, const char *dst_path, text_t *dst_name);
-status_t wr_get_name_from_path(const char *path, uint32_t *beg_pos, char *name);
-status_t wr_check_dir(wr_session_t *session, const char *dir_path, gft_item_type_t type,
-    wr_check_dir_output_t *output_info, bool32 is_throw_err);
-
 wr_env_t *wr_get_env(void);
 wr_config_t *wr_get_inst_cfg(void);
 status_t wr_get_root_version(wr_vg_info_item_t *vg_item, uint64 *version);
 status_t wr_check_name(const char *name);
 status_t wr_check_attr_flag(uint64 attrFlag);
-status_t wr_check_path(const char *path);
 status_t wr_check_volume_path(const char *path);
 status_t wr_check_device_path(const char *path);
-status_t wr_check_path_both(const char *path);
 
 /* AU is usually NOT serial/continuous within a single file, judged from R/W file behaviors */
 status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, uint64 ftid, bool32 *is_open);
@@ -220,8 +209,6 @@ static inline wr_file_context_t *wr_get_file_context_by_handle(wr_file_run_ctx_t
 typedef status_t (*wr_invalidate_other_nodes_proc_t)(
     wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
 
-status_t wr_invalidate_other_nodes_proc(
-    wr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
 void regist_invalidate_other_nodes_proc(wr_invalidate_other_nodes_proc_t proc);
 
 typedef status_t (*wr_broadcast_check_file_open_proc_t)(wr_vg_info_item_t *vg_item, uint64 ftid, bool32 *cmd_ack);
@@ -236,7 +223,6 @@ status_t wr_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *vg_item
 status_t wr_write_zero2au(char *op_desc, wr_vg_info_item_t *vg_item, uint64 fid, auid_t auid, uint32_t au_offset);
 status_t wr_try_write_zero_one_au(
     char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 offset);
-void wr_alarm_check_vg_usage(wr_session_t *session);
 
 #ifdef __cplusplus
 }

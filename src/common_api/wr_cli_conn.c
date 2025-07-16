@@ -253,15 +253,6 @@ status_t check_server_addr_format(const char *server_addr)
     return WR_SUCCESS;
 }
 
-void wr_leave_api(wr_conn_t *conn, bool32 get_api_volume_error)
-{
-    cm_spin_unlock(&((wr_session_t *)(conn->session))->shm_lock);
-    LOG_DEBUG_INF("Succeed to unlock session %u shm lock", ((wr_session_t *)(conn->session))->id);
-    if (get_api_volume_error) {
-        wr_get_api_volume_error();
-    }
-}
-
 #ifdef __cplusplus
 }
 #endif

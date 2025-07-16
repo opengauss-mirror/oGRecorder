@@ -48,46 +48,11 @@ int32_t g_wr_tcp_conn_timeout = WR_TCP_CONNECT_TIMEOUT;
 uint32_t g_wr_server_pid = 0;
 
 typedef struct str_files_rw_ctx {
-    wr_conn_t *conn;
-    wr_file_context_t *file_ctx;
-    wr_env_t *env;
     int32_t handle;
     int32_t size;
     bool32 read;
     int64 offset;
 } files_rw_ctx_t;
-
-status_t wr_lock_vg_s(wr_vg_info_item_t *vg_item, wr_session_t *session)
-{
-    wr_latch_offset_t latch_offset;
-    latch_offset.type = WR_LATCH_OFFSET_SHMOFFSET;
-    return wr_cli_lock_shm_meta_s(session, &latch_offset, vg_item->vg_latch, NULL);
-}
-
-static inline void wr_init_conn(wr_conn_t *conn)
-{
-    conn->flag = CM_FALSE;
-    conn->cli_vg_handles = NULL;
-    conn->session = NULL;
-}
-
-status_t wr_alloc_conn(wr_conn_t **conn)
-{
-    wr_conn_t *_conn = (wr_conn_t *)cm_malloc_align(WRAPI_BLOCK_SIZE, sizeof(wr_conn_t));
-    if (_conn != NULL) {
-        wr_init_conn(_conn);
-        *conn = _conn;
-        return CM_SUCCESS;
-    }
-
-    return CM_ERROR;
-}
-
-void wr_free_conn(wr_conn_t *conn)
-{
-    WR_FREE_POINT(conn);
-    return;
-}
 
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn)
 {
@@ -206,48 +171,6 @@ status_t wr_cli_ssl_connect(wr_conn_t *conn)
     return CM_SUCCESS;
 }
 
-// NOTE:just for wrcmd because not support many threads in one process.
-status_t wr_connect_ex(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn)
-{
-    status_t status = CM_ERROR;
-    wr_env_t *wr_env = wr_get_env();
-    wr_init_conn(conn);
-    do {
-        status = wr_connect("127.0.0.1:19225", options, conn);
-        WR_BREAK_IFERR2(status, LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client connet server failed."));
-        uint32_t max_open_file = WR_DEFAULT_OPEN_FILES_NUM;
-        conn->proto_version = WR_PROTO_VERSION;
-        status = wr_cli_handshake(conn, max_open_file);
-        WR_BREAK_IFERR3(status, LOG_RUN_ERR_INHIBIT(LOG_INHIBIT_LEVEL1, "wr client handshake to server failed."),
-            wr_disconnect(conn));
-        wr_env->conn_count++;
-    } while (0);
-    return status;
-}
-
-status_t wr_cli_session_lock(wr_conn_t *conn, wr_session_t *session)
-{
-    if (!cm_spin_timed_lock(&session->shm_lock, SESSION_LOCK_TIMEOUT)) {
-        LOG_RUN_ERR("Failed to lock session %u shm lock", session->id);
-        return CM_ERROR;
-    }
-    LOG_DEBUG_INF("Succeed to lock session %u shm lock", session->id);
-    if (session->cli_info.thread_id != conn->cli_info.thread_id ||
-        session->cli_info.connect_time != conn->cli_info.connect_time) {
-        WR_THROW_ERROR_EX(ERR_WR_CONNECT_FAILED,
-            "session %u thread id is %u, connect_time is %llu, conn thread id is %u, connect_time is %llu", session->id,
-            session->cli_info.thread_id, session->cli_info.connect_time, conn->cli_info.thread_id,
-            conn->cli_info.connect_time);
-        LOG_RUN_ERR("Failed to check session %u, session thread id is %u, connect_time is %llu, conn thread id is %u, "
-                    "connect_time is %llu",
-                    session->id, session->cli_info.thread_id, session->cli_info.connect_time, conn->cli_info.thread_id,
-                    conn->cli_info.connect_time);
-        cm_spin_unlock(&session->shm_lock);
-        LOG_DEBUG_INF("Succeed to unlock session %u shm lock", session->id);
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
 void wr_disconnect_ex(wr_conn_t *conn)
 {
     wr_env_t *wr_env = wr_get_env();
@@ -361,11 +284,6 @@ status_t wr_vfs_query_file_info_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, 
     return CM_SUCCESS;
 }
 
-gft_node_t *wr_read_dir_impl(wr_conn_t *conn, wr_vfs_t *dir, bool32 skip_delete)
-{
-    return NULL;
-}
-
 status_t wr_create_file_impl(wr_conn_t *conn, const char *file_path, int flag)
 {
     LOG_DEBUG_INF("wr create file entry, file path:%s, flag:%d", file_path, flag);
@@ -385,47 +303,6 @@ status_t wr_remove_file_impl(wr_conn_t *conn, const char *file_path)
     status_t status = wr_msg_interact(conn, WR_CMD_DELETE_FILE, (void *)file_path, NULL);
     LOG_DEBUG_INF("wr remove file leave");
     return status;
-}
-
-status_t wr_find_vg_by_file_path(const char *path, wr_vg_info_item_t **vg_item)
-{
-    wr_env_t *wr_env = wr_get_env();
-    if (!wr_env->initialized) {
-        WR_THROW_ERROR(ERR_WR_ENV_NOT_INITIALIZED);
-        return CM_ERROR;
-    }
-
-    uint32_t beg_pos = 0;
-    char vg_name[WR_MAX_NAME_LEN];
-    status_t status = wr_get_name_from_path(path, &beg_pos, vg_name);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Failed to get name from path:%s, status:%d.", path, status));
-
-    *vg_item = wr_find_vg_item(vg_name);
-    if (*vg_item == NULL) {
-        LOG_RUN_ERR("Failed to find VG:%s.", vg_name);
-        WR_THROW_ERROR(ERR_WR_VG_NOT_EXIST, vg_name);
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
-
-status_t wr_init_file_context(
-    wr_file_context_t *context, gft_node_t *out_node, wr_vg_info_item_t *vg_item, wr_file_mode_e mode)
-{
-    context->flag = WR_FILE_CONTEXT_FLAG_USED;
-    context->offset = 0;
-    context->next = WR_INVALID_ID32;
-    context->node = out_node;
-    context->vg_item = vg_item;
-    context->vgid = vg_item->id;
-    context->fid = out_node->fid;
-    context->vol_offset = 0;
-    context->tid = cm_get_current_thread_id();
-    if (strcpy_s(context->file_path, WR_MAX_NAME_LEN, out_node->name) != EOK) {
-        return CM_ERROR;
-    }
-    context->mode = mode;
-    return CM_SUCCESS;
 }
 
 /*  
@@ -502,43 +379,6 @@ status_t wr_postpone_file_time_impl(wr_conn_t *conn, const char *file_name, cons
     return status;
 }
 
-status_t wr_latch_context_by_handle(
-    wr_conn_t *conn, int32_t handle, wr_file_context_t **context, wr_latch_mode_e latch_mode)
-{
-    wr_env_t *wr_env = wr_get_env();
-    if (!wr_env->initialized) {
-        WR_THROW_ERROR(ERR_WR_ENV_NOT_INITIALIZED);
-        LOG_RUN_ERR("wr env not initialized.");
-        return CM_ERROR;
-    }
-    wr_file_run_ctx_t *file_run_ctx = &wr_env->file_run_ctx;
-    if (handle >= (int32_t)file_run_ctx->max_open_file || handle < 0) {
-        WR_THROW_ERROR(
-            ERR_WR_INVALID_PARAM, "value of handle must be a positive integer and less than max_open_file.");
-        LOG_RUN_ERR("File handle is invalid:%d.", handle);
-        return CM_ERROR;
-    }
-
-    wr_file_context_t *file_cxt = wr_get_file_context_by_handle(file_run_ctx, handle);
-    // wr_latch(&file_cxt->latch, latch_mode, ((wr_session_t *)conn->session)->id);
-    if (file_cxt->flag == WR_FILE_CONTEXT_FLAG_FREE) {
-        // wr_unlatch(&file_cxt->latch);
-        LOG_RUN_ERR("Failed to r/w, file is closed, handle:%d, context id:%u.", handle, file_cxt->id);
-        return CM_ERROR;
-    }
-
-    WR_ASSERT_LOG(handle == (int32_t)file_cxt->id, "handle %d not equal to file id %u", handle, file_cxt->id);
-
-    if (file_cxt->node == NULL) {
-        // wr_unlatch(&file_cxt->latch);
-        LOG_RUN_ERR("file node is null, handle:%d, context id:%u.", handle, file_cxt->id);
-        return CM_ERROR;
-    }
-
-    *context = file_cxt;
-    return CM_SUCCESS;
-}
-
 status_t wr_close_file_impl(wr_conn_t *conn, int handle, bool need_lock)
 {
     LOG_DEBUG_INF("wr close file entry, handle:%d", handle);
@@ -606,47 +446,6 @@ status_t wr_check_file_flag(int flag)
     return CM_SUCCESS;
 }
 
-void wr_init_rw_param(
-    wr_rw_param_t *param, wr_conn_t *conn, int handle, wr_file_context_t *ctx, int64 offset, bool32 atomic)
-{
-    param->conn = conn;
-    param->handle = handle;
-    param->wr_env = wr_get_env();
-    param->context = ctx;
-    param->offset = offset;
-    param->atom_oper = atomic;
-    param->is_read = WR_FALSE;
-}
-
-status_t wr_read_write_file_core(wr_conn_t *conn, int64 offset, void *buf, int32_t size, int64 handle) 
-{
-    LOG_DEBUG_INF("wr write file entry, handle:%lld, size:%d", handle, size);   
-    wr_write_file_info_t send_info;
-    send_info.offset = offset;
-    send_info.handle = handle;
-    send_info.size = size;
-    send_info.buf = buf;
-
-    status_t status = wr_msg_interact(conn, WR_CMD_WRITE_FILE, (void *)&send_info, NULL);
-    LOG_DEBUG_INF("wr write file leave");
-    return status;
-}
-
-status_t wr_read_write_file(wr_conn_t *conn, int32_t handle, void *buf, int32_t size, int64 offset, bool32 is_read)
-{
-    status_t status;
-
-    if (size < 0) {
-        LOG_RUN_ERR("File size is invalid: %d.", size);
-        return CM_ERROR;
-    }
-    LOG_DEBUG_INF("wr read write file entry, handle:%d, is_read:%u", handle, is_read);
-    status = wr_read_write_file_core(conn, offset, buf, size, handle);
-    LOG_DEBUG_INF("wr read write file leave");
-
-    return status;
-}
-
 int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset)
 {
     if (size < 0) {
@@ -661,13 +460,12 @@ int64 wr_pwrite_file_impl(wr_conn_t *conn, wr_file_handle *file_handle, const vo
 
     status_t status;
     unsigned long long total_size = 0;
-    unsigned long long curr_size;
     unsigned long long remaining_size = size;
     long long int rel_size;
     uint8_t hash[SHA256_DIGEST_LENGTH];
 
     while (total_size < size) {
-        curr_size = (remaining_size > WR_RW_STEP_SIZE) ? WR_RW_STEP_SIZE : remaining_size;
+        unsigned long long curr_size = (remaining_size > WR_RW_STEP_SIZE) ? WR_RW_STEP_SIZE : remaining_size;
         send_info.offset = offset + total_size;
         send_info.size = curr_size;
         send_info.buf = (char *)buf + total_size;
@@ -754,18 +552,6 @@ int64 wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned 
 
     LOG_DEBUG_INF("wr pread file leave");
     return total_size;
-}
-
-status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst)
-{
-    WR_RETURN_IFERR2(wr_check_device_path(src), LOG_RUN_ERR("old name path is invalid."));
-    WR_RETURN_IFERR2(wr_check_device_path(dst), LOG_RUN_ERR("new name path is invalid."));
-    LOG_DEBUG_INF("Rename file, old name path: %s, new name path: %s", src, dst);
-    wr_rename_file_info_t send_info;
-    send_info.src = src;
-    send_info.dst = dst;
-    WR_RETURN_IF_ERROR(wr_msg_interact(conn, WR_CMD_RENAME_FILE, (void *)&send_info, NULL));
-    return CM_SUCCESS;
 }
 
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType)
@@ -985,18 +771,6 @@ status_t wr_getcfg_impl(wr_conn_t *conn, const char *name, char *out_str, size_t
     return CM_SUCCESS;
 }
 
-void wr_get_api_volume_error(void)
-{
-    int32_t code = cm_get_error_code();
-    // volume open/seek/read write fail for I/O, just exit
-    if (code == ERR_WR_VOLUME_SYSTEM_IO) {
-        LOG_RUN_ERR("[WR API] ABORT INFO : volume operate failed for I/O ERROR, errcode:%d.", code);
-        cm_fync_logfile();
-        wr_exit_error();
-    }
-    return;
-}
-
 status_t wr_get_inst_status_on_server(wr_conn_t *conn, wr_server_status_t *wr_status)
 {
     if (wr_status == NULL) {
@@ -1040,21 +814,6 @@ status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd, bool need_lock)
 status_t wr_stop_server_impl(wr_conn_t *conn)
 {
     return wr_msg_interact(conn, WR_CMD_STOP_SERVER, NULL, NULL);
-}
-
-status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node)
-{
-    item->type = (wr_item_type_t)node->type;
-    item->size = node->size;
-    item->written_size = node->written_size;
-    item->create_time = node->create_time;
-    item->update_time = node->update_time;
-    int32_t errcode = memcpy_s(item->name, WR_MAX_NAME_LEN, node->name, WR_MAX_NAME_LEN);
-    if (SECUREC_UNLIKELY(errcode != EOK)) {
-        WR_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
-        return WR_ERROR;
-    }
-    return WR_SUCCESS;
 }
 
 static status_t wr_encode_setcfg(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
@@ -1439,32 +1198,6 @@ status_t wr_msg_interact(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack)
     conn->server_version = wr_get_version(ack_pack);
     conn->proto_version = MIN(WR_PROTO_VERSION, conn->server_version);
     return wr_decode_packet(make_proc, ack_pack, ack);
-}
-
-void wr_set_conn_wait_event(wr_conn_t *conn, wr_wait_event_e event)
-{
-    if (conn->session != NULL) {
-        wr_set_stat(&((wr_session_t *)conn->session)->stat_ctx, event);
-    }
-}
-
-void wr_unset_conn_wait_event(wr_conn_t *conn)
-{
-    if (conn->session != NULL) {
-        wr_unset_stat(&((wr_session_t *)conn->session)->stat_ctx);
-    }
-}
-
-status_t wr_msg_interact_with_stat(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack)
-{
-    timeval_t begin_tv;
-    wr_begin_stat(&begin_tv);
-    status_t status = wr_msg_interact(conn, cmd, send_info, ack);
-    if (status == CM_SUCCESS && conn->session != NULL) {
-        wr_session_t *session = (wr_session_t *)conn->session;
-        wr_end_stat_ex(&session->stat_ctx, &session->wr_session_stat[session->stat_ctx.wait_event], &begin_tv);
-    }
-    return status;
 }
 
 void wr_clean_file_handle(wr_file_handle *file_handle)

@@ -82,7 +82,6 @@ static inline bool32 wr_auid_is_uninit(auid_t *auid)
 #define WR_BLOCK_ID_SET_NOT_AUX(block_id) ((*(uint64 *)&block_id) & (*(uint64 *)&wr_unset_inited_mask))
 #define WR_BLOCK_ID_IS_AUX(block_id) (((block_id).item & WR_AU_UNINITED_MARK) == 1)
 
-char *wr_display_metaid(auid_t id);
 
 #ifdef __cplusplus
 }

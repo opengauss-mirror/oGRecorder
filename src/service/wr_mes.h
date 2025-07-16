@@ -251,7 +251,6 @@ void wr_proc_loaddisk_req(wr_session_t *session, mes_msg_t *msg);
 void wr_proc_join_cluster_req(wr_session_t *session, mes_msg_t *msg);
 void wr_proc_refresh_ft_by_primary_req(wr_session_t *session, mes_msg_t *msg);
 
-status_t wr_send2standby(big_packets_ctrl_t *ack, const char *buf);
 status_t wr_join_cluster(bool32 *join_succ);
 
 #ifdef __cplusplus

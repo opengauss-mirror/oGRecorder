@@ -37,7 +37,7 @@ static uint32_t wr_zero_buf_len = 0;
 status_t wr_init_zero_buf()
 {
     uint32_t len = WR_DEFAULT_AU_SIZE;
-    char *buf = NULL;
+    char *buf;
 #ifndef WIN32
     int32_t fd = open("/dev/zero", O_RDWR);
     if (fd < 0) {
@@ -79,14 +79,4 @@ void wr_uninit_zero_buf()
 #endif
     wr_zero_buf_len = 0;
     wr_zero_buf = NULL;
-}
-
-char *wr_get_zero_buf()
-{
-    return wr_zero_buf;
-}
-
-uint32_t wr_get_zero_buf_len()
-{
-    return wr_zero_buf_len;
 }

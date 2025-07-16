@@ -51,8 +51,6 @@ typedef struct st_wr_invalidate_meta_msg {
     uint64 meta_block_id;
 } wr_invalidate_meta_msg_t;
 
-void wr_del_syn_meta(wr_vg_info_item_t *vg_item, wr_block_ctrl_t *block_ctrl, int64 syn_meta_ref_cnt);
-bool32 wr_syn_buffer_cache(wr_session_t *session, wr_vg_info_item_t *vg_item);
 status_t wr_meta_syn_remote(wr_session_t *session, wr_meta_syn_t *meta_syn, uint32_t size, bool32 *ack);
 status_t wr_invalidate_meta_remote(
     wr_session_t *session, wr_invalidate_meta_msg_t *invalidate_meta_msg, uint32_t size, bool32 *invalid_ack);

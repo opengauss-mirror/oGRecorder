@@ -48,7 +48,6 @@ __declspec(thread) wr_thv_run_ctx_t wr_thv_run_ctx = {0};
 static thv_ctrl_t g_thv_ctrl_func[MAX_THV_TYPE];
 
 // Thread variant address, it will be created in function create_var_func and released in function release_var_func.
-static __thread pointer_t g_thv_addr[MAX_THV_TYPE] = {0};
 static pthread_key_t g_thv_key;
 
 void wr_exit_error()
@@ -71,11 +70,6 @@ static void cm_destroy_thv(pointer_t thread_var)
             curr_thread_var[i] = NULL;
         }
     }
-}
-
-void wr_destroy_thv(thv_type_e type)
-{
-    cm_destroy_thv(&g_thv_addr[type]);
 }
 
 status_t cm_create_thv_ctrl(void)
@@ -195,13 +189,6 @@ void wr_set_thv_run_ctx_item(wr_thv_run_ctx_item_e item, void *item_addr)
     }
 }
 
-void *wr_get_thv_run_ctx_item(wr_thv_run_ctx_item_e item)
-{
-    if (item < WR_THV_RUN_CTX_ITEM_MAX) {
-        return wr_thv_run_ctx.item_addr[item];
-    }
-    return NULL;
-}
 
 #ifdef __cplusplus
 }

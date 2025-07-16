@@ -176,33 +176,15 @@ void wr_destroy_session(wr_session_t *session);
 void wr_destroy_session_inner(wr_session_t *session);
 wr_session_t *wr_get_session(uint32_t sid);
 
-status_t wr_lock_shm_meta_s_with_stack(
-    wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch, int32_t timeout);
-status_t wr_cli_lock_shm_meta_s(wr_session_t *session, wr_latch_offset_t *offset, wr_shared_latch_t *shared_latch,
-    latch_should_exit should_exit);
-void wr_lock_shm_meta_x(const wr_session_t *session, wr_shared_latch_t *shared_latch);
-void wr_lock_shm_meta_x2ix(wr_session_t *session, wr_shared_latch_t *shared_latch);
-void wr_lock_shm_meta_ix2x(wr_session_t *session, wr_shared_latch_t *shared_latch);
-void wr_lock_shm_meta_degrade(wr_session_t *session, wr_shared_latch_t *shared_latch);
-// only used by wrserver
-void wr_unlock_shm_meta_without_stack(wr_session_t *session, wr_shared_latch_t *shared_latch);
 // only used by api-client or by clean
 bool32 wr_unlock_shm_meta_s_with_stack(wr_session_t *session, wr_shared_latch_t *shared_latch, bool32 is_try_lock);
-status_t wr_lock_shm_meta_bucket_s(wr_session_t *session, uint32_t id, wr_shared_latch_t *shared_latch);
-void wr_lock_shm_meta_bucket_x(wr_session_t *session, wr_shared_latch_t *shared_latch);
-void wr_unlock_shm_meta_bucket(wr_session_t *session, wr_shared_latch_t *shared_latch);
 void wr_clean_session_latch(wr_session_t *session, bool32 is_daemon);
 uint32_t wr_get_uwression_startid(void);
 uint32_t wr_get_recover_task_idx(void);
 uint32_t wr_get_max_total_session_cnt(void);
 uint32_t wr_get_delay_clean_task_idx(void);
-uint32_t wr_get_hashmap_dynamic_extend_task_idx(void);
-bool32 wr_lock_shm_meta_timed_x(const wr_session_t *session, wr_shared_latch_t *shared_latch, uint32_t wait_ticks);
 uint32_t wr_get_delay_clean_task_idx(void);
 typedef uint32_t (*wr_get_bg_task_idx_func_t)(uint32_t idx);
-uint32_t wr_get_meta_syn_task_idx(uint32_t idx);
-uint32_t wr_get_recycle_meta_task_idx(uint32_t idx);
-uint32_t wr_get_alarm_check_task_idx(void);
 void wr_server_session_lock(wr_session_t *session);
 void wr_server_session_unlock(wr_session_t *session);
 wr_session_t *wr_get_reserv_session(uint32_t idx);

@@ -40,8 +40,6 @@ typedef struct tagknl_stack {
     char *buff;
 } wr_stack;
 
-char *wr_get_stack_pos(wr_stack *stack, uint32 depth);
-void wr_pop_ex(wr_stack *stack, uint32 depth);
 
 #ifdef __cplusplus
 }

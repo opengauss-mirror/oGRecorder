@@ -33,8 +33,6 @@ extern "C" {
 
 status_t wr_init_zero_buf();
 void wr_uninit_zero_buf();
-char *wr_get_zero_buf();
-uint32_t wr_get_zero_buf_len();
 
 #ifdef __cplusplus
 }

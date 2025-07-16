@@ -193,10 +193,9 @@ static void wr_return_error(wr_session_t *session)
 {
     int32_t code;
     const char *message = NULL;
-    wr_packet_t *send_pack = NULL;
 
     CM_ASSERT(session != NULL);
-    send_pack = &session->send_pack;
+    wr_packet_t *send_pack = &session->send_pack;
     wr_init_set(send_pack, session->proto_version);
     send_pack->head->cmd = session->recv_pack.head->cmd;
     send_pack->head->result = (uint8)CM_ERROR;
@@ -221,8 +220,7 @@ static void wr_return_success(wr_session_t *session)
 {
     CM_ASSERT(session != NULL);
     status_t status;
-    wr_packet_t *send_pack = NULL;
-    send_pack = &session->send_pack;
+    wr_packet_t *send_pack = &session->send_pack;
     send_pack->head->cmd = session->recv_pack.head->cmd;
     send_pack->head->result = (uint8)CM_SUCCESS;
     send_pack->head->flags = 0;

@@ -58,17 +58,15 @@ static int32_t wr_get_one_char()
 status_t wr_receive_info_from_terminal(char *buff, int32_t buff_size, bool32 is_plain_text)
 {
     int32_t pos = 0;
-    char char_ascii;
-    int32_t key = 0;
     bool32 len_exceed = CM_FALSE;
     CM_POINTER(buff);
     do {
-        key = wr_get_one_char();
+        int32_t key = wr_get_one_char();
         if (key < 0) {
             (void)printf("invalid char which may be EOF found");
             return CM_ERROR;
         }
-        char_ascii = (char)key;
+        char char_ascii = (char)key;
 #ifdef WIN32
         if (char_ascii == KEY_BS) {
 #else
