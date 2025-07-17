@@ -206,21 +206,15 @@ typedef struct st_wr_postpone_file_time {
 #define WR_DEFAULT_UDS_PATH "UDS:/tmp/.wr_unix_d_socket"
 #define SESSION_LOCK_TIMEOUT 500 // tickets
 
-status_t wr_alloc_conn(wr_conn_t **conn);
-void wr_free_conn(wr_conn_t *conn);
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
 void wr_disconnect(wr_conn_t *conn);
 
 // NOTE:just for wrcmd because not support many threads in one process.
-status_t wr_connect_ex(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
 void wr_disconnect_ex(wr_conn_t *conn);
-status_t wr_lock_vg_s(wr_vg_info_item_t *vg_item, wr_session_t *session);
-status_t wr_cli_session_lock(wr_conn_t *conn, wr_session_t *session);
 status_t wr_vfs_create_impl(wr_conn_t *conn, const char *dir_name, unsigned long long attrFlag);
 status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir, unsigned long long attrFlag);
 status_t wr_vfs_mount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle, unsigned long long attrFlag);
 status_t wr_vfs_unmount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle);
-gft_node_t *wr_read_dir_impl(wr_conn_t *conn, wr_vfs_t *dir, bool32 skip_delete);
 status_t wr_create_file_impl(wr_conn_t *conn, const char *file_path, int flag);
 status_t wr_remove_file_impl(wr_conn_t *conn, const char *file_path);
 status_t wr_open_file_impl(wr_conn_t *conn, const char *file_path, int flag, wr_file_handle* file_handle);
@@ -229,11 +223,9 @@ status_t wr_exist_impl(wr_conn_t *conn, const char *path, bool32 *result, gft_it
 status_t wr_check_path_exist(wr_conn_t *conn, const char *path);
 status_t wr_check_file_exist(wr_conn_t *conn, const char *path, bool *is_exist);
 status_t wr_check_file_flag(int flag);
-status_t wr_rename_file_impl(wr_conn_t *conn, const char *src, const char *dst);
 status_t wr_truncate_impl(wr_conn_t *conn, int handle, long long length, int truncateType);
 status_t wr_stat_file_impl(
     wr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *count, int *mode, char **time);
-status_t wr_set_stat_info(wr_stat_info_t item, gft_node_t *node);
 status_t wr_postpone_file_time_impl(wr_conn_t *conn, const char *file_name, const char *time);
 void wr_clean_file_handle(wr_file_handle *file_handle);
 
@@ -249,12 +241,7 @@ int64 wr_pread_file_impl(wr_conn_t *conn, int handle, const void *buf, unsigned 
 status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, const char *scope);
 status_t wr_getcfg_impl(wr_conn_t *conn, const char *name, char *out_str, size_t str_len);
 status_t wr_stop_server_impl(wr_conn_t *conn);
-void wr_get_api_volume_error(void);
 status_t wr_msg_interact(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack);
-
-void wr_set_conn_wait_event(wr_conn_t *conn, wr_wait_event_e event);
-void wr_unset_conn_wait_event(wr_conn_t *conn);
-status_t wr_msg_interact_with_stat(wr_conn_t *conn, uint8 cmd, void *send_info, void *ack);
 
 status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd, bool need_lock);
 status_t wr_get_inst_status_on_server(wr_conn_t *conn, wr_server_status_t *wr_status);
@@ -267,20 +254,6 @@ status_t wr_reload_certs_impl(wr_conn_t *conn);
         if (ptr) {                                \
             (*(ptr) = (value));                   \
         }                                         \
-    } while (0)
-
-#define WR_LOCK_VG_META_S_RETURN_ERROR(vg_item, session)                          \
-    do {                                                                           \
-        if (SECUREC_UNLIKELY(wr_lock_vg_s((vg_item), (session)) != CM_SUCCESS)) { \
-            return CM_ERROR;                                                       \
-        }                                                                          \
-    } while (0)
-
-#define WR_LOCK_VG_META_S_RETURN_NULL(vg_item, session)                           \
-    do {                                                                           \
-        if (SECUREC_UNLIKELY(wr_lock_vg_s((vg_item), (session)) != CM_SUCCESS)) { \
-            return NULL;                                                           \
-        }                                                                          \
     } while (0)
 
 #define WR_UNLOCK_VG_META_S(vg_item, session) \

@@ -166,7 +166,6 @@ wr_log_def_t *wr_get_cmd_log_def();
 uint32_t wr_get_instance_log_def_count();
 uint32_t wr_get_cmd_log_def_count();
 
-char *wr_get_print_tab(uint8 level);
 
 #ifdef __cplusplus
 }

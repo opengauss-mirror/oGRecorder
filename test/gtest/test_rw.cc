@@ -65,11 +65,15 @@ protected:
     void TearDown() override {
         EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle1, true), WR_SUCCESS);
         EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle2, true), WR_SUCCESS);
+#ifndef ENABLE_WORM
         EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE1), WR_SUCCESS);
         EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE2), WR_SUCCESS);
+#endif
         EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle1), WR_SUCCESS);
         EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle2), WR_SUCCESS);
+#ifndef ENABLE_WORM
         EXPECT_EQ(wr_vfs_delete(g_inst_handle1, TEST_DIR, 1), WR_SUCCESS);
+#endif
     }
 };
 

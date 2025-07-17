@@ -67,11 +67,6 @@
 #define HELP_SHORT          ("h")
 #define HELP_LONG           ("--help")
 
-typedef struct st_wr_print_help_t {
-    char fmt;
-    uint32_t bytes;
-} wr_print_help_t;
-
 wr_conn_t* g_cmd_conn= NULL;  // global connection for wrCmd
 
 wr_conn_t *wr_get_connection_for_cmd()
@@ -130,28 +125,6 @@ static status_t cmd_check_cfg_scope(const char *scope)
         return CM_ERROR;
     }
     return CM_SUCCESS;
-}
-
-double wr_convert_size(double size, const char *measure)
-{
-    double result = size;
-    switch (measure[0]) {
-        case 'T':
-            result /= SIZE_T(1);
-            break;
-        case 'G':
-            result /= SIZE_G(1);
-            break;
-        case 'M':
-            result /= SIZE_M(1);
-            break;
-        case 'K':
-            result /= SIZE_K(1);
-            break;
-        default:
-            break;
-    }
-    return result;
 }
 
 static wr_args_t cmd_ts_args[] = {};
@@ -234,33 +207,6 @@ static status_t lscli_proc(void)
     (void)printf("%-20s%-20s%-256s\n", "cli_pid", "start_time", "process_name");
     (void)printf("%-20llu%-20lld%-256s\n", cli_info.cli_pid, cli_info.start_time, cli_info.process_name);
     return CM_SUCCESS;
-}
-
-static inline char escape_char(char c)
-{
-    if (c > 0x1f && c < 0x7f) {
-        return c;
-    } else {
-        return '.';
-    }
-}
-
-bool32 wr_check_software_version(int32_t file_fd, int64_t *offset)
-{
-    int32_t read_size = 0;
-    uint32_t software_version;
-    status_t status = cm_read_file(file_fd, &software_version, sizeof(uint32_t), &read_size);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to read software_version");
-        return CM_FALSE;
-    }
-    if (software_version > (uint32_t)WR_SOFTWARE_VERSION) {
-        LOG_RUN_ERR("The file software_version which is %u is bigger than the actural software_version which is %u.",
-            software_version, (uint32_t)WR_SOFTWARE_VERSION);
-        return CM_FALSE;
-    }
-    *offset += (int64_t)sizeof(uint32_t);
-    return CM_TRUE;
 }
 
 static wr_args_set_t cmd_encrypt_args_set = {

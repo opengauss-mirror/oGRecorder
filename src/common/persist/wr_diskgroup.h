@@ -82,19 +82,8 @@ typedef handle_t wr_directory_t;  // wr_vfs_t
 
 void wr_free_vg_info();
 wr_vg_info_item_t *wr_find_vg_item(const char *vg_name);
-wr_vg_info_item_t *wr_find_vg_item_by_id(uint32_t vg_id);
 
-
-status_t wr_load_vg_ctrl_part(wr_vg_info_item_t *vg_item, int64 offset, void *buf, int32_t size, bool32 *remote);
-
-void wr_lock_vg_mem_x(wr_vg_info_item_t *vg_item);
-void wr_lock_vg_mem_s(wr_vg_info_item_t *vg_item);
-void wr_lock_vg_mem_s_force(wr_vg_info_item_t *vg_item);
-void wr_unlock_vg_mem(wr_vg_info_item_t *vg_item);
-
-status_t wr_file_lock_vg_w(wr_config_t *inst_cfg);
 status_t wr_lock_disk_vg(const char *entry_path, wr_config_t *inst_cfg);
-status_t wr_lock_share_disk_vg(const char *entry_path, wr_config_t *inst_cfg);
 
 status_t wr_unlock_vg_raid(wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id);
 status_t wr_unlock_vg_share_disk(wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id);
@@ -106,8 +95,6 @@ status_t wr_unlock_vg_storage_core(wr_vg_info_item_t *vg_item, const char *entry
 
 extern wr_vg_info_t *g_vgs_info;
 #define VGS_INFO (g_vgs_info)
-uint32_t wr_find_volume(wr_vg_info_item_t *vg_item, const char *volume_name);
-uint32_t wr_find_free_volume_id(const wr_vg_info_item_t *vg_item);
 status_t wr_cmp_volume_head(wr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id);
 status_t wr_check_lock_remain_inner(
     int32_t wr_mode, wr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id, bool32 *is_remain);
@@ -183,7 +170,6 @@ bool32 wr_is_readwrite(void);
 bool32 wr_is_readonly(void);
 void wr_set_server_flag(void);
 bool32 wr_need_exec_local(void);
-wr_vg_info_t *wr_malloc_vg_info(void);
 
 typedef wr_instance_status_e (*wr_get_instance_status_proc_t)(void);
 extern wr_get_instance_status_proc_t get_instance_status_proc;
@@ -192,12 +178,10 @@ void regist_get_instance_status_proc(wr_get_instance_status_proc_t proc);
 int32_t wr_get_server_status_flag(void);
 void wr_set_server_status_flag(int32_t wr_status);
 void wr_set_recover_thread_id(uint32_t thread_id);
-uint32_t wr_get_recover_thread_id(void);
 
 status_t wr_check_write_volume(wr_vg_info_item_t *vg_item, uint32_t volumeid, int64 offset, void *buf, uint32_t size);
 typedef status_t (*wr_remote_read_proc_t)(
     const char *vg_name, wr_volume_t *volume, int64 offset, void *buf, int size);
-void regist_remote_read_proc(wr_remote_read_proc_t proc);
 status_t wr_add_volume_vg_ctrl(
     wr_ctrl_t *vg_ctrl, uint32_t id, uint64 vol_size, const char *volume_name, volume_slot_e volume_flag);
 status_t wr_gen_volume_head(

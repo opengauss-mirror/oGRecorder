@@ -138,16 +138,9 @@ status_t ga_create_global_area(void);
 void ga_destroy_global_area(void);
 int32_t ga_attach_area(uint32_t attach_perm);
 void ga_detach_area(void);
-uint32_t ga_get_pool_usage(ga_pool_id_e pool_id);
 
-void ga_append_into_queue_by_pool_id(ga_pool_id_e pool_id, ga_queue_t *queue, uint32_t object_id);
 uint32_t ga_alloc_object(ga_pool_id_e pool_id, uint32_t specific_id);
-int32_t ga_alloc_object_list(ga_pool_id_e pool_id, uint32_t count, ga_queue_t *list);
-void ga_free_object(ga_pool_id_e pool_id, uint32_t object_id);
-void ga_free_object_list(ga_pool_id_e pool_id, ga_queue_t *list);
 char *ga_object_addr(ga_pool_id_e pool_id, uint32_t object_id);
-cm_shm_key_t ga_object_key(ga_pool_id_e pool_id, uint32_t object_id);
-uint32_t ga_next_object(ga_pool_id_e pool_id, uint32_t object_id);
 
 #ifdef __cplusplus
 }

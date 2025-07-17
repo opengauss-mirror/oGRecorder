@@ -208,13 +208,12 @@ static inline void wr_init_set(wr_packet_t *pack, uint32_t proto_version)
 static inline status_t wr_put_str(wr_packet_t *pack, const char *str)
 {
     uint32_t size;
-    char *addr = NULL;
     errno_t errcode = 0;
 
     CM_ASSERT(pack != NULL);
     CM_ASSERT(str != NULL);
     size = (uint32_t)strlen(str);
-    addr = WR_WRITE_ADDR(pack);
+    char *addr = WR_WRITE_ADDR(pack);
     uint32_t estimated_size = pack->head->size + CM_ALIGN4(size + 1);
     if (estimated_size > pack->buf_size) {
         CM_THROW_ERROR(ERR_BUFFER_OVERFLOW, estimated_size, pack->buf_size);
@@ -232,12 +231,11 @@ static inline status_t wr_put_str(wr_packet_t *pack, const char *str)
 
 static inline status_t wr_put_sha256(wr_packet_t *pack, const unsigned char *sha256_value)
 {
-    char *addr = NULL;
     errno_t errcode = 0;
     CM_ASSERT(pack != NULL);
     CM_ASSERT(sha256_value != NULL);
 
-    addr = WR_WRITE_ADDR(pack);
+    char *addr = WR_WRITE_ADDR(pack);
     uint32_t estimated_size = pack->head->size + SHA256_DIGEST_LENGTH;
     if (estimated_size > pack->buf_size) {
         CM_THROW_ERROR(ERR_BUFFER_OVERFLOW, estimated_size, pack->buf_size);
@@ -376,13 +374,12 @@ static inline status_t xor_sha256_hash(const uint8_t *data_hash,
 static inline status_t wr_get_data(wr_packet_t *pack, uint32_t size, void **buf)
 {
     int64 len;
-    char *temp_buf = NULL;
     CM_ASSERT(pack != NULL);
 
     len = (int64)CM_ALIGN4(size);
     TO_UINT32_OVERFLOW_CHECK(len, int64);
     CM_RETURN_IFERR(wr_pack_check_len(pack, len));
-    temp_buf = WR_READ_ADDR(pack);
+    char *temp_buf = WR_READ_ADDR(pack);
     pack->offset += CM_ALIGN4(size);
     if (buf != NULL) {
         *buf = (void *)temp_buf;
@@ -405,13 +402,12 @@ static inline status_t wr_get_packet_strlen(wr_packet_t *pack, char *str, size_t
 
 static inline status_t wr_get_str(wr_packet_t *pack, char **buf)
 {
-    char *str = NULL;
     int64 len;
     size_t str_len = 0;
     CM_ASSERT(pack != NULL);
 
     CM_RETURN_IFERR(wr_pack_check_len(pack, 1));
-    str = WR_READ_ADDR(pack);
+    char *str = WR_READ_ADDR(pack);
     CM_RETURN_IFERR(wr_get_packet_strlen(pack, str, &str_len));
     len = (int64)CM_ALIGN4(str_len);
     TO_UINT32_OVERFLOW_CHECK(len, int64);

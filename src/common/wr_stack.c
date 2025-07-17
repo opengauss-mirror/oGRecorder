@@ -27,26 +27,3 @@
 #include "wr_defs.h"
 #include "wr_log.h"
 
-char *wr_get_stack_pos(wr_stack *stack, uint32 depth)
-{
-    CM_ASSERT(stack != NULL);
-
-    if (stack->depth < depth) {
-        return NULL;
-    }
-
-    return (stack->buff + stack->indicator[depth]);
-}
-
-void wr_pop_ex(wr_stack *stack, uint32 depth)
-{
-    CM_ASSERT(stack != NULL);
-
-    if (depth >= WR_MAX_STACK_DEPTH) {
-        LOG_RUN_ERR("pop vg_item stack depth is out of bound");
-        return;
-    }
-
-    stack->depth = depth;
-    stack->buff_pos = stack->indicator[depth];
-}

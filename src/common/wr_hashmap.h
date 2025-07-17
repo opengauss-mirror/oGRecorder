@@ -60,38 +60,12 @@ typedef struct tag_cm_oamap {
     cm_oamap_compare_t compare_func;
 } cm_oamap_t;
 
-// mem_ctx == NULL will use the standard malloc and free
-void cm_oamap_init_mem(cm_oamap_t *map);
-
 int32_t cm_oamap_init(
     cm_oamap_t *map, uint32_t init_capacity, cm_oamap_compare_t compare_func /* , memory_context_t *mem_ctx */);
 
 void cm_oamap_destroy(cm_oamap_t *map);
 
-int32_t cm_oamap_insert(cm_oamap_t *map, uint32_t hash, void *key, void *value);
-
-void *cm_oamap_lookup(cm_oamap_t *map, uint32_t hash, void *key);
-
-void *cm_oamap_remove(cm_oamap_t *map, uint32_t hash, void *key);
-
-void cm_oamap_reset_iterator(cm_oamap_iterator_t *iter);
-
-int32_t cm_oamap_fetch(cm_oamap_t *map, cm_oamap_iterator_t *iter, void **key, void **value);
-
-bool32 cm_oamap_ptr_compare(void *key1, void *key2);
-
-bool32 cm_oamap_uint64_compare(void *key1, void *key2);
-
-bool32 cm_oamap_uint32_compare(void *key1, void *key2);
-
-bool32 cm_oamap_string_compare(void *key1, void *key2);
-
-uint32_t cm_oamap_size(cm_oamap_t *map);
-
 uint32_t cm_hash_uint32_shard(uint32_t val);
-uint32_t cm_hash_int64(int64 i64);
-uint32_t cm_hash_text(const text_t *text, uint32_t range);
-uint32_t cm_hash_string(const char *str, uint32_t range);
 
 #ifdef __cplusplus
 }

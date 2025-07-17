@@ -41,10 +41,6 @@ typedef struct st_wr_open_file_info_t {
 status_t wr_init_open_file_index(wr_vg_info_item_t *vg_item);
 void wr_destroy_open_file_index(wr_vg_info_item_t *vg_item);
 
-status_t wr_insert_open_file_index(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid, uint64 pid, int64 start_time);
-status_t wr_delete_open_file_index(
-    wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid, uint64 pid, int64 start_time);
 status_t wr_check_open_file(wr_session_t *session, wr_vg_info_item_t *vg_item, uint64 ftid, bool32 *is_open);
 static inline void wr_free_open_file_node(bilist_node_t *node, bilist_t *bilist)
 {

@@ -243,12 +243,10 @@ static void wr_set_cluster_proto_vers(uint8 inst_id, uint32_t version)
 static int wr_handle_broadcast_msg(mes_msg_list_t *responses, wr_recv_msg_t *recv_msg_output)
 {
     int ret;
-    wr_message_head_t *ack_head;
-    uint32_t src_inst;
     for (uint32_t i = 0; i < responses->count; i++) {
         mes_msg_t *msg = &responses->messages[i];
-        ack_head = (wr_message_head_t *)msg->buffer;
-        src_inst = responses->messages[i].src_inst;
+        wr_message_head_t *ack_head = (wr_message_head_t *)msg->buffer;
+        uint32_t src_inst = responses->messages[i].src_inst;
         wr_set_cluster_proto_vers((uint8)src_inst, ack_head->sw_proto_ver);
         if (ack_head->result == ERR_WR_VERSION_NOT_MATCH) {
             recv_msg_output->version_not_match_inst |= ((uint64)0x1 << src_inst);
@@ -447,26 +445,6 @@ static status_t wr_prepare_ack_msg(
     }
     *ack_size = send_pack->head->size - sizeof(wr_packet_head_t);
     return CM_SUCCESS;
-}
-
-void wr_proc_remote_req_err(wr_session_t *session, wr_message_head_t *req_wr_head, unsigned char cmd, int32_t ret)
-{
-    wr_message_head_t ack;
-    char *ack_buf = NULL;
-    uint32_t ack_size = 0;
-    status_t status = wr_prepare_ack_msg(session, ret, &ack_buf, &ack_size, req_wr_head->msg_proto_ver);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("The wrserver prepare ack msg failed, src node:%u, dst node:%u.", req_wr_head->src_inst,
-            req_wr_head->dst_inst);
-        return;
-    }
-    uint16 src_inst = req_wr_head->dst_inst;
-    uint16 dst_inst = req_wr_head->src_inst;
-    ruid_type ruid = req_wr_head->ruid;
-    uint32_t version = req_wr_head->msg_proto_ver;
-    wr_init_mes_head(&ack, cmd, 0, src_inst, dst_inst, ack_size + WR_MES_MSG_HEAD_SIZE, version, ruid);
-    ack.result = ret;
-    (void)mes_send_response_x(dst_inst, ack.flags, ruid, 2, &ack, WR_MES_MSG_HEAD_SIZE, ack_buf, ack_size);
 }
 
 static status_t wr_process_remote_req_prepare(wr_session_t *session, mes_msg_t *msg, wr_processor_t *processor)
@@ -1155,22 +1133,6 @@ void wr_proc_syb2active_req(wr_session_t *session, mes_msg_t *msg)
     }
     LOG_DEBUG_INF("[MES] The wr server send messages to the remote node success, src node:%u, dst node:%u.",
         (uint32_t)(ack.src_inst), (uint32_t)(ack.dst_inst));
-}
-
-status_t wr_send2standby(big_packets_ctrl_t *ack, const char *buf)
-{
-    wr_message_head_t *wr_head = &ack->wr_head;
-    status_t ret = mes_send_response_x(wr_head->dst_inst, wr_head->flags, wr_head->ruid, 2, ack,
-        sizeof(big_packets_ctrl_t), buf, wr_head->size - sizeof(big_packets_ctrl_t));
-    if (ret != CM_SUCCESS) {
-        LOG_RUN_ERR("The wrserver fails to send messages to the remote node, src node:%u, dst node:%u.",
-            (uint32_t)(wr_head->src_inst), (uint32_t)(wr_head->dst_inst));
-        return ret;
-    }
-
-    LOG_DEBUG_INF("[MES] The wr server send messages to the remote node success, src node:%u, dst node:%u.",
-        (uint32_t)(wr_head->src_inst), (uint32_t)(wr_head->dst_inst));
-    return ret;
 }
 
 status_t wr_join_cluster(bool32 *join_succ)

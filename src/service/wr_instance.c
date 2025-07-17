@@ -119,17 +119,6 @@ static status_t wr_init_thread(wr_instance_t *inst)
     return CM_SUCCESS;
 }
 
-bool32 wr_config_cm()
-{
-    wr_config_t *inst_cfg = wr_get_inst_cfg();
-    char *value = cm_get_config_value(&inst_cfg->config, "WR_CM_SO_NAME");
-    if (value == NULL || strlen(value) == 0 || strlen(value) >= WR_MAX_NAME_LEN) {
-        LOG_RUN_INF("wr cm config of WR_CM_SO_NAME is empty.");
-        return CM_FALSE;
-    }
-    return CM_TRUE;
-}
-
 static status_t wr_init_inst_handle_session(wr_instance_t *inst)
 {
     status_t status = wr_create_session(NULL, &inst->handle_session);
@@ -564,8 +553,7 @@ status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try
     if (!cm_res->is_init) {
         return CM_SUCCESS;
     }
-    status_t ret = CM_SUCCESS;
-    ret = wr_get_cm_res_lock_owner(cm_res, master_id);
+    status_t ret = wr_get_cm_res_lock_owner(cm_res, master_id);
     WR_RETURN_IFERR2(ret, LOG_RUN_WAR("Failed to get cm lock owner, if WR is normal open ignore the log."));
     if (*master_id == WR_INVALID_ID32) {
         if (!try_lock) {
@@ -730,28 +718,6 @@ void wr_delay_clean_proc(thread_t *thread)
         }
         g_wr_instance.is_cleaning = CM_FALSE;
         sleep_times = 0;
-    }
-}
-
-void wr_alarm_check_proc(thread_t *thread)
-{
-    cm_set_thread_name("alarm_check");
-    uint32_t sleep_times = 0;
-    uint32_t work_idx = wr_get_alarm_check_task_idx();
-    wr_session_ctrl_t *session_ctrl = wr_get_session_ctrl();
-    wr_session_t *session = session_ctrl->sessions[work_idx];
-    // for check other alarms
-    uint32_t alarm_counts = WR_VG_ALARM_CHECK_COUNT;
-    while (!thread->closed) {
-        // only master node need alarm
-        if (sleep_times % WR_VG_ALARM_CHECK_COUNT == 0) {
-            g_wr_instance.is_checking = CM_TRUE;
-            wr_alarm_check_vg_usage(session);
-            g_wr_instance.is_checking = CM_FALSE;
-        }
-        cm_sleep(CM_SLEEP_500_FIXED);
-        sleep_times++;
-        sleep_times = sleep_times % alarm_counts;
     }
 }
 

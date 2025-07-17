@@ -36,12 +36,3 @@ __declspec(thread) char g_display_buf[WR_DISPLAY_SIZE];
 __thread char g_display_buf[WR_DISPLAY_SIZE];
 #endif
 
-char *wr_display_metaid(auid_t id)
-{
-    int ret = sprintf_s(g_display_buf, WR_DISPLAY_SIZE, "metaid:%llu (v:%u, au:%llu, block:%u, item:%u)",
-        WR_ID_TO_U64(id), (uint32_t)(id).volume, (uint64)(id).au, (uint32_t)(id).block, (uint32_t)(id).item);
-    if (ret < 0) {
-        g_display_buf[0] = '\0';
-    }
-    return g_display_buf;
-}

@@ -144,7 +144,7 @@ status_t wr_simulation_cm_init(unsigned int instance_id, const char *res_name, c
     return status;
 }
 
- char *wr_simulation_cm_get_res_stat(void)
+char *wr_simulation_cm_get_res_stat(void)
 {
     uint64 bitmap_online = g_simulation_cm.params.bitmap_online;
     char *result = (char *)malloc(CM_MAX_INT64_STRLEN + 1);
@@ -161,12 +161,11 @@ status_t wr_simulation_cm_init(unsigned int instance_id, const char *res_name, c
     }
     return result;
 }
-    
+
 void wr_simulation_cm_free_res_stat(char *res_stat)
 {
     if (res_stat != NULL) {
         cm_free(res_stat);
-        res_stat = NULL;
     }
 }
 
@@ -204,11 +203,6 @@ status_t wr_simulation_cm_res_trans_lock(const char *lock_name, unsigned int ins
 {
     LOG_RUN_INF("[WR][simulation_cm]Simulate to trans lock %s.", lock_name);
     return wr_refresh_cm_config_lock_owner_id(inst_id);
-}
-
-void wr_simulation_cm_uninit(void)
-{
-    cm_close_thread(&g_simulation_cm.thread);
 }
 
 #define CM_SIMULATION_PATH_LEN 10

@@ -153,12 +153,6 @@ char *g_wr_warn_desc[] = {
 };
 
 #define WR_MAX_PRINT_LEVEL 4
-static char *g_wr_printf_tab[WR_MAX_PRINT_LEVEL] = {"", "\t", "\t\t", "\t\t\t"};
-
-char *wr_get_print_tab(uint8 level)
-{
-    return g_wr_printf_tab[level];
-}
 
 wr_log_def_t *wr_get_instance_log_def()
 {
@@ -181,9 +175,8 @@ static status_t wr_init_log_file(log_param_t *log_param, wr_config_t *inst_cfg)
 {
     int64 val_int64;
     uint16 val_uint16;
-    char *value = NULL;
 
-    value = cm_get_config_value(&inst_cfg->config, "_LOG_MAX_FILE_SIZE");
+    char *value = cm_get_config_value(&inst_cfg->config, "_LOG_MAX_FILE_SIZE");
     status_t status = cm_str2size(value, &val_int64);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "_LOG_MAX_FILE_SIZE"));
     if (val_int64 < CM_MIN_LOG_FILE_SIZE || val_int64 > CM_MAX_LOG_FILE_SIZE) {
@@ -291,9 +284,8 @@ static status_t wr_load_log_compressed(wr_config_t *inst_cfg, log_param_t *log_p
 static status_t wr_init_loggers_inner(wr_config_t *inst_cfg, log_param_t *log_param)
 {
     uint32_t val_uint32;
-    char *value = NULL;
 
-    value = cm_get_config_value(&inst_cfg->config, "_LOG_BACKUP_FILE_COUNT");
+    char *value = cm_get_config_value(&inst_cfg->config, "_LOG_BACKUP_FILE_COUNT");
     if (cm_str2uint32(value, &val_uint32) != CM_SUCCESS) {
         CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_BACKUP_FILE_COUNT");
         return CM_ERROR;
