@@ -25,6 +25,8 @@
 #ifndef WIN32
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 #include "cm_base.h"
@@ -47,6 +49,7 @@
 #include "wrcmd_encrypt.h"
 #include "wr_cli_conn.h"
 #include "wr_args_parse.h"
+
 #ifndef WIN32
 #include "config.h"
 #endif
@@ -66,6 +69,12 @@
 #define ALL_LONG            ("--all")
 #define HELP_SHORT          ("h")
 #define HELP_LONG           ("--help")
+
+#define LAST_DAY 2
+#define WR_CMD_LEN          2048
+#define WR_OPENSSL_KEY_BITS 2048
+#define WR_PERM_DIR         0700
+#define WR_PERM_FILE        0400
 
 wr_conn_t* g_cmd_conn= NULL;  // global connection for wrCmd
 
@@ -512,12 +521,233 @@ static status_t reload_certs_proc(void)
 
     status_t status = wr_reload_certs_impl(conn);
     if (status != CM_SUCCESS) {
-        WR_PRINT_ERROR("Failed to switchover server.\n");
+        WR_PRINT_ERROR("Failed to reload certs server.\n");
     } else {
-        WR_PRINT_INF("Succeed to switchover server.\n");
+        WR_PRINT_INF("Succeed to reload certs server.\n");
     }
     wr_disconnect_ex(conn);
     return status;
+}
+
+static wr_args_t cmd_gencert_args[] = {
+    {'t', "type", CM_TRUE, CM_TRUE, NULL, NULL, NULL, 0, NULL, NULL, 0},
+    {'d', "days", CM_FALSE, CM_TRUE, NULL, NULL, NULL, 0, NULL, NULL, 0},
+};
+
+static wr_args_set_t cmd_gencert_args_set = {
+    cmd_gencert_args,
+    sizeof(cmd_gencert_args) / sizeof(wr_args_t),
+    NULL,
+};
+
+static void gencert_help(const char *prog_name, int print_flag)
+{
+    (void)printf("\nUsage:%s gencert -t <client|server> [-d days]\n", prog_name);
+    (void)printf("[command] generate and check certs for client or server\n");
+    (void)printf("  -t/--type <client|server>\n");
+    (void)printf("  -d/--days <days>  (optional, default: 3650)\n");
+}
+
+static void prepare_certs_path(const char *certs_path) {
+    char cmd[WR_CMD_LEN];
+    snprintf(cmd, sizeof(cmd),
+        "mkdir -p %s && "
+        "cp /etc/pki/tls/openssl.cnf %s/. && "
+        "cd %s && mkdir -p demoCA demoCA/newcerts demoCA/private && "
+        "touch demoCA/index.txt && echo '01'>demoCA/serial && chmod 700 demoCA/private && "
+        "sed -i 's/^.*default_md.*$/default_md      = sha256/' openssl.cnf",
+        certs_path, certs_path, certs_path);
+    system(cmd);
+}
+
+static void generate_root_cert(const char *certs_path, int days) {
+    char cmd[WR_CMD_LEN];
+    snprintf(cmd, sizeof(cmd),
+        "cd %s && "
+        "openssl rand -base64 32 > ca.pass && "
+        "chmod 400 ca.pass && "
+        "export OPENSSL_CONF=%s/openssl.cnf; "
+        "openssl genrsa -aes256 -passout file:ca.pass -out demoCA/private/cakey.pem 2048 && "
+        "openssl req -new -x509 -passin file:ca.pass -days %d -key demoCA/private/cakey.pem -out demoCA/cacert.pem -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA\" && "
+        "cp demoCA/cacert.pem .",
+        certs_path, certs_path, days);
+    system(cmd);
+}
+
+static void create_server_certs(const char *certs_path, int days) {
+    char cmd[WR_CMD_LEN];
+    snprintf(cmd, sizeof(cmd),
+        "mkdir -p %s/server && "
+        "touch %s/server/openssl.cnf && "
+        "cd %s && "
+        "export OPENSSL_CONF=%s/openssl.cnf; "
+        "openssl genrsa -aes256 -passout file:ca.pass -out server.key 2048 && "
+        "openssl req -new -key server.key -passin file:ca.pass -out server.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=server\" && "
+        "openssl x509 -req -days %d -in server.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin file:ca.pass -CAcreateserial -out server.crt -extfile server/openssl.cnf && "
+        "openssl rsa -in server.key -out server.key -passin file:ca.pass && "
+        "chmod 400 server.* && echo '00' >demoCA/crlnumber",
+        certs_path, certs_path, certs_path, certs_path, days);
+    system(cmd);
+}
+
+static void create_client_certs(const char *certs_path, int days) {
+    char cmd[WR_CMD_LEN];
+    char client_dir[CM_MAX_PATH_LEN];
+    snprintf(client_dir, sizeof(client_dir), "%s/client", certs_path);
+    mkdir(client_dir, WR_PERM_DIR);
+
+    snprintf(cmd, sizeof(cmd),
+        "touch %s/client/openssl.cnf && "
+        "cd %s && "
+        "password=$(openssl rand -base64 32); "
+        "export OPENSSL_CONF=%s/openssl.cnf; "
+        "echo $password | openssl genrsa -aes256 -passout stdin -out client.key 2048 && "
+        "echo $password | openssl req -new -key client.key -passin stdin -out client.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=client\" && "
+        "openssl x509 -req -days %d -in client.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin file:ca.pass -CAcreateserial -out client.crt -extfile client/openssl.cnf && "
+        "echo $password | openssl rsa -in client.key -out client.key -passin stdin && "
+        "chmod 400 client.*",
+        certs_path, certs_path, certs_path, days);
+    system(cmd);
+}
+
+static void create_server_conf(const char *conf_file, const char *ser_ca, const char *ser_key, const char *ser_cert, const char *ser_crl) {
+    FILE *fp = fopen(conf_file, "w");
+    if (!fp) return;
+    fprintf(fp, "SER_SSL_CA=%s\n", ser_ca);
+    fprintf(fp, "SER_SSL_KEY=%s\n", ser_key);
+    fprintf(fp, "SER_SSL_CERT=%s\n", ser_cert);
+    fprintf(fp, "SER_SSL_CRL=%s\n", ser_crl);
+    fclose(fp);
+}
+
+static void create_client_conf(const char *conf_file, const char *cli_ca, const char *cli_key, const char *cli_cert, const char *cli_crl) {
+    FILE *fp = fopen(conf_file, "w");
+    if (!fp) return;
+    fprintf(fp, "CLI_SSL_CA=%s\n", cli_ca);
+    fprintf(fp, "CLI_SSL_KEY=%s\n", cli_key);
+    fprintf(fp, "CLI_SSL_CERT=%s\n", cli_cert);
+    fprintf(fp, "CLI_SSL_CRL=%s\n", cli_crl);
+    fclose(fp);
+}
+
+static void check_certs_permission(const char *filename) {
+    chmod(filename, WR_PERM_FILE);
+}
+
+static void check_certs_expired(const char *ca, const char *cert) {
+    char cmd[WR_CMD_LEN], buf[WR_CMD_LEN];
+    FILE *fp;
+    int ca_last = 0, cert_last = 0;
+
+    snprintf(cmd, sizeof(cmd),
+        "openssl x509 -in %s -noout -enddate | cut -d= -f2 | xargs -I {} date -d {} +%%s | xargs -I {} expr {} - $(date +%%s) | xargs -I {} expr {} / 86400",
+        ca);
+    fp = popen(cmd, "r");
+    if (fp && fgets(buf, sizeof(buf), fp)) ca_last = atoi(buf);
+    if (fp) pclose(fp);
+
+    snprintf(cmd, sizeof(cmd),
+        "openssl x509 -in %s -noout -enddate | cut -d= -f2 | xargs -I {} date -d {} +%%s | xargs -I {} expr {} - $(date +%%s) | xargs -I {} expr {} / 86400",
+        cert);
+    fp = popen(cmd, "r");
+    if (fp && fgets(buf, sizeof(buf), fp)) cert_last = atoi(buf);
+    if (fp) pclose(fp);
+
+    if (ca_last < LAST_DAY) {
+        printf("CA will be expired in %d, please renew %s.\n", ca_last, ca);
+    }
+    if (cert_last < LAST_DAY) {
+        printf("CA will be expired in %d, please renew %s.\n", cert_last, cert);
+    }
+}
+
+static int file_exists(const char *filename) {
+    return access(filename, F_OK) == 0;
+}
+
+static status_t gencert_proc(void)
+{
+    const char *wr_home = getenv("WR_HOME");
+    if (!wr_home) {
+        printf("Please set WR_HOME environment variable.\n");
+        return CM_ERROR;
+    }
+    char *type = cmd_gencert_args[0].input_args;
+    char *days_str = cmd_gencert_args[1].input_args;
+    int days = 3650;
+    if (days_str != NULL) {
+        days = atoi(days_str);
+        if (days <= 0) {
+            printf("Invalid days value: %s\n", days_str);
+            return CM_ERROR;
+        }
+    }
+    char certs_path[CM_MAX_PATH_LEN], conf_file[CM_MAX_PATH_LEN];
+    if (snprintf(certs_path, sizeof(certs_path), "%s/CA", wr_home) >= sizeof(certs_path)) {
+        printf("certs_path too long, path buffer overflow!\n");
+        return CM_ERROR;
+    }
+
+    if (type == NULL) {
+        printf("Please specify -t client or -t server\n");
+        return CM_ERROR;
+    }
+
+    if (strcmp(type, "client") == 0) {
+        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/wr_cli_inst.ini", wr_home) >= sizeof(conf_file)) {
+            printf("conf_file path too long!\n");
+            return CM_ERROR;
+        }
+        char cli_ca[CM_MAX_PATH_LEN], cli_key[CM_MAX_PATH_LEN], cli_cert[CM_MAX_PATH_LEN], cli_crl[CM_MAX_PATH_LEN];
+        if (snprintf(cli_ca, sizeof(cli_ca), "%s/cacert.pem", certs_path) >= sizeof(cli_ca) ||
+            snprintf(cli_key, sizeof(cli_key), "%s/client.key", certs_path) >= sizeof(cli_key) ||
+            snprintf(cli_cert, sizeof(cli_cert), "%s/client.crt", certs_path) >= sizeof(cli_cert) ||
+            snprintf(cli_crl, sizeof(cli_crl), "%s/client.crl", certs_path) >= sizeof(cli_crl)) {
+            printf("certs_path too long, path buffer overflow!\n");
+            return CM_ERROR;
+        }
+        create_client_certs(certs_path, days);
+        create_client_conf(conf_file, cli_ca, cli_key, cli_cert, cli_crl);
+        if (!file_exists(cli_ca) || !file_exists(cli_key) || !file_exists(cli_cert)) {
+            printf("Please check following client certs whether exist: cacert.pem, client.key, client.crt .\n");
+            return CM_ERROR;
+        }
+        check_certs_permission(cli_ca);
+        check_certs_permission(cli_key);
+        check_certs_permission(cli_cert);
+        check_certs_expired(cli_ca, cli_cert);
+        printf("Client certs generated and checked successfully.\n");
+    } else if (strcmp(type, "server") == 0) {
+        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/wr_ser_inst.ini", wr_home) >= sizeof(conf_file)) {
+            printf("conf_file path too long!\n");
+            return CM_ERROR;
+        }
+        char ser_ca[CM_MAX_PATH_LEN], ser_key[CM_MAX_PATH_LEN], ser_cert[CM_MAX_PATH_LEN], ser_crl[CM_MAX_PATH_LEN];
+        if (snprintf(ser_ca, sizeof(ser_ca), "%s/cacert.pem", certs_path) >= sizeof(ser_ca) ||
+            snprintf(ser_key, sizeof(ser_key), "%s/server.key", certs_path) >= sizeof(ser_key) ||
+            snprintf(ser_cert, sizeof(ser_cert), "%s/server.crt", certs_path) >= sizeof(ser_cert) ||
+            snprintf(ser_crl, sizeof(ser_crl), "%s/server.crl", certs_path) >= sizeof(ser_crl)) {
+            printf("certs_path too long, path buffer overflow!\n");
+            return CM_ERROR;
+        }
+        prepare_certs_path(certs_path);
+        generate_root_cert(certs_path, days);
+        create_server_conf(conf_file, ser_ca, ser_key, ser_cert, ser_crl);
+        create_server_certs(certs_path, days);
+        if (!file_exists(ser_ca) || !file_exists(ser_key) || !file_exists(ser_cert)) {
+            printf("Please check following server certs whether exist: cacert.pem, server.key, server.crt .\n");
+            return CM_ERROR;
+        }
+        check_certs_permission(ser_ca);
+        check_certs_permission(ser_key);
+        check_certs_permission(ser_cert);
+        check_certs_expired(ser_ca, ser_cert);
+        printf("Server certs generated and checked successfully.\n");
+    } else {
+        printf("Unknown type: %s, must be client or server\n", type);
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
 }
 
 // clang-format off
@@ -531,6 +761,7 @@ wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"stopwr", stopwr_help, stopwr_proc, &cmd_stopwr_args_set, true},
     {"switchover", switchover_help, switchover_proc, &cmd_switchover_args_set, true},
     {"reload_certs", reload_certs_help, reload_certs_proc, &cmd_reload_certs_args_set, false},
+    {"gencert", gencert_help, gencert_proc, &cmd_gencert_args_set, true},
 };
 
 void clean_cmd()
