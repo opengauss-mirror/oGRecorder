@@ -160,9 +160,9 @@ TEST_F(WrApiTest, TestWrfileStat) {
 }
 
 TEST_F(WrApiTest, TestWrfilePostpone) {
-    const char *time1 = "2025-06-23 10:00:00";
-    const char *time2 = "2025-06-24 11:00:00";
-    const char *time3 = "2025-06-22 23:00:00";
+    const char *time1 = "2025-07-23 10:00:00";
+    const char *time2 = "2025-07-24 11:00:00";
+    const char *time3 = "2025-07-22 23:00:00";
     EXPECT_EQ(wr_file_postpone(g_vfs_handle, TEST_FILE1, time1), WR_SUCCESS);
     EXPECT_EQ(wr_file_postpone(g_vfs_handle, TEST_FILE2, time2), WR_SUCCESS);
     EXPECT_EQ(wr_file_postpone(g_vfs_handle, TEST_FILE3, time3), WR_SUCCESS);
