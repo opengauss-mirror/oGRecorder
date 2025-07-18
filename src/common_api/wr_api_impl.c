@@ -231,9 +231,9 @@ status_t wr_vfs_mount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle, unsigned 
     LOG_DEBUG_INF("wr mount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
     wr_mount_vfs_info_t send_info;
     send_info.vfs_name = vfs_handle->vfs_name;
-    send_info.dir = NULL; 
+    send_info.dir = 0; 
     status_t status = wr_msg_interact(conn, WR_CMD_MOUNT_VFS, (void *)&send_info,  (void *)&send_info);
-    vfs_handle->dir = send_info.dir;
+    vfs_handle->dir_handle = send_info.dir;
     LOG_DEBUG_INF("wr mount vfs leave");
     return status;
 }
@@ -246,7 +246,7 @@ status_t wr_vfs_unmount_impl(wr_conn_t *conn, wr_vfs_handle *vfs_handle)
     }
     LOG_DEBUG_INF("wr unmount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
     wr_mount_vfs_info_t send_info;
-    send_info.dir = vfs_handle->dir; 
+    send_info.dir = vfs_handle->dir_handle; 
     status_t status = wr_msg_interact(conn, WR_CMD_UNMOUNT_VFS, (void *)&send_info,  (void *)&send_info);
     LOG_DEBUG_INF("wr unmount vfs leave");
     return status;
@@ -256,7 +256,7 @@ status_t wr_vfs_query_file_num_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, u
 {
     LOG_DEBUG_INF("wr query file num entry");
     wr_query_file_num_info_t send_info;
-    send_info.dir = vfs_handle.dir;
+    send_info.dir = vfs_handle.dir_handle;
     send_info.file_num = *file_num;
     status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_NUM, (void *)&send_info, (void *)&send_info);
     if (status != CM_SUCCESS) {
@@ -272,7 +272,7 @@ status_t wr_vfs_query_file_info_impl(wr_conn_t *conn, wr_vfs_handle vfs_handle, 
 {
     LOG_DEBUG_INF("Client query file info entry, vfs_name: %s", vfs_handle.vfs_name);
     wr_query_file_num_info_t send_info;
-    send_info.dir = vfs_handle.dir;
+    send_info.dir = vfs_handle.dir_handle;
     send_info.is_continue = is_continue;
     status_t status = wr_msg_interact(conn, WR_CMD_QUERY_FILE_INFO, (void *)&send_info, (void *)file_info);
     if (status != CM_SUCCESS) {
@@ -738,7 +738,9 @@ void wr_destroy(void)
 
 status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, const char *scope)
 {
-    WR_RETURN_IF_ERROR(wr_check_name(name));
+    WR_RETURN_IF_ERROR(wr_check_str_not_null(name, "name"));
+    WR_RETURN_IF_ERROR(wr_check_str_not_null(value, "value"));
+    WR_RETURN_IF_ERROR(wr_check_str_not_null(scope, "scope"));
     wr_setcfg_info_t send_info;
     send_info.name = name;
     send_info.value = value;
@@ -750,7 +752,7 @@ status_t wr_setcfg_impl(wr_conn_t *conn, const char *name, const char *value, co
 
 status_t wr_getcfg_impl(wr_conn_t *conn, const char *name, char *out_str, size_t str_len)
 {
-    WR_RETURN_IF_ERROR(wr_check_name(name));
+    WR_RETURN_IF_ERROR(wr_check_str_not_null(name, "name"));
     text_t extra_info = CM_NULL_TEXT;
     WR_RETURN_IF_ERROR(wr_msg_interact(conn, WR_CMD_GETCFG, (void *)name, (void *)&extra_info));
     if (extra_info.len == 0) {

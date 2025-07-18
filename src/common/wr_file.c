@@ -131,23 +131,24 @@ static status_t wr_check_path_is_valid(const char *path, uint32_t path_max_size)
     return CM_SUCCESS;
 }
 
-status_t wr_check_name(const char *name)
+status_t wr_check_str_not_null(const char *str, const char *desc)
 {
-    if (name == NULL || strlen(name) == 0) {
-        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, "[null]", ", name cannot be a null string.");
+    if (str == NULL || str[0] == '\0') {
+        WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, "[null]", ", %s cannot be a null or empty string.", desc);
         return CM_ERROR;
     }
+    return CM_SUCCESS;
+}
 
+status_t wr_check_name(const char *name)
+{
+    wr_check_str_not_null(name, "name");
     return wr_check_name_is_valid(name, WR_MAX_NAME_LEN);
 }
 
 status_t wr_check_device_path(const char *path)
 {
-    if (path == NULL || strlen(path) == 0) {
-        WR_RETURN_IFERR2(
-            CM_ERROR, WR_THROW_ERROR(ERR_WR_FILE_PATH_ILL, "[null]", ", path cannot be a null string."));
-    }
-
+    wr_check_str_not_null(path, "device path");
     return wr_check_path_is_valid(path + 1, (WR_FILE_PATH_MAX_LENGTH - 1));
 }
 

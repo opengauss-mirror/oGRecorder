@@ -141,7 +141,7 @@ typedef struct st_wr_read_file_info {
 } wr_read_file_info_t;
 
 typedef struct st_wr_query_file_num_info {
-    void* dir;
+    uint64 dir;
     uint32_t file_num;
     bool is_continue;
 } wr_query_file_num_info_t;
@@ -172,7 +172,7 @@ typedef struct st_wr_remove_dir_info {
 
 typedef struct st_wr_mount_vfs_info {
     const char *vfs_name;
-    void* dir;
+    uint64_t dir;
 } wr_mount_vfs_info_t;
 
 typedef struct st_wr_get_server_info {

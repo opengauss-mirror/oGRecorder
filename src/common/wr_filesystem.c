@@ -33,6 +33,8 @@
 #include "wr_file.h"
 #include "wr_thv.h"
 #include "wr_param.h"
+#include <pthread.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +49,58 @@ static void wr_get_fs_path(const char *name, char *buf, size_t buf_size)
             buf[0] = '\0';
         }
     }
+}
+
+typedef struct wr_dir_map_item {
+    uint64_t handle;
+    DIR *dir;
+    struct wr_dir_map_item *next;
+} wr_dir_map_item_t;
+
+/* handle-DIR map */
+static wr_dir_map_item_t *g_dir_map_head = NULL;
+static pthread_mutex_t g_dir_map_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint64_t g_next_dir_handle = 1;
+
+uint64_t wr_dir_map_insert(DIR *dir) {
+    pthread_mutex_lock(&g_dir_map_lock);
+    uint64_t handle = g_next_dir_handle++;
+    wr_dir_map_item_t *item = malloc(sizeof(wr_dir_map_item_t));
+    item->handle = handle;
+    item->dir = dir;
+    item->next = g_dir_map_head;
+    g_dir_map_head = item;
+    pthread_mutex_unlock(&g_dir_map_lock);
+    return handle;
+}
+
+DIR *wr_dir_map_get(uint64_t handle) {
+    pthread_mutex_lock(&g_dir_map_lock);
+    wr_dir_map_item_t *item = g_dir_map_head;
+    while (item) {
+        if (item->handle == handle) {
+            pthread_mutex_unlock(&g_dir_map_lock);
+            return item->dir;
+        }
+        item = item->next;
+    }
+    pthread_mutex_unlock(&g_dir_map_lock);
+    return NULL;
+}
+
+void wr_dir_map_remove(uint64_t handle) {
+    pthread_mutex_lock(&g_dir_map_lock);
+    wr_dir_map_item_t **pp = &g_dir_map_head;
+    while (*pp) {
+        if ((*pp)->handle == handle) {
+            wr_dir_map_item_t *to_free = *pp;
+            *pp = to_free->next;
+            free(to_free);
+            break;
+        }
+        pp = &((*pp)->next);
+    }
+    pthread_mutex_unlock(&g_dir_map_lock);
 }
 
 status_t wr_filesystem_mkdir(const char *name, mode_t mode) {
@@ -111,10 +165,10 @@ status_t wr_filesystem_rmdir(const char *name, uint64 flag) {
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_opendir(const char *name, void **out_dir)
+status_t wr_filesystem_opendir(const char *name, uint64_t *out_handle)
 {
-    if (!name || !out_dir) {
-        LOG_RUN_ERR("[FS] Invalid parameters: name or out_dir is NULL");
+    if (!name || !out_handle) {
+        LOG_RUN_ERR("[FS] Invalid parameters: name or out_handle is NULL");
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -126,26 +180,25 @@ status_t wr_filesystem_opendir(const char *name, void **out_dir)
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-
     LOG_RUN_INF("[FS] Successfully opened directory: %s", name);
-    *out_dir = (void *)dir;
+    *out_handle = wr_dir_map_insert(dir);
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_closedir(void *dir)
+status_t wr_filesystem_closedir(uint64_t handle)
 {
+    DIR *dir = wr_dir_map_get(handle);
     if (!dir) {
-        LOG_RUN_ERR("[FS] Invalid directory handle for");
+        LOG_RUN_ERR("[FS] Invalid directory handle: %lu", handle);
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-
-    if (closedir((DIR *)dir) != 0) {
+    if (closedir(dir) != 0) {
         LOG_RUN_ERR("[FS] Failed to close directory");
         WR_THROW_ERROR(ERR_WR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-
+    wr_dir_map_remove(handle);
     LOG_RUN_INF("[FS] Successfully closed directory");
     return CM_SUCCESS;
 }
@@ -235,15 +288,20 @@ status_t wr_filesystem_pread(int handle, int64 offset, int64 size, char *buf, in
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_query_file_num(void *dir, uint32_t *file_num) {
+status_t wr_filesystem_query_file_num(uint64_t handle, uint32_t *file_num) {
     if (!file_num) {
-        LOG_RUN_ERR("[FS] Invalid parameters: vfs_name or file_num is NULL");
+        LOG_RUN_ERR("[FS] Invalid parameters: file_num is NULL");
+        return CM_ERROR;
     }
-
+    DIR *dir = wr_dir_map_get(handle);
+    if (!dir) {
+        LOG_RUN_ERR("[FS] Invalid directory handle: %lu", handle);
+        return CM_ERROR;
+    }
     struct dirent *entry;
     *file_num = 0;
     rewinddir(dir);
-    while ((entry = readdir((DIR*)dir)) != NULL) {
+    while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_REG) {
             (*file_num)++;
         }
@@ -252,19 +310,22 @@ status_t wr_filesystem_query_file_num(void *dir, uint32_t *file_num) {
     return CM_SUCCESS;
 }
 
-status_t wr_filesystem_query_file_info(void *dir, wr_file_item_t *file_items, uint32_t max_files, uint32_t *file_count, bool is_continue) {
+status_t wr_filesystem_query_file_info(uint64_t handle, wr_file_item_t *file_items, uint32_t max_files, uint32_t *file_count, bool is_continue) {
     if (!file_items || !file_count) {
-        LOG_RUN_ERR("[FS] Invalid parameters:file_items, or file_count is NULL");
+        LOG_RUN_ERR("[FS] Invalid parameters: file_items or file_count is NULL");
         return CM_ERROR;
     }
-
+    DIR *dir = wr_dir_map_get(handle);
+    if (!dir) {
+        LOG_RUN_ERR("[FS] Invalid directory handle: %lu", handle);
+        return CM_ERROR;
+    }
     if (!is_continue) {
         rewinddir(dir);
     }
     struct dirent *entry;
     *file_count = 0;
-
-    while ((entry = readdir((DIR*)dir)) != NULL) {
+    while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_REG) {
             wr_file_item_t *current_item = &file_items[*file_count];
             strncpy(current_item->name, entry->d_name, WR_MAX_NAME_LEN - 1);
@@ -275,7 +336,6 @@ status_t wr_filesystem_query_file_info(void *dir, wr_file_item_t *file_items, ui
             }
         }
     }
-    
     return CM_SUCCESS;
 }
 
