@@ -65,6 +65,7 @@ typedef struct st_wr_alloc_fs_block_info {
 wr_env_t *wr_get_env(void);
 wr_config_t *wr_get_inst_cfg(void);
 status_t wr_get_root_version(wr_vg_info_item_t *vg_item, uint64 *version);
+status_t wr_check_str_not_null(const char *str, const char *desc);
 status_t wr_check_name(const char *name);
 status_t wr_check_attr_flag(uint64 attrFlag);
 status_t wr_check_volume_path(const char *path);

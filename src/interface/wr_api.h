@@ -96,7 +96,7 @@ typedef struct st_wr_dirent {
 
 typedef struct wr_vfs_handle {
     wr_instance_handle handle;
-    void *dir;
+    unsigned long long dir_handle; /* handle for directory */
     char vfs_name[WR_MAX_NAME_LEN];
 } wr_vfs_handle;
 

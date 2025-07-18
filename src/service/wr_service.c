@@ -290,23 +290,23 @@ static status_t wr_process_mount_vfs(wr_session_t *session)
 {
     char *vfs_name = NULL;
     wr_init_get(&session->recv_pack);
-    void* dir;
+    uint64_t handle;
     WR_RETURN_IF_ERROR(wr_get_str(&session->recv_pack, &vfs_name));
     
-    if (wr_filesystem_opendir(vfs_name, &dir) != CM_SUCCESS) {
+    if (wr_filesystem_opendir(vfs_name, &handle) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to mount vfs:%s", vfs_name);
         return CM_ERROR;
     }
-    (void)wr_put_int64(&session->send_pack, (int64)dir);
+    (void)wr_put_int64(&session->send_pack, (int64)handle);
     return CM_SUCCESS;
 }
 
 static status_t wr_process_unmount_vfs(wr_session_t *session)
 {
-    void* dir;
+    uint64_t handle;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&dir));
-    if (wr_filesystem_closedir(dir) != CM_SUCCESS) {
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&handle));
+    if (wr_filesystem_closedir(handle) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to unmount vfs");
         return CM_ERROR;
     }
@@ -315,11 +315,11 @@ static status_t wr_process_unmount_vfs(wr_session_t *session)
 
 static status_t wr_process_query_file_num(wr_session_t *session)
 {
-    void *dir = NULL;
+    uint64_t handle = 0;
     uint32_t file_num = 0;
     wr_init_get(&session->recv_pack);
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&dir));
-    if (wr_filesystem_query_file_num(dir, &file_num) != CM_SUCCESS) {
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64 *)&handle));
+    if (wr_filesystem_query_file_num(handle, &file_num) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to query file num for vfs");
         return CM_ERROR;
     }
@@ -333,13 +333,13 @@ static status_t wr_process_query_file_info(wr_session_t *session)
     uint32_t file_count = 0;
     bool32 is_continue = CM_FALSE;
     wr_file_item_t file_items[WR_MAX_FILE_NUM];
-    void *dir = NULL;
+    uint64_t handle = 0;
 
     wr_init_get(&session->recv_pack);
     WR_RETURN_IF_ERROR(wr_get_int32(&session->recv_pack, (int32*)&is_continue));
-    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64*)&dir));
+    WR_RETURN_IF_ERROR(wr_get_int64(&session->recv_pack, (int64*)&handle));
 
-    if (wr_filesystem_query_file_info(dir, file_items, WR_MAX_FILE_NUM, &file_count, is_continue) != CM_SUCCESS) {
+    if (wr_filesystem_query_file_info(handle, file_items, WR_MAX_FILE_NUM, &file_count, is_continue) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to query file info for vfs");
         return CM_ERROR;
     }

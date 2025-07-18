@@ -199,7 +199,7 @@ int wr_vfs_unmount(wr_vfs_handle *vfs_handle)
     status_t ret = wr_vfs_unmount_impl(hdl->conn, vfs_handle);
     vfs_handle->handle = NULL;
     vfs_handle->vfs_name[0] = '\0';
-    vfs_handle->dir = NULL;
+    vfs_handle->dir_handle = 0;
 
     return ret; 
 }
