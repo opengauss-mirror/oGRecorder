@@ -30,6 +30,8 @@ function print_help()
 "
 }
 
+pkg_flag=OFF
+
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help)
@@ -63,6 +65,10 @@ while [ $# -gt 0 ]; do
         -s|--storage_mode)
           storage_mode=$2
           shift 2
+          ;;
+        --pkg|-pkg)
+          pkg_flag=ON
+          shift 1
           ;;
          *)
             echo "Internal Error: option processing error: $1" 1>&2
@@ -190,3 +196,23 @@ cp -r $COPT_LIB_PATH/cbb/bin/perctrl $binarylib_dir/kernel/component/${OUT_PACKA
 cp -r install/wr_clear.sh $binarylib_dir/kernel/component/${OUT_PACKAGE}/bin
 cp -r src/interface/*.h $binarylib_dir/kernel/component/${OUT_PACKAGE}/include
 echo "build WR SUCCESS"
+
+cp -r src/interface/*.h $binarylib_dir/kernel/component/${OUT_PACKAGE}/include
+echo "build WR SUCCESS"
+
+if [ "$pkg_flag"x == "ON"x ]; then
+    pkg_name="wr_package.tar.gz"
+    tmp_dir="wr_package_tmp"
+    rm -rf $tmp_dir
+    mkdir -p $tmp_dir/bin
+    mkdir -p $tmp_dir/lib
+    mkdir -p $tmp_dir/include
+
+    cp -r output/bin/wr* $tmp_dir/bin/
+    cp -r output/lib/libwr* $tmp_dir/lib/
+    cp -r src/interface/*.h $tmp_dir/include/
+
+    tar -czvf $pkg_name -C $tmp_dir .
+    rm -rf $tmp_dir
+    echo "Package created: $pkg_name"
+fi

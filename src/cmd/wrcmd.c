@@ -46,7 +46,6 @@
 #include "wr_file.h"
 #include "wr_api.h"
 #include "wr_api_impl.h"
-#include "wrcmd_encrypt.h"
 #include "wr_cli_conn.h"
 #include "wr_args_parse.h"
 
@@ -215,82 +214,6 @@ static status_t lscli_proc(void)
 
     (void)printf("%-20s%-20s%-256s\n", "cli_pid", "start_time", "process_name");
     (void)printf("%-20llu%-20lld%-256s\n", cli_info.cli_pid, cli_info.start_time, cli_info.process_name);
-    return CM_SUCCESS;
-}
-
-static wr_args_set_t cmd_encrypt_args_set = {
-    NULL,
-    0,
-    NULL,
-};
-
-static void encrypt_help(const char *prog_name, int print_flag)
-{
-    (void)printf("\nUsage:%s encrypt\n", prog_name);
-    (void)printf("[client command] password encrypt\n");
-}
-
-static status_t wr_save_random_file(const uchar *value, int32_t value_len)
-{
-    char file_name[CM_FILE_NAME_BUFFER_SIZE];
-    char dir_name[CM_FILE_NAME_BUFFER_SIZE];
-    int32_t handle;
-    PRTS_RETURN_IFERR(snprintf_s(
-        dir_name, CM_FILE_NAME_BUFFER_SIZE, CM_FILE_NAME_BUFFER_SIZE - 1, "%s/wr_protect", g_inst_cfg->home));
-    PRTS_RETURN_IFERR(snprintf_s(file_name, CM_FILE_NAME_BUFFER_SIZE, CM_FILE_NAME_BUFFER_SIZE - 1, "%s/wr_protect/%s",
-        g_inst_cfg->home, WR_FKEY_FILENAME));
-    if (!cm_dir_exist(dir_name)) {
-        WR_RETURN_IF_ERROR(cm_create_dir(dir_name));
-    }
-    if (access(file_name, R_OK | F_OK) == 0) {
-        (void)chmod(file_name, S_IRUSR | S_IWUSR);
-        WR_RETURN_IF_ERROR(cm_overwrite_file(file_name));
-        WR_RETURN_IF_ERROR(cm_remove_file(file_name));
-    }
-    WR_RETURN_IF_ERROR(
-        cm_open_file_ex(file_name, O_SYNC | O_CREAT | O_RDWR | O_TRUNC | O_BINARY, S_IRUSR | S_IWUSR, &handle));
-    status_t ret = cm_write_file(handle, value, value_len);
-    cm_close_file(handle);
-    return ret;
-}
-
-static status_t encrypt_proc(void)
-{
-    status_t status;
-    char plain[CM_PASSWD_MAX_LEN + 1] = {0};
-    status = wr_catch_input_text(plain, CM_PASSWD_MAX_LEN + 1);
-    if (status != CM_SUCCESS) {
-        (void)(memset_s(plain, CM_PASSWD_MAX_LEN + 1, 0, CM_PASSWD_MAX_LEN + 1));
-        WR_PRINT_RUN_ERROR("[ENCRYPT]Failed to encrypt password when catch input.\n");
-        return CM_ERROR;
-    }
-    LOG_RUN_INF("[ENCRYPT]Succeed to encrypt password when catch input.\n");
-    cipher_t cipher;
-    status = cm_encrypt_pwd((uchar *)plain, (uint32_t)strlen(plain), &cipher);
-    if (status != CM_SUCCESS) {
-        (void)(memset_s(plain, CM_PASSWD_MAX_LEN + 1, 0, CM_PASSWD_MAX_LEN + 1));
-        WR_PRINT_RUN_ERROR("[ENCRYPT]Failed to encrypt password.\n");
-        return CM_ERROR;
-    }
-    LOG_RUN_INF("[ENCRYPT]Succeed to encrypt password.\n");
-    (void)(memset_s(plain, CM_PASSWD_MAX_LEN + 1, 0, CM_PASSWD_MAX_LEN + 1));
-    status = wr_save_random_file(cipher.rand, RANDOM_LEN + 1);
-    if (status != CM_SUCCESS) {
-        WR_PRINT_RUN_ERROR("[ENCRYPT]Failed to save random component.\n");
-        return CM_ERROR;
-    }
-    LOG_RUN_INF("[ENCRYPT]Succeed to save random component.\n");
-    (void)(memset_s(cipher.rand, RANDOM_LEN + 1, 0, RANDOM_LEN + 1));
-    char buf[CM_MAX_SSL_CIPHER_LEN] = {0};
-    uint32_t buf_len = CM_MAX_SSL_CIPHER_LEN;
-    status = cm_base64_encode((uchar *)&cipher, (uint32_t)sizeof(cipher_t), buf, &buf_len);
-    if (status != CM_SUCCESS) {
-        WR_PRINT_RUN_ERROR("[ENCRYPT]Failed to encrypt password when encode.\n");
-        return CM_ERROR;
-    }
-    (void)printf("Cipher: \t\t%s\n", buf);
-    (void)fflush(stdout);
-    LOG_RUN_INF("[ENCRYPT]Succeed to print cipher, length is %u.\n", (uint32_t)strlen(buf));
     return CM_SUCCESS;
 }
 
@@ -754,7 +677,6 @@ static status_t gencert_proc(void)
 wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"ts", ts_help, ts_proc, &cmd_ts_args_set, false},
     {"lscli", lscli_help, lscli_proc, &cmd_lscli_args_set, false},
-    {"encrypt", encrypt_help, encrypt_proc, &cmd_encrypt_args_set, true},
     {"setcfg", setcfg_help, setcfg_proc, &cmd_setcfg_args_set, true},
     {"getcfg", getcfg_help, getcfg_proc, &cmd_getcfg_args_set, false},
     {"getstatus", getstatus_help, getstatus_proc, &cmd_getstatus_args_set, false},
