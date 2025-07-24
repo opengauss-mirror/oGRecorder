@@ -14,7 +14,8 @@ if [ ${file_user} != ${os_user} ]; then
 fi
 
 WR_BIN=wrserver
-WR_BIN_FULL=${GAUSSHOME}/bin/wrserver
+WR_BIN_FULL=${WR_HOME}/bin/wrserver
+WR_BIN_CMD=${WR_HOME}/bin/wrcmd
 BIN_PATH=${GAUSSHOME}/bin
 SCRIPT_NAME=$0
 
@@ -45,8 +46,8 @@ fi
 
 log()
 {
-   # time=`date "+%Y-%m-%d %H:%M:%S"`
-   # echo "[$time][DSS]$1" >> ${startdss_log} 2>&1
+   time=`date "+%Y-%m-%d %H:%M:%S"`
+   echo "[$time][DSS]$1" >> ${startdss_log} 2>&1
    return
 }
 
@@ -160,6 +161,13 @@ function Check()
     then
         log "[CHECK]wrserver is dead."
         exit 3
+    fi
+    ${WR_BIN_CMD} getstatus
+    wr_status=$?
+    if [ ${wr_status} != 0 ]
+    then
+        log "[CHECK]wrcmd status return code: $wr_status"
+        exit 2
     fi
 }
 

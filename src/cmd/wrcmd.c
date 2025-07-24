@@ -562,14 +562,14 @@ static void check_certs_expired(const char *ca, const char *cert) {
     FILE *fp;
     int ca_last = 0, cert_last = 0;
 
-    snprintf(cmd, sizeof(cmd),
+    snprintf_s(cmd, sizeof(cmd), sizeof(cmd) - 1,
         "openssl x509 -in %s -noout -enddate | cut -d= -f2 | xargs -I {} date -d {} +%%s | xargs -I {} expr {} - $(date +%%s) | xargs -I {} expr {} / 86400",
         ca);
     fp = popen(cmd, "r");
     if (fp && fgets(buf, sizeof(buf), fp)) ca_last = atoi(buf);
     if (fp) pclose(fp);
 
-    snprintf(cmd, sizeof(cmd),
+    snprintf_s(cmd, sizeof(cmd), sizeof(cmd) - 1,
         "openssl x509 -in %s -noout -enddate | cut -d= -f2 | xargs -I {} date -d {} +%%s | xargs -I {} expr {} - $(date +%%s) | xargs -I {} expr {} / 86400",
         cert);
     fp = popen(cmd, "r");
