@@ -516,7 +516,7 @@ static void create_server_certs(const char *certs_path, int days) {
 static void create_client_certs(const char *certs_path, int days) {
     char cmd[WR_CMD_LEN];
     char client_dir[CM_MAX_PATH_LEN];
-    snprintf(client_dir, sizeof(client_dir), "%s/client", certs_path);
+    snprintf_s(client_dir, sizeof(client_dir), sizeof(client_dir) -1, "%s/client", certs_path);
     mkdir(client_dir, WR_PERM_DIR);
 
     snprintf(cmd, sizeof(cmd),
