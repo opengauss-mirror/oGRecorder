@@ -143,6 +143,15 @@ static status_t wr_delay_clean_background_task(wr_instance_t *inst)
     return status;
 }
 
+static status_t wr_alarm_check_background_task(wr_instance_t *inst)
+{
+    LOG_RUN_INF("create wr alarm check background task.");
+    uint32 vg_usgae_alarm_thread_id = wr_get_alarm_check_task_idx();
+    status_t status =
+        cm_create_thread(wr_alarm_check_proc, 0, &g_wr_instance, &(g_wr_instance.threads[vg_usgae_alarm_thread_id]));
+    return status;
+}
+
 static status_t wr_init_background_tasks(void)
 {
     status_t status = wr_recovery_background_task(&g_wr_instance);
@@ -154,6 +163,11 @@ static status_t wr_init_background_tasks(void)
     status = wr_delay_clean_background_task(&g_wr_instance);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Create wr delay clean background task failed.");
+        return status;
+    }
+    status = wr_alarm_check_background_task(&g_wr_instance);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("Create wr disk usage alarm background task failed.");
         return status;
     }
     return status;

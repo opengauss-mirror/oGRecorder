@@ -53,6 +53,7 @@ static char *g_wr_cmd_desc[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_POSTPONE_FILE_TIME)] = "extend file expired time",
     [WR_CMD_TYPE_OFFSET(WR_CMD_HANDSHAKE)] = "handshake with server",
     [WR_CMD_TYPE_OFFSET(WR_CMD_RELOAD_CERTS)] = "reload wr server certs",
+    [WR_CMD_TYPE_OFFSET(WR_CMD_GET_DISK_USAGE)] = "get disk usage",
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXIST)] = "exist item",
     [WR_CMD_TYPE_OFFSET(WR_CMD_GET_FTID_BY_PATH)] = "get ftid by path",
     [WR_CMD_TYPE_OFFSET(WR_CMD_GETCFG)] = "getcfg",

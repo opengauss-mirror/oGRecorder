@@ -673,6 +673,48 @@ static status_t gencert_proc(void)
     return CM_SUCCESS;
 }
 
+static wr_args_t cmd_usage_args[] = {};
+static wr_args_set_t cmd_usage_args_set = {
+    cmd_usage_args,
+    sizeof(cmd_usage_args) / sizeof(wr_args_t),
+    NULL,
+};
+
+static void usage_help(const char *prog_name, int print_flag)
+{
+    (void)printf("\nUsage:%s usage\n", prog_name);
+    (void)printf("[client command] reload wr server certs\n");
+    if (print_flag == WR_HELP_SIMPLE) {
+        return;
+    }
+}
+
+static status_t usage_proc(void)
+{
+    const double GB = 1073741824.0; // 1 GB in bytes
+    wr_conn_t *conn = wr_get_connection_for_cmd();
+    if (conn == NULL) {
+        return CM_ERROR;
+    }
+    wr_disk_usage_info_t info = {0};
+    status_t status = wr_get_disk_usage_impl(conn, &info);
+    if (status != CM_SUCCESS) {
+        WR_PRINT_ERROR("Failed to get disk usage.\n");
+    } else {
+        double percent = 0.0;
+        if (info.total_bytes > 0) {
+            percent = (double)info.used_bytes / (double)info.total_bytes * 100.0;
+        }
+        printf("Total: %.2f GB, Used: %.2f GB, Available: %.2f GB, Usage: %.2f%%\n",
+            info.total_bytes / GB,
+            info.used_bytes / GB,
+            info.available_bytes / GB,
+            percent);
+    }
+    wr_disconnect_ex(conn);
+    return status;
+}
+
 // clang-format off
 wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"ts", ts_help, ts_proc, &cmd_ts_args_set, false},
@@ -684,6 +726,7 @@ wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"switchover", switchover_help, switchover_proc, &cmd_switchover_args_set, true},
     {"reload_certs", reload_certs_help, reload_certs_proc, &cmd_reload_certs_args_set, false},
     {"gencert", gencert_help, gencert_proc, &cmd_gencert_args_set, true},
+    {"usage", usage_help, usage_proc, &cmd_usage_args_set, true},
 };
 
 void clean_cmd()

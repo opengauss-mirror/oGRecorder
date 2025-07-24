@@ -38,6 +38,11 @@
 #include "wr_thv.h"
 #include "wr_filesystem.h"
 #include "wr_file.h"
+#include <pthread.h>
+#include <sys/statvfs.h>
+
+static pthread_mutex_t g_wr_disk_usage_lock = PTHREAD_MUTEX_INITIALIZER;
+static wr_disk_usage_info_t g_wr_disk_usage_info = {0};
 
 wr_env_t g_wr_env;
 wr_env_t *wr_get_env(void)
@@ -315,4 +320,41 @@ void wr_clean_all_sessions_latch()
         wr_clean_session_latch(session, CM_TRUE);
         wr_server_session_unlock(session);
     }
+}
+
+void wr_get_disk_usage_info(wr_disk_usage_info_t *info)
+{
+    pthread_mutex_lock(&g_wr_disk_usage_lock);
+    *info = g_wr_disk_usage_info;
+    pthread_mutex_unlock(&g_wr_disk_usage_lock);
+}
+
+static void wr_set_disk_usage_info(unsigned long total, unsigned long used, unsigned long avail, double usage)
+{
+    pthread_mutex_lock(&g_wr_disk_usage_lock);
+    g_wr_disk_usage_info.total_bytes = total;
+    g_wr_disk_usage_info.used_bytes = used;
+    g_wr_disk_usage_info.available_bytes = avail;
+    g_wr_disk_usage_info.usage_percent = usage;
+    pthread_mutex_unlock(&g_wr_disk_usage_lock);
+}
+
+void wr_alarm_check_disk_usage()
+{
+    const char *data_path = g_inst_cfg->params.data_file_path;
+    struct statvfs stat;
+    if (statvfs(data_path, &stat) != 0) {
+        LOG_RUN_ERR("[ALARM] Failed to get disk usage for %s, errno=%d", data_path, errno);
+        wr_set_disk_usage_info(0, 0, 0, 0);
+        return;
+    }
+
+    unsigned long total = stat.f_blocks * stat.f_frsize;
+    unsigned long available = stat.f_bavail * stat.f_frsize;
+    unsigned long used = total - available;
+    double usage = (total == 0) ? 0 : (double)used / (double)total * 100.0;
+
+    LOG_RUN_INF_INHIBIT(LOG_INHIBIT_LEVEL5, "[ALARM] Disk usage of %s: total=%.2fGB, used=%.2fGB, available=%.2fGB, usage=%.2f%%.",
+        data_path, total / 1073741824.0, used / 1073741824.0, available / 1073741824.0, usage);
+    wr_set_disk_usage_info(total, used, available, usage);
 }

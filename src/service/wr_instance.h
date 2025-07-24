@@ -119,6 +119,7 @@ void wr_recovery_when_primary(wr_session_t *session, wr_instance_t *inst, uint32
 status_t wr_get_cm_res_lock_owner(wr_cm_res *cm_res, uint32_t *master_id);
 void wr_get_cm_lock_and_recover(thread_t *thread);
 void wr_delay_clean_proc(thread_t *thread);
+void wr_alarm_check_proc(thread_t *thread);
 void wr_hashmap_dynamic_extend_and_redistribute_proc(thread_t *thread);
 bool32 wr_check_join_cluster();
 

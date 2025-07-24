@@ -805,6 +805,17 @@ status_t wr_reload_certs_impl(wr_conn_t *conn)
     return wr_msg_interact(conn, WR_CMD_RELOAD_CERTS, NULL, NULL);
 }
 
+status_t wr_get_disk_usage_impl(wr_conn_t *conn, wr_disk_usage_info_t *info)
+{
+    wr_disk_usage_ack_t ack_info = {0};
+    WR_RETURN_IF_ERROR(wr_msg_interact(conn, WR_CMD_GET_DISK_USAGE, NULL, (void *)&ack_info));
+    info->available_bytes = ack_info.available_bytes;
+    info->total_bytes = ack_info.total_bytes;
+    info->used_bytes = ack_info.used_bytes;
+    info->usage_percent = ack_info.usage_percent;
+    return CM_SUCCESS;
+}
+
 status_t wr_close_file_on_server(wr_conn_t *conn, int64 fd, bool need_lock)
 {
     wr_close_file_info_t send_info;
@@ -1016,6 +1027,28 @@ static status_t wr_decode_get_time_stat(wr_packet_t *ack_pack, void *ack)
     return CM_SUCCESS;
 }
 
+static status_t wr_decode_get_disk_usage(wr_packet_t *ack_pack, void *ack)
+{
+    wr_disk_usage_ack_t *info = (wr_disk_usage_ack_t *)ack;
+    if (wr_get_int64(ack_pack, &info->total_bytes) != CM_SUCCESS) {
+        WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_GET_DISK_USAGE), "get total_bytes error");
+        return CM_ERROR;
+    }
+    if (wr_get_int64(ack_pack, &info->used_bytes) != CM_SUCCESS) {
+        WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_GET_DISK_USAGE), "get used_bytes error");
+        return CM_ERROR;
+    }
+    if (wr_get_int64(ack_pack, &info->available_bytes) != CM_SUCCESS) {
+        WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_GET_DISK_USAGE), "get available_bytes error");
+        return CM_ERROR;
+    }
+    if (wr_get_int64(ack_pack, (int64*)&info->usage_percent) != CM_SUCCESS) {
+        WR_THROW_ERROR(ERR_WR_CLI_EXEC_FAIL, wr_get_cmd_desc(WR_CMD_GET_DISK_USAGE), "get usage_percent error");
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
 static status_t wr_encode_truncate_file(wr_conn_t *conn, wr_packet_t *pack, void *send_info)
 {
     wr_truncate_file_info_t *info = (wr_truncate_file_info_t *)send_info;
@@ -1157,6 +1190,7 @@ wr_packet_proc_t g_wr_packet_proc[WR_CMD_END] =
     [WR_CMD_GETCFG] = {wr_encode_getcfg, wr_decode_getcfg, "getcfg"},
     [WR_CMD_GET_INST_STATUS] = {NULL, wr_decode_get_inst_status, "get inst status"},
     [WR_CMD_GET_TIME_STAT] = {NULL, wr_decode_get_time_stat, "get time stat"},
+    [WR_CMD_GET_DISK_USAGE] = {NULL, wr_decode_get_disk_usage, "get disk usage"},
 };
 
 status_t wr_decode_packet(wr_packet_proc_t *make_proc, wr_packet_t *ack_pack, void *ack)
