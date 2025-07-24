@@ -133,12 +133,8 @@ static config_item_t g_wr_params[] = {
         NULL, 31, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER",
         NULL, 32, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_BLACKBOX_DETAIL_ON", CM_TRUE, ATTR_NONE, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
-        NULL, 33, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_blackbox_detail_on, wr_notify_blackbox_detail_on, NULL, NULL},
     {"MES_WAIT_TIMEOUT", CM_TRUE, ATTR_NONE, "10000", NULL, NULL, "-", "[500,30000]", "GS_TYPE_INTEGER",
         NULL, 34, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_mes_wait_timeout, wr_notify_mes_wait_timeout, NULL, NULL},
-    {"_ENABLE_CORE_STATE_COLLECT", CM_TRUE, ATTR_NONE, "TRUE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
-        NULL, 35, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_enable_core_state_collect, wr_notify_enable_core_state_collect, NULL, NULL},
     {"DELAY_CLEAN_INTERVAL", CM_TRUE, ATTR_NONE, "5", NULL, NULL, "-", "[5,1000000]", "GS_TYPE_INTEGER",
         NULL, 36, EFFECT_IMMEDIATELY, CFG_INS, wr_verify_delay_clean_interval, wr_notify_delay_clean_interval, NULL, NULL},
     {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
@@ -563,18 +559,6 @@ static status_t wr_load_shm_key(wr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-static status_t wr_load_blackbox_detail_on(wr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "_BLACKBOX_DETAIL_ON");
-    return wr_load_blackbox_detail_on_inner(value, inst_cfg);
-}
-
-static status_t wr_load_enable_core_state_collect(wr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "_ENABLE_CORE_STATE_COLLECT");
-    return wr_load_enable_core_state_collect_inner(value, inst_cfg);
-}
-
 status_t wr_load_delay_clean_interval_core(char *value, wr_config_t *inst_cfg)
 {
     uint32_t delay_clean_interval;
@@ -703,9 +687,7 @@ status_t wr_load_config(wr_config_t *inst_cfg)
     CM_RETURN_IFERR(wr_load_mes_with_ip(inst_cfg));
     CM_RETURN_IFERR(wr_load_ip_white_list(inst_cfg));
     CM_RETURN_IFERR(wr_load_threadpool_cfg(inst_cfg));
-    CM_RETURN_IFERR(wr_load_blackbox_detail_on(inst_cfg));
     CM_RETURN_IFERR(wr_load_listen_addr(inst_cfg));
-    CM_RETURN_IFERR(wr_load_enable_core_state_collect(inst_cfg));
     CM_RETURN_IFERR(wr_load_delay_clean_interval(inst_cfg));
     CM_RETURN_IFERR(wr_load_data_file_path(inst_cfg));
     return CM_SUCCESS;

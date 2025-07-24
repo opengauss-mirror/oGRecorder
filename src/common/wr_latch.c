@@ -43,11 +43,6 @@ void wr_latch_x2(latch_t *latch, uint32_t sid)
     cm_latch_x(latch, sid, NULL);
 }
 
-void wr_latch_s2(latch_t *latch, uint32_t sid, bool32 is_force, latch_statis_t *stat)
-{
-    cm_latch_s(latch, sid, is_force, stat);
-}
-
 void wr_set_latch_extent(wr_latch_extent_t *latch_extent, uint16 stat, uint16 shared_count)
 {
     latch_extent->stat_bak = stat;

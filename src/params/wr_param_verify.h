@@ -52,12 +52,8 @@ status_t wr_verify_audit_file_size(void *lex, void *def);
 status_t wr_notify_audit_file_size(void *se, void *item, char *value);
 status_t wr_verify_audit_level(void *lex, void *def);
 status_t wr_notify_audit_level(void *se, void *item, char *value);
-status_t wr_verify_enable_core_state_collect(void *lex, void *def);
-status_t wr_notify_enable_core_state_collect(void *se, void *item, char *value);
 status_t wr_verify_delay_clean_interval(void *lex, void *def);
 status_t wr_notify_delay_clean_interval(void *se, void *item, char *value);
-status_t wr_verify_blackbox_detail_on(void *lex, void *def);
-status_t wr_notify_blackbox_detail_on(void *se, void *item, char *value);
 status_t wr_verify_mes_wait_timeout(void *lex, void *def);
 status_t wr_notify_mes_wait_timeout(void *se, void *item, char *value);
 
