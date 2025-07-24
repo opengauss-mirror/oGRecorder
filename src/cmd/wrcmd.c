@@ -516,7 +516,7 @@ static void create_server_certs(const char *certs_path, int days) {
 static void create_client_certs(const char *certs_path, int days) {
     char cmd[WR_CMD_LEN];
     char client_dir[CM_MAX_PATH_LEN];
-    snprintf(client_dir, sizeof(client_dir), "%s/client", certs_path);
+    snprintf_s(client_dir, sizeof(client_dir), sizeof(client_dir) -1, "%s/client", certs_path);
     mkdir(client_dir, WR_PERM_DIR);
 
     snprintf(cmd, sizeof(cmd),
@@ -562,14 +562,14 @@ static void check_certs_expired(const char *ca, const char *cert) {
     FILE *fp;
     int ca_last = 0, cert_last = 0;
 
-    snprintf(cmd, sizeof(cmd),
+    snprintf_s(cmd, sizeof(cmd), sizeof(cmd) - 1,
         "openssl x509 -in %s -noout -enddate | cut -d= -f2 | xargs -I {} date -d {} +%%s | xargs -I {} expr {} - $(date +%%s) | xargs -I {} expr {} / 86400",
         ca);
     fp = popen(cmd, "r");
     if (fp && fgets(buf, sizeof(buf), fp)) ca_last = atoi(buf);
     if (fp) pclose(fp);
 
-    snprintf(cmd, sizeof(cmd),
+    snprintf_s(cmd, sizeof(cmd), sizeof(cmd) - 1,
         "openssl x509 -in %s -noout -enddate | cut -d= -f2 | xargs -I {} date -d {} +%%s | xargs -I {} expr {} - $(date +%%s) | xargs -I {} expr {} / 86400",
         cert);
     fp = popen(cmd, "r");
