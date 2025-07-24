@@ -158,34 +158,6 @@ status_t wr_get_cfg_param(const char *name, char **value);
 status_t wr_load_delay_clean_interval_core(char *value, wr_config_t *inst_cfg);
 status_t wr_set_cert_param(const char *param_name, const char *param_value);
 
-static inline status_t wr_load_blackbox_detail_on_inner(char *value, wr_config_t *inst_cfg)
-{
-    if (cm_str_equal_ins(value, "TRUE")) {
-        inst_cfg->params.blackbox_detail_on = CM_TRUE;
-    } else if (cm_str_equal_ins(value, "FALSE")) {
-        inst_cfg->params.blackbox_detail_on = CM_FALSE;
-    } else {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "_BLACKBOX_DETAIL_ON");
-        return CM_ERROR;
-    }
-    LOG_RUN_INF("_BLACKBOX_DETAIL_ON = %u.", inst_cfg->params.blackbox_detail_on);
-    return CM_SUCCESS;
-}
-
-static inline status_t wr_load_enable_core_state_collect_inner(char *value, wr_config_t *inst_cfg)
-{
-    if (cm_str_equal_ins(value, "TRUE")) {
-        inst_cfg->params.enable_core_state_collect = CM_TRUE;
-    } else if (cm_str_equal_ins(value, "FALSE")) {
-        inst_cfg->params.enable_core_state_collect = CM_FALSE;
-    } else {
-        WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "_ENABLE_CORE_STATE_COLLECT");
-        return CM_ERROR;
-    }
-    LOG_RUN_INF("_ENABLE_CORE_STATE_COLLECT = %u.", inst_cfg->params.enable_core_state_collect);
-    return CM_SUCCESS;
-}
-
 #ifdef __cplusplus
 }
 #endif

@@ -180,13 +180,6 @@ static inline void wr_latch_node_init(gft_node_t *node)
     cm_latch_init(&block_ctrl->latch);
 }
 
-static inline void wr_latch_s_node(wr_session_t *session, gft_node_t *node, latch_statis_t *stat)
-{
-    wr_block_ctrl_t *block_ctrl = wr_get_block_ctrl_by_node(node);
-    WR_ASSERT_LOG(block_ctrl != NULL, "block_ctrl is NULL when latch s node because node is root block");
-    wr_latch_s2(&block_ctrl->latch, WR_SESSIONID_IN_LOCK(session->id), CM_FALSE, stat);
-}
-
 static inline void wr_latch_x_node(wr_session_t *session, gft_node_t *node, latch_statis_t *stat)
 {
     wr_block_ctrl_t *block_ctrl = wr_get_block_ctrl_by_node(node);
