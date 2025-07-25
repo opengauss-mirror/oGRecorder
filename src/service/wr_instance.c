@@ -721,6 +721,25 @@ void wr_delay_clean_proc(thread_t *thread)
     }
 }
 
+void wr_alarm_check_proc(thread_t *thread)
+{
+    cm_set_thread_name("alarm_check");
+    uint32 sleep_times = 0;
+    // for check other alarms
+    uint32 alarm_counts = WR_VG_ALARM_CHECK_COUNT;
+    while (!thread->closed) {
+        // only master node need alarm
+        if (sleep_times % WR_VG_ALARM_CHECK_COUNT == 0) {
+            g_wr_instance.is_checking = CM_TRUE;
+            wr_alarm_check_disk_usage();
+            g_wr_instance.is_checking = CM_FALSE;
+        }
+        cm_sleep(CM_SLEEP_500_FIXED);
+        sleep_times++;
+        sleep_times = sleep_times % alarm_counts;
+    }
+}
+
 static void wr_check_peer_inst_inner(wr_instance_t *inst)
 {
     /**

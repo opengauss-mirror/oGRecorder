@@ -183,7 +183,7 @@ uint32_t wr_get_uwression_startid(void);
 uint32_t wr_get_recover_task_idx(void);
 uint32_t wr_get_max_total_session_cnt(void);
 uint32_t wr_get_delay_clean_task_idx(void);
-uint32_t wr_get_delay_clean_task_idx(void);
+uint32_t wr_get_alarm_check_task_idx(void);
 typedef uint32_t (*wr_get_bg_task_idx_func_t)(uint32_t idx);
 void wr_server_session_lock(wr_session_t *session);
 void wr_server_session_unlock(wr_session_t *session);

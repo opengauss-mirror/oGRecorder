@@ -119,6 +119,11 @@ uint32_t wr_get_delay_clean_task_idx(void)
     return (wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM) + WR_DELAY_CLEAN_BACKGROUND_TASK;
 }
 
+uint32_t wr_get_alarm_check_task_idx(void)
+{
+    return (wr_get_uwression_startid() - (uint32_t)WR_BACKGROUND_TASK_NUM) + WR_ALARM_CHECK_TASK;
+}
+
 static status_t wr_init_session(wr_session_t *session, const cs_pipe_t *pipe)
 {
     wr_latch_stack_t *latch_stack = &session->latch_stack;

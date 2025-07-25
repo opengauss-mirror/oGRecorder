@@ -930,6 +930,23 @@ static status_t wr_process_reload_certs(wr_session_t *session)
     return CM_SUCCESS;
 }
 
+static status_t wr_process_get_disk_usage(wr_session_t *session)
+{
+    wr_init_get(&session->recv_pack);
+    wr_disk_usage_info_t info;
+    wr_get_disk_usage_info(&info);
+    
+    WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, (int64)info.total_bytes));
+    WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, (int64)info.used_bytes));
+    WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, (int64)info.available_bytes));
+    WR_RETURN_IF_ERROR(wr_put_int64(&session->send_pack, (int64)info.usage_percent));
+
+    LOG_DEBUG_INF("Get disk usage: total=%lu, used=%lu, avail=%lu, usage=%.2f%%",
+        info.total_bytes, info.used_bytes, info.available_bytes, info.usage_percent);
+
+    return CM_SUCCESS;
+};
+
 static status_t wr_process_set_main_inst(wr_session_t *session)
 {
     status_t status = CM_ERROR;
@@ -1008,6 +1025,7 @@ static wr_cmd_hdl_t g_wr_cmd_handle[WR_CMD_TYPE_OFFSET(WR_CMD_END)] = {
     [WR_CMD_TYPE_OFFSET(WR_CMD_POSTPONE_FILE_TIME)] = {WR_CMD_POSTPONE_FILE_TIME, wr_process_postpone_file_time, NULL,
         CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_RELOAD_CERTS)] = {WR_CMD_RELOAD_CERTS, wr_process_reload_certs, NULL, CM_FALSE},
+    [WR_CMD_TYPE_OFFSET(WR_CMD_GET_DISK_USAGE)] = {WR_CMD_GET_DISK_USAGE, wr_process_get_disk_usage, NULL, CM_FALSE},
     // query
     [WR_CMD_TYPE_OFFSET(WR_CMD_HANDSHAKE)] = {WR_CMD_HANDSHAKE, wr_process_handshake, NULL, CM_FALSE},
     [WR_CMD_TYPE_OFFSET(WR_CMD_EXIST)] = {WR_CMD_EXIST, wr_process_exist, NULL, CM_FALSE},

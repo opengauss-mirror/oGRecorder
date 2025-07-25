@@ -192,11 +192,6 @@ mkdir -p $binarylib_dir/kernel/component/${OUT_PACKAGE}/lib
 mkdir -p $binarylib_dir/kernel/component/${OUT_PACKAGE}/include
 cp -r output/lib/libwr* $binarylib_dir/kernel/component/${OUT_PACKAGE}/lib
 cp -r output/bin/wr* $binarylib_dir/kernel/component/${OUT_PACKAGE}/bin
-cp -r $COPT_LIB_PATH/cbb/bin/perctrl $binarylib_dir/kernel/component/${OUT_PACKAGE}/bin
-cp -r install/wr_clear.sh $binarylib_dir/kernel/component/${OUT_PACKAGE}/bin
-cp -r src/interface/*.h $binarylib_dir/kernel/component/${OUT_PACKAGE}/include
-echo "build WR SUCCESS"
-
 cp -r src/interface/*.h $binarylib_dir/kernel/component/${OUT_PACKAGE}/include
 echo "build WR SUCCESS"
 

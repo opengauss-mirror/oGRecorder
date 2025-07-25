@@ -40,8 +40,8 @@ extern "C" {
 #define WR_MAX_AUDIT_PATH_LENGTH (SIZE_K(2) + 512)
 
 #define WR_VG_ALARM_CHECK_COUNT 10
-#define WR_VG_USAGE_MIN 0
-#define WR_VG_USAGE_MAX 100
+#define WR_DISK_USAGE_MIN 0
+#define WR_DISK_USAGE_MAX 100
 
 /* invalid id */
 #define WR_INVALID_INT8 ((int8)(-1))

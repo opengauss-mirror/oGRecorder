@@ -32,6 +32,7 @@
 #include "wr_interaction.h"
 #include "wr_session.h"
 #include "wr_api.h"
+#include "wr_file.h"
 #include "ssl_func.h"
 
 #ifdef __cplusplus
@@ -200,6 +201,13 @@ typedef struct st_wr_postpone_file_time {
     const char *file_atime;
 } wr_postpone_file_time_t;
 
+typedef struct {
+    int64 total_bytes;
+    int64 used_bytes;
+    int64 available_bytes;
+    double usage_percent;
+} wr_disk_usage_ack_t;
+
 #define WRAPI_BLOCK_SIZE 512
 #define WR_HOME "WR_HOME"
 #define SYS_HOME "HOME"
@@ -248,6 +256,7 @@ status_t wr_get_inst_status_on_server(wr_conn_t *conn, wr_server_status_t *wr_st
 status_t wr_get_time_stat_on_server(wr_conn_t *conn, wr_stat_item_t *time_stat, uint64 size);
 status_t wr_set_main_inst_impl(wr_conn_t *conn);
 status_t wr_reload_certs_impl(wr_conn_t *conn);
+status_t wr_get_disk_usage_impl(wr_conn_t *conn, wr_disk_usage_info_t *info);
 
 #define WR_SET_PTR_VALUE_IF_NOT_NULL(ptr, value) \
     do {                                          \

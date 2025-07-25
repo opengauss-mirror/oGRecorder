@@ -43,6 +43,13 @@ typedef struct st_wr_node_data {
     char *vg_name;
 } wr_node_data_t;
 
+typedef struct {
+    unsigned long total_bytes;
+    unsigned long used_bytes;
+    unsigned long available_bytes;
+    double usage_percent;
+} wr_disk_usage_info_t;
+
 int wr_check_readwrite(const char *name);
 
 status_t wr_exist_item(wr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type);
@@ -217,6 +224,9 @@ status_t wr_data_oper(char *op_desc, bool32 is_write, wr_vg_info_item_t *vg_item
 status_t wr_write_zero2au(char *op_desc, wr_vg_info_item_t *vg_item, uint64 fid, auid_t auid, uint32_t au_offset);
 status_t wr_try_write_zero_one_au(
     char *desc, wr_session_t *session, wr_vg_info_item_t *vg_item, gft_node_t *node, int64 offset);
+
+void wr_get_disk_usage_info(wr_disk_usage_info_t *info);
+void wr_alarm_check_disk_usage();
 
 #ifdef __cplusplus
 }
