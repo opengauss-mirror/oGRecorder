@@ -408,24 +408,85 @@ class InstallImpl:
     def _createCMCALocal(self):
         self.logger.debug("Creating Cm ca files locally.")
         certPath = os.path.join(self.gaussHome, "share/sslcert/cm")
-        mkdirCmd = "rm %s -rf; mkdir -p %s" % (certPath, certPath)
+        mkdirCmd = f"rm -rf {certPath}; mkdir -p {certPath}"
         status, output = subprocess.getstatusoutput(mkdirCmd)
         if status != 0:
-            self.logger.debug("Command: %s\nStatus: %sOutput: %s" % (mkdirCmd, status, output))
+            self.logger.debug(f"Command: {mkdirCmd}\nStatus: {status}\nOutput: {output}")
             self.logger.logExit("Failed to create cert path.")
         self._createCMSslConf(certPath)
-        curPath = os.path.split(os.path.realpath(__file__))[0]
-        createCMCACert = os.path.realpath(os.path.join(curPath, "CreateCMCACert.sh"))
         passwd = self._getPassword()
-        cmd = "source %s; echo \"%s\" | sh %s" % (self.envFile, passwd, createCMCACert)
-        # once used, set password to null and release it
+        activePeriod = "10950"
+        opensslConf = os.path.join(certPath, "openssl.cnf")
+        if not os.path.isfile(opensslConf):
+            self.logger.logExit("CM ssl conf does not exist.")
+
+        old_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+        if "LD_LIBRARY_PATH" in os.environ:
+            del os.environ["LD_LIBRARY_PATH"]
+
+        # 生成 cakey.pem
+        gen_cakey_cmd = f'echo "{passwd}" | openssl genrsa -aes256 -f4 -passout stdin -out {certPath}/cakey.pem 2048'
+        status, output = subprocess.getstatusoutput(gen_cakey_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to generate cakey.pem.\n" + output)
+
+        # 生成 cacert.pem
+        gen_cacert_cmd = f'echo "{passwd}" | openssl req -new -x509 -passin stdin -days {activePeriod} -key {certPath}/cakey.pem -out {certPath}/cacert.pem -subj "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA"'
+        status, output = subprocess.getstatusoutput(gen_cacert_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to generate cacert.pem.\n" + output)
+
+        for role in ["server", "client"]:
+            # 生成 key
+            gen_key_cmd = f'echo "{passwd}" | openssl genrsa -aes256 -passout stdin -out {certPath}/{role}.key 2048'
+            status, output = subprocess.getstatusoutput(gen_key_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate {role}.key.\n" + output)
+            # 生成 csr
+            gen_csr_cmd = f'echo "{passwd}" | openssl req -new -key {certPath}/{role}.key -passin stdin -out {certPath}/{role}.csr -subj "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN={role}"'
+            status, output = subprocess.getstatusoutput(gen_csr_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate {role}.csr.\n" + output)
+            # 生成 crt
+            gen_crt_cmd = f'echo "{passwd}" | openssl x509 -req -days {activePeriod} -in {certPath}/{role}.csr -CA {certPath}/cacert.pem -CAkey {certPath}/cakey.pem -passin stdin -CAcreateserial -out {certPath}/{role}.crt -extfile {certPath}/openssl.cnf'
+            status, output = subprocess.getstatusoutput(gen_crt_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate {role}.crt.\n" + output)
+            # 删除 csr 文件
+            rm_csr_cmd = f'rm -f {certPath}/{role}.csr'
+            subprocess.getstatusoutput(rm_csr_cmd)
+
+        # 恢复 LD_LIBRARY_PATH
+        os.environ["LD_LIBRARY_PATH"] = old_ld_library_path
+
+        # 生成 server cipher 和 rand
+        expect_server_cmd = (
+            f'expect -c \'spawn cm_ctl encrypt -M server -D {certPath}; '
+            f'expect "*password*" {{ send "{passwd}\\r"; exp_continue }}\''
+        )
+        status, output = subprocess.getstatusoutput(expect_server_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to encrypt server key.\n" + output)
+
+        # 生成 client cipher 和 rand
+        expect_client_cmd = (
+            f'expect -c \'spawn cm_ctl encrypt -M client -D {certPath}; '
+            f'expect "*password*" {{ send "{passwd}\\r"; exp_continue }}\''
+        )
+        status, output = subprocess.getstatusoutput(expect_client_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to encrypt client key.\n" + output)
+
+        # 密码置空
         passwd = ""
         del passwd
-        status, output = subprocess.getstatusoutput(cmd)
-        cmd = ""
-        del cmd
+
+        # 设置只读权限
+        chmod_cmd = f'chmod 400 {certPath}/*'
+        status, output = subprocess.getstatusoutput(chmod_cmd)
         if status != 0:
-            self.logger.logExit("Failed to create cm ca cert file.\n" + output)
+            self.logger.logExit("Failed to set readonly for cert files.\n" + output)
+
         self._cleanUselessFile()
 
     def _distributeCA(self):

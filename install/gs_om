@@ -34,9 +34,14 @@ import ipaddress
 import stat
 import argparse
 import getpass
+import getopt
 import xml.etree.ElementTree as ET
 import xml.etree.cElementTree as ETree
+from InstallImpl import InstallImpl
 from CMLog import CMLog
+
+from Common import *
+from ErrorCode import ErrorCode
 
 sys.path.append(os.path.split(os.path.realpath(__file__))[0] + "/../../")
 from ErrorCode import ErrorCode
@@ -81,7 +86,6 @@ BASE_ID_DUMMYDATANODE = 3001
 BASE_ID_COORDINATOR = 5001
 BASE_ID_DATANODE = 6001
 BASE_ID_ETCD = 7001
-BASE_ID_DSS = 8001
 DIRECTORY_PERMISSION = 0o750
 
 # For primary/standby instance When the ID > 7000 ,
@@ -174,53 +178,6 @@ def ignoreCheck(Object, member, model):
     output : boolean
     """
     INSTANCEINFO_IGNORE_TABLE = {}
-    if (model == "replace"):
-        # init instance ignore table for replace
-        INSTANCEINFO_IGNORE_TABLE = {"listenIps": None,
-                                     "haIps": None,
-                                     "hostname": None,
-                                     "mirrorId": None
-                                     }
-    elif (model == "changeIP"):
-        # init instance ignore table for changeip
-        INSTANCEINFO_IGNORE_TABLE = {"listenIps": None,
-                                     "haIps": None,
-                                     "hostname": None,
-                                     "port": None,
-                                     "haPort": None,
-                                     "mirrorId": None
-                                     }
-    elif (model == "upgradectl"):
-        # init instance ignore table for upgradectl
-        INSTANCEINFO_IGNORE_TABLE = {
-            "instanceRole": None,
-            "instanceId": None,
-            "mirrorId": None
-        }
-    elif (model == "manageCN"):
-        # init instance ignore table for manageCN
-        INSTANCEINFO_IGNORE_TABLE = {
-            "instanceId": None,
-            "mirrorId": None
-        }
-    elif (model == "expand"):
-        # init instance ignore table for expand
-        INSTANCEINFO_IGNORE_TABLE = {
-            "mirrorId": None
-        }
-    elif (model == "compareCluster"):
-        INSTANCEINFO_IGNORE_TABLE = {
-            "listenIps": None,
-            "haIps": None,
-            "hostname": None,
-            "port": None,
-            "haPort": None,
-            "mirrorId": None
-        }
-        if (hasattr(Object,
-                    "instanceRole") and Object.instanceRole ==
-                INSTANCE_ROLE_COODINATOR):
-            INSTANCEINFO_IGNORE_TABLE["instanceId"] = None
     # init node ignore table
     DBNODEINFO_IGNORE_TABLE = {
         "backIps": None,
@@ -417,12 +374,9 @@ def compareObject(Object_A, Object_B, instName, tempbuffer=None, model=None,
             tempbuffer.append(str(Object_A))
             tempbuffer.append(str(Object_B))
             return False, tempbuffer
-        dss_ignore = [
-            "enable_dss", "dss_config", "dss_home", "cm_vote_disk", "cm_share_disk",
-            "dss_pri_disks", "dss_shared_disks", "dss_vg_info", "dss_vgname", "dss_ssl_enable",
-            "ss_rdma_work_config", "ss_interconnect_type", "float_ips"]
+        need_ignore = ["float_ips"]
         for i in Object_A_list:
-            if i.startswith("_") or ignoreCheck(Object_A, i, model) or i in dss_ignore:
+            if i.startswith("_") or i in need_ignore:
                 continue
             Inst_A = getattr(Object_A, i)
             try:
@@ -517,17 +471,6 @@ def checkObject(Object_A, Object_B, checkbuffer, manageCNinfo):
 xmlRootNode = None
 
 ####################################################################
-
-
-class queryCmd():
-    def __init__(self, outputFile="", dataPathQuery=False, portQuery=False,
-                 azNameQuery=False):
-        self.outputFile = outputFile
-        self.dataPathQuery = dataPathQuery
-        self.portQuery = portQuery
-        self.azNameQuery = azNameQuery
-        self.clusterStateQuery = False
-
 
 class peerInstanceInfo():
     """
@@ -628,9 +571,6 @@ class instanceInfo():
         self.cascadeRole = "off"
         # dcf_data_path
         self.dcf_data_path = ""
-        # uwal_ip
-        self.uwal_ip = ""
-        self.ssh_port = 0
 
     def __cmp__(self, target):
         """
@@ -728,8 +668,6 @@ class dbNodeInfo():
         self.standbyDnNum = 0
         self.dummyStandbyDnNum = 0
         self.cascadeRole = "off"
-        # enable_uwal
-        self.enable_uwal = ""
         self.ssh_port = 0
         # wr
         self.wrIp1 = ""
@@ -831,8 +769,6 @@ class dbNodeInfo():
                 dbInst.haIps = self.backIps[:]
             else:
                 dbInst.haIps = haIps[:]
-        if self.enable_uwal == "on":
-            dbInst.uwal_ip = self.backIps[-1]
         # cm_server
         if (instRole == INSTANCE_ROLE_CMSERVER):
             dbInst.datadir = os.path.join(self.cmDataDir, "cm_server")
@@ -960,7 +896,7 @@ class dbClusterInfo():
         self.cmsFloatIp = ""
         self.__newInstanceId = [BASE_ID_CMSERVER, BASE_ID_GTM, BASE_ID_ETCD,
                                 BASE_ID_COORDINATOR, BASE_ID_DATANODE,
-                                BASE_ID_CMAGENT, BASE_ID_DSS]
+                                BASE_ID_CMAGENT]
         self.__newDummyStandbyId = BASE_ID_DUMMYDATANODE
         self.__newMirrorId = 0
         self.clusterRings = []
@@ -1002,32 +938,6 @@ class dbClusterInfo():
         # add for dcf
         self.enable_dcf = ""
         self.dcf_config = ""
-        # add for dss
-        self.enable_dss = ""
-        self.dss_config = ""
-        self.dss_home = ""
-        self.cm_vote_disk = ""
-        self.cm_share_disk = ""
-        self.dss_pri_disks = {}
-        self.dss_shared_disks = {}
-        self.dss_vg_info = ""
-        self.dss_vgname = ""
-        self.dss_ssl_enable = ""
-        self.ss_rdma_work_config = ""
-        self.ss_interconnect_type = ""
-        self.local_stream_ip_map = []
-        self.remote_stream_ip_map = []
-        self.remote_dn_base_port = 0
-        self.local_dn_base_port = 0
-        # add for uwal
-        self.enable_uwal = ""
-        self.uwal_disk_size = ""
-        self.uwal_devices_path = ""
-        self.uwal_log_path = ""
-        self.uwal_rpc_compression_switch = ""
-        self.uwal_rpc_flowcontrol_switch = ""
-        self.uwal_rpc_flowcontrol_value = ""
-        self.uwal_async_append_switch = ""
         # wr
         self.wr_nodes_list = ""
         self.wrPath = ""
@@ -1052,56 +962,6 @@ class dbClusterInfo():
         if not os.path.exists(logPath):
             os.makedirs(logPath)
         self.logger = CMLog(logPath, "gs_om", mode)
-
-    def init_dss_config(self, xml_entiy):
-        '''
-        init dss input parameter
-        '''
-
-        # dss
-        _, self.dss_home = self.readOneClusterConfigItem(
-            xml_entiy, "dss_home", "cluster")
-        _, self.dss_vgname = self.readOneClusterConfigItem(
-            xml_entiy, "ss_dss_vg_name", "cluster")
-        _, self.dss_vg_info = self.readOneClusterConfigItem(
-            xml_entiy, "dss_vg_info", "cluster")
-        # cm
-        _, self.cm_vote_disk = self.readOneClusterConfigItem(
-            xml_entiy, "votingDiskPath", "cluster")
-        _, self.cm_share_disk = self.readOneClusterConfigItem(
-            xml_entiy, "shareDiskDir", "cluster")
-
-        # dss ssl
-        _, self.dss_ssl_enable = self.readOneClusterConfigItem(
-            xml_entiy, "dss_ssl_enable", "cluster")
-
-        # rdma
-        _, self.ss_rdma_work_config = self.readOneClusterConfigItem(
-            xml_entiy, "ss_rdma_work_config", "cluster")
-        _, self.ss_interconnect_type = self.readOneClusterConfigItem(
-            xml_entiy, "ss_interconnect_type", "cluster")
-
-        #DssSimpleChecker.check_dss_some_param(self)
-
-    def init_uwal_config(self, xml_entiy):
-        '''
-        init uwal input parameter
-        '''
-
-        _, self.uwal_disk_size = self.readOneClusterConfigItem(
-            xml_entiy, "uwal_disk_size", "cluster")
-        _, self.uwal_devices_path = self.readOneClusterConfigItem(
-            xml_entiy, "uwal_devices_path", "cluster")
-        _, self.uwal_log_path = self.readOneClusterConfigItem(
-            xml_entiy, "uwal_log_path", "cluster")
-        _, self.uwal_rpc_compression_switch = self.readOneClusterConfigItem(
-            xml_entiy, "uwal_rpc_compression_switch", "cluster")
-        _, self.uwal_rpc_flowcontrol_switch = self.readOneClusterConfigItem(
-            xml_entiy, "uwal_rpc_flowcontrol_switch", "cluster")
-        _, self.uwal_rpc_flowcontrol_value = self.readOneClusterConfigItem(
-            xml_entiy, "uwal_rpc_flowcontrol_value", "cluster")
-        _, self.uwal_async_append_switch = self.readOneClusterConfigItem(
-            xml_entiy, "uwal_async_append_switch", "cluster")
 
     def check_conf_cm_state(self):
         """
@@ -1785,18 +1645,14 @@ class dbClusterInfo():
         """
         Check cm_server config
         """
-        if self.enable_dss == 'on':
-            if self.cmscount < 1:
-                raise Exception(ErrorCode.GAUSS_512["GAUSS_51236"] +
-                                'The cm_server instances are required.')
-        else:
-            if self.cmscount > 0 and len(self.dbNodes) < 2:
-                raise Exception(ErrorCode.GAUSS_512["GAUSS_51236"] +
-                                    "The cm_server instance can be "
-                                    "configured only on three or more nodes.")
-            if 0 < self.cmscount < 2:
-                raise Exception(ErrorCode.GAUSS_512["GAUSS_51236"] +
-                                "At least three cm_server instances are required.")
+
+        if self.cmscount > 0 and len(self.dbNodes) < 2:
+            raise Exception(ErrorCode.GAUSS_512["GAUSS_51236"] +
+                                "The cm_server instance can be "
+                                "configured only on three or more nodes.")
+        if 0 < self.cmscount < 2:
+            raise Exception(ErrorCode.GAUSS_512["GAUSS_51236"] +
+                            "At least three cm_server instances are required.")
 
 
     def checkXMLFile(self, xml_file):
@@ -1944,7 +1800,6 @@ class dbClusterInfo():
         self.__checkAZForSingleInst()
         IpPort = self.__checkInstancePortandIP()
         self.__check_cms_config()
-        self.init_dss_config(xmlRootNode)
         return IpPort
 
     def __read_cluster_node_info_for_one(self):
@@ -2392,13 +2247,6 @@ class dbClusterInfo():
             raise Exception(ErrorCode.GAUSS_502["GAUSS_50213"] % \
                             ("%s log path(%s)" % (
                                 VersionInfo.PRODUCT_NAME, self.logPath)))
-        _, self.enable_dss = self.readOneClusterConfigItem(xmlRootNode, "enable_dss", "cluster")
-        if self.enable_dss.strip() == "on":
-            self.enable_dss = self.enable_dss.strip()
-            self.init_dss_config(xml_entiy=xmlRootNode)
-        elif self.enable_dss.strip() not in ['off', '']:
-            raise Exception(ErrorCode.GAUSS_500["GAUSS_50011"] %
-                                ('enable_dss', self.enable_dss))
 
 
         # Read enable_dcf
@@ -2408,9 +2256,6 @@ class dbClusterInfo():
         if self.enable_dcf not in ['', 'on', 'off']:
             raise Exception(ErrorCode.GAUSS_500["GAUSS_50011"] %
                                 ('enable_dcf', self.enable_dcf))
-
-        if self.enable_dcf == 'on' and self.enable_dss == 'on':
-            raise Exception('Only one DSS or DCF can be enabled.')
 
         if self.enable_dcf == 'on':
             (ret_status, ret_value) = self.readOneClusterConfigItem(
@@ -2438,17 +2283,6 @@ class dbClusterInfo():
         else:
             raise Exception(ErrorCode.GAUSS_502["GAUSS_50204"] % \
                             "cluster network type" + " Error: \n%s" % retValue)
-        
-        # Read enable_uwal
-        _, self.enable_uwal = self.readOneClusterConfigItem(
-            xmlRootNode, "enable_uwal", "cluster")
-
-        if self.enable_uwal not in ['', 'on', 'off']:
-            raise Exception(ErrorCode.GAUSS_500["GAUSS_50011"] %
-                                ('enable_uwal', self.enable_uwal))
-
-        if self.enable_uwal == 'on':
-            self.init_uwal_config(xml_entiy=xmlRootNode)
 
         if "HOST_IP" in os.environ.keys():
             self.corePath = self.__read_and_check_config_item(xmlRootNode, "corePath",
@@ -2733,8 +2567,6 @@ class dbClusterInfo():
         # Get DB number
         dbNode.dataNum = self.__readNodeIntValue(dbNode.name, "dataNum", True,
                                                  0)
-        # Get enable_uwal
-        dbNode.enable_uwal = self.enable_uwal
         # read cm directory for server and agent
         try:
             dbNode.cmDataDir = self.__readNodeStrValue(dbNode.name, "cmDir")
@@ -5165,6 +4997,316 @@ def getEnv(env_param, default_value=None):
 
     return env_value
 
+class Install:
+    """
+    The class is used to do perform installation
+    """
+
+    def __init__(self):
+        self.envFile = ""
+        self.xmlFile = ""
+        self.gaussHome = ""
+        self.gaussLog = ""
+        self.toolPath = ""
+        self.tmpPath = ""
+        self.cmDirs = []
+        self.hostnames = []
+        self.localhostName = ""
+        self.cmpkg = ""
+        self.nodesInfo = dict()
+        self.clusterStopped = False
+        self.maxTerm = 0
+        self.primaryTermAbnormal = False
+        self.primary = ""
+
+    def getLocalhostName(self):
+        import socket
+        self.localhostName = socket.gethostname()
+
+    def getEnvParams(self):
+        self.gaussHome = getEnvParam(self.envFile, "GAUSSHOME")
+        self.gaussLog = getEnvParam(self.envFile, "GAUSSLOG")
+        self.toolPath = getEnvParam(self.envFile, "GPHOME")
+        self.tmpPath = getEnvParam(self.envFile, "PGHOST")
+
+    def checkExeUser(self):
+        if os.getuid() == 0:
+            CMLog.exitWithError(ErrorCode.GAUSS_501["GAUSS_50105"])
+
+    def usage(self):
+        """
+cm_install is a utility to deploy CM tool to openGauss database cluster.
+
+Usage:
+    cm_install -? | --help
+    cm_install -X XMLFILE [-e envFile] --cmpkg=cmpkgPath
+General options:
+    -X                                 Path of the XML configuration file.
+    -e                                 Path of env file.
+                                       Default value "~/.bashrc".
+    --cmpkg                            Path of CM pacakage.
+    -?, --help                         Show help information for this
+                                       utility, and exit the command line mode.
+        """
+        print(self.usage.__doc__)
+
+    def parseCommandLine(self):
+        if len(sys.argv) == 1:
+            self.usage()
+            sys.exit(1)
+
+        try:
+            opts, args = getopt.getopt(sys.argv[1:], "?X:e:", ["help", "cmpkg="])
+        except getopt.GetoptError as e:
+            CMLog.exitWithError(ErrorCode.GAUSS_500["GAUSS_50000"] % str(e))
+
+        for opt, value in opts:
+            if opt in ("-?", "--help"):
+                self.usage()
+                sys.exit(0)
+            elif opt in ("-X"):
+                self.xmlFile = value
+            elif opt in ("-e"):
+                self.envFile = value
+            elif opt in ("--cmpkg"):
+                self.cmpkg = value
+
+    def checkParam(self):
+        if self.xmlFile == "":
+            CMLog.exitWithError(ErrorCode.GAUSS_500["GAUSS_50001"] % 'X' + ".")
+        checkXMLFile(self.xmlFile)
+
+        if self.cmpkg == "":
+            CMLog.exitWithError(ErrorCode.GAUSS_500["GAUSS_50001"] % '-cmpkg' + ".")
+        if not os.path.exists(self.cmpkg):
+            CMLog.exitWithError(ErrorCode.GAUSS_502["GAUSS_50201"] % self.cmpkg)
+        if not os.path.isfile(self.cmpkg):
+            CMLog.exitWithError(ErrorCode.GAUSS_502["GAUSS_50210"] % ("cmpkg " + self.cmpkg))
+
+        if self.envFile == "":
+            self.envFile = os.path.join(os.environ['HOME'], ".bashrc")
+        if not os.path.exists(self.envFile):
+            CMLog.exitWithError(ErrorCode.GAUSS_502["GAUSS_50201"] % ("envFile " + self.envFile))
+        if not os.path.isfile(self.envFile):
+            CMLog.exitWithError(ErrorCode.GAUSS_502["GAUSS_50210"] % ("envFile " + self.envFile))
+        mppdbEnv = getEnvParam(self.envFile, "MPPDB_ENV_SEPARATE_PATH")
+        if mppdbEnv != "":
+            self.envFile = mppdbEnv
+        if self.envFile == "" or not os.path.exists(self.envFile) or not os.path.isfile(self.envFile):
+            CMLog.exitWithError(ErrorCode.GAUSS_518["GAUSS_51802"] % 'MPPDB_ENV_SEPARATE_PATH' + ".")
+
+    def checkOm(self):
+        """
+        check whether there is om tool
+        """
+        cmd = "source %s; gs_om --version" % self.envFile
+        status, output = subprocess.getstatusoutput(cmd)
+        if status != 0:
+            errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s\n" % (
+                cmd, status, output)
+            self.logger.logExit("OM tool is required." + errorDetail)
+
+    def checkXMLFileSecurity(self):
+        """
+        function : check XML contain DTDs
+        input : String
+        output : NA
+        """
+        # Check xml for security requirements
+        # if it have "<!DOCTYPE" or it have "<!ENTITY",
+        # exit and print "File have security risks."
+        try:
+            with open(self.xmlFile, "r", encoding='utf-8') as fb:
+                lines = fb.readlines()
+            for line in lines:
+                if re.findall("<!DOCTYPE", line) or re.findall("<!ENTITY", line):
+                    raise Exception("File have security risks.")
+        except Exception as e:
+            raise Exception(str(e))
+
+    def initParserXMLFile(self):
+        """
+        function : Init parser xml file
+        input : String
+        output : Object
+        """
+        try:
+            # check xml for security requirements
+            self.checkXMLFileSecurity()
+            dom_tree = ETree.parse(self.xmlFile)
+            rootNode = dom_tree.getroot()
+        except Exception as e:
+            raise Exception(ErrorCode.GAUSS_512["GAUSS_51236"] + " Error: \n%s." % str(e))
+        return rootNode
+
+    def generateXml(self):
+        """
+        function : generate xml file
+        input : String
+        output : Object
+        """
+        cmd = "source %s; ./gs_om generate-xml %s" % (self.envFile, self.xmlFile)
+        status, output = subprocess.getstatusoutput(cmd)
+        if status != 0:
+            self.logger.logExit((ErrorCode.GAUSS_514["GAUSS_51400"] % cmd) + \
+                "\nStatus:%d\nOutput:" + output)
+
+    def getInfoListOfAllNodes(self):
+        """
+        get hostname and cmDir list of all nodes
+        check other CM infos in xml
+        TODO: check the consistence of xml and installed cluster.
+        """
+        self.localhostName = getLocalhostName()
+
+        # get hostnames and port from static file
+        cmd = "source %s; ./gs_om view %s" % (self.envFile, self.xmlFile)
+        status, output = subprocess.getstatusoutput(cmd)
+        if status != 0:
+            self.logger.logExit((ErrorCode.GAUSS_514["GAUSS_51400"] % cmd) + \
+                "\nStatus:%d\nOutput:" + output)
+        nodesStaticInfoStr = re.split("azName.*:.*", output)
+        if len(nodesStaticInfoStr) == 0:
+            self.logger.logExit("Failed to get cluster info from static file.")
+        if len(nodesStaticInfoStr) < 2:
+            self.logger.logExit("CM is not supported in single instance.")
+        nodesStaticInfo = nodesStaticInfoStr[1:]
+        for nodeInfo in nodesStaticInfo:
+            if nodeInfo == "":
+                continue
+            nodename = re.findall("nodeName:(.*)", nodeInfo)[0]
+            self.hostnames.append(nodename)
+            dataPath = re.findall("datanodeLocalDataPath.*:(.*)", nodeInfo)[0]
+            port = re.findall("datanodePort.*:(.*)", nodeInfo)[0]
+            self.nodesInfo[nodename] = {"dataPath": dataPath, "port": port}
+
+        # get node info from XML
+        hostnamesInXML = []
+        rootNode = self.initParserXMLFile()
+        elementName = 'DEVICELIST'
+        if not rootNode.findall('DEVICELIST'):
+            raise Exception(ErrorCode.GAUSS_512["GAUSS_51200"] % elementName)
+        deviceArray = rootNode.findall('DEVICELIST')[0]
+        deviceNodes = deviceArray.findall('DEVICE')
+        cmDict = {"cmsNum": "", "cmServerPortBase": "", "cmServerPortStandby": "",
+             "cmServerlevel": "", "cmServerListenIp1": "", "cmServerRelation": ""}
+        for dev in deviceNodes:
+            paramList = dev.findall('PARAM')
+            for param in paramList:
+                paraName = param.attrib['name']
+                paraValue = param.attrib['value']
+                if paraName == 'name':
+                    hostnamesInXML.append(paraValue)
+                elif paraName == 'cmDir':
+                    self.cmDirs.append(paraValue)
+                elif paraName == 'cmServerLevel':
+                    cmDict['cmServerlevel'] = paraValue
+                elif paraName in cmDict.keys():
+                    cmDict[paraName] = paraValue
+        # check whether XML contains all nodes info
+        if self.hostnames != hostnamesInXML:
+            self.logger.logExit("XML info is not consistent with static file.")
+        # check params in xml
+        for item in cmDict:
+            if item == 'cmServerPortStandby':
+                continue
+            if cmDict[item] == "":
+                self.logger.logExit(ErrorCode.GAUSS_512["GAUSS_51200"] % item)
+        if cmDict['cmsNum'] != '1':
+            self.logger.logExit(ErrorCode.GAUSS_500["GAUSS_50024"] % 'cmsNum')
+        if cmDict['cmServerlevel'] != '1':
+            self.logger.logExit(ErrorCode.GAUSS_500["GAUSS_50024"] % 'cmServerlevel')
+        if not cmDict['cmServerPortBase'].isdigit():
+            self.logger.logExit(ErrorCode.GAUSS_500["GAUSS_50024"] % 'cmServerPortBase')
+        if cmDict['cmServerPortStandby'] != "" and not cmDict['cmServerPortStandby'].isdigit():
+            self.logger.logExit(ErrorCode.GAUSS_500["GAUSS_50024"] % 'cmServerPortStandby')
+        if len(self.hostnames) != len(self.cmDirs):
+            self.logger.logExit("\"cmDir\" of all nodes must be provided.")
+
+    def checkHostTrust(self):
+        checkHostsTrust(self.hostnames)
+
+    def initLogger(self):
+        logPath = os.path.join(self.gaussLog, "cm", "cm_tool")
+        if not os.path.exists(logPath):
+            os.makedirs(logPath)
+        self.logger = CMLog(logPath, "cm_install", "cm_install")
+
+    def checkCM(self):
+        """
+        Check whether there is CM in current cluster.
+        """
+        checkCMExistCmd = "source %s; cm_ctl query -Cv | " \
+            "grep 'CMServer State' > /dev/null" % self.envFile
+        status, output = subprocess.getstatusoutput(checkCMExistCmd)
+        if status == 0:
+            self.logger.logExit("CM exists in current cluster.")
+
+    def checkCluster(self):
+        """
+        check the status of the current cluster
+        """
+        cmd = "source %s; gs_om -t status --detail" % self.envFile
+        status, output = subprocess.getstatusoutput(cmd)
+        if status != 0:
+            erroeDetail = "Detail:\nCommand:\n" + cmd + "\noutput:" + output
+            self.logger.logExit(ErrorCode.GAUSS_516["GAUSS_51600"] + erroeDetail)
+        if "cluster_state   : Unavailable" in output:
+            # It’s permitted to deploy CM tool when cluster is stopped,
+            # but not permitted when cluster is unavailable.
+            if output.count("Manually stopped") == len(self.hostnames):
+                self.clusterStopped = True
+                return
+            self.logger.logExit("The cluster is unavailable currently.")
+        if "cluster_state   : Normal" not in output:
+            self.logger.logExit("Cluster is running but its status is abnormal.")
+        # check whether term of primary is invalid and biggest.
+        primaryCount = 0
+        primaryTerm = 0
+        sqlCmd = "select term from pg_last_xlog_replay_location();"
+        for host in self.hostnames:
+            isLocal = False
+            if host == self.localhostName:
+                isLocal = True
+            findPrimaryCmd = "source %s; gs_ctl query -D %s | grep -i 'local_role.*Primary' > /dev/null" % \
+                (self.envFile, self.nodesInfo[host]["dataPath"])
+            notPrimary, output = executeCmdOnHost(host, findPrimaryCmd, isLocal)
+            if notPrimary == 0:
+                primaryCount += 1
+            getTermLsnCmd = "source %s; gsql -d postgres -p %s -tA -c '%s'" % \
+                (self.envFile, self.nodesInfo[host]["port"], sqlCmd)
+            status, term = executeCmdOnHost(host, getTermLsnCmd, isLocal)
+            if status != 0:
+                self.logger.logExit("Failed to get term of host %s." % host)
+            if notPrimary == 0:
+                primaryTerm = int(term)
+            if self.maxTerm < int(term):
+                self.maxTerm = int(term)
+
+        if primaryCount != 1:
+            self.logger.logExit("The number of primary is invalid.")
+        if primaryTerm == 0 or primaryTerm < self.maxTerm:
+            self.primaryTermAbnormal = True
+            self.logger.warn("Term of primary is invalid or not maximal.\n"
+                "Hint: it seems that the cluster is newly installed, so it's "
+                "recommended to deploy CM tool while installing the cluster.")
+
+    def run(self):
+        self.checkExeUser()
+        self.parseCommandLine()
+        self.checkParam()
+        self.generateXml()
+        self.getEnvParams()
+        self.initLogger()
+        #self.checkOm()
+        self.checkCM()
+        self.getInfoListOfAllNodes()
+        self.getLocalhostName()
+        self.checkHostTrust()
+        #self.checkCluster()
+        installImpl = InstallImpl(self)
+        installImpl.run()
+
 def main():
     clusterInfo = dbClusterInfo()
 
@@ -5190,6 +5332,12 @@ def main():
     view_parser.add_argument('user', help='install user')
     view_parser.add_argument('envf', help='envfile path')
 
+    # CM Install command
+    cm_install_parser = subparsers.add_parser('cm_install', help='Deploy CM tool to openGauss cluster')
+    cm_install_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
+    cm_install_parser.add_argument('-e', dest='envFile', default='', help='env file path')
+    cm_install_parser.add_argument('--cmpkg', dest='cmpkg', required=True, help='CM package path')
+
     # WR uninstall command
     view_parser = subparsers.add_parser('wr_uninstall', help='uninstall cluster')
     view_parser.add_argument('xmlFile', help='XML configuration file')
@@ -5204,6 +5352,12 @@ def main():
     elif args.command == 'generate-xml':
         clusterInfo.initFromXml(args.xmlFile)
         clusterInfo.doRebuildConf(args.xmlFile)
+    elif args.command == 'cm_install':
+        install = Install()
+        install.xmlFile = args.xmlFile
+        install.envFile = args.envFile
+        install.cmpkg = args.cmpkg
+        install.run()
     elif args.command == 'wr_install':
         # clusterInfo.initFromXml(args.xmlFile)
         clusterInfo.wr_install(args.xmlFile, args.wrPkgPath)
