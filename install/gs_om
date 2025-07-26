@@ -37,14 +37,11 @@ import getpass
 import getopt
 import xml.etree.ElementTree as ET
 import xml.etree.cElementTree as ETree
-from InstallImpl import InstallImpl
 from CMLog import CMLog
-
-from Common import *
+from curses.ascii import isdigit, islower, isupper
 from ErrorCode import ErrorCode
 
 sys.path.append(os.path.split(os.path.realpath(__file__))[0] + "/../../")
-from ErrorCode import ErrorCode
 
 NET_IPV6 = "ipv6"
 NET_IPV4 = "ipv4"
@@ -170,73 +167,6 @@ g_networkType = 0
 # global param to cache gs_om query instance result.
 global_cls_query_rst = {}
 
-
-def ignoreCheck(Object, member, model):
-    """
-    funciton : Ignore checking the instance information of table.
-    input : Object, Object, model
-    output : boolean
-    """
-    INSTANCEINFO_IGNORE_TABLE = {}
-    # init node ignore table
-    DBNODEINFO_IGNORE_TABLE = {
-        "backIps": None,
-        "sshIps": None,
-        "masterBasePorts": None,
-        "standbyBasePorts": None,
-        "dummyStandbyBasePort": None,
-        "cmsNum": None,
-        "cooNum": None,
-        "dataNum": None,
-        "gtmNum": None,
-        "name": None,
-        "virtualIp": None
-    }
-    # init cluster ignore table
-    DBCLUSTERINFO_IGNORE_TABLE = {
-        "xmlFile": None,
-        "newNodes": None,
-        "clusterRings": None
-    }
-
-    if (model == "upgradectl"):
-        DBNODEINFO_IGNORE_TABLE.pop("backIps")
-        DBNODEINFO_IGNORE_TABLE.pop("sshIps")
-        DBNODEINFO_IGNORE_TABLE.pop("name")
-        DBCLUSTERINFO_IGNORE_TABLE.pop("clusterRings")
-    elif (model == "manageCN"):
-        DBNODEINFO_IGNORE_TABLE.pop("backIps")
-        DBNODEINFO_IGNORE_TABLE.pop("sshIps")
-        DBNODEINFO_IGNORE_TABLE.pop("name")
-        DBNODEINFO_IGNORE_TABLE["id"] = None
-    if (isinstance(Object, instanceInfo)):
-        if (member not in list(INSTANCEINFO_IGNORE_TABLE.keys())):
-            return False
-        elif (INSTANCEINFO_IGNORE_TABLE[member] is None or not callable(
-                INSTANCEINFO_IGNORE_TABLE[member])):
-            return True
-        else:
-            return INSTANCEINFO_IGNORE_TABLE[member](Object)
-    elif (isinstance(Object, dbNodeInfo)):
-        if (member not in list(DBNODEINFO_IGNORE_TABLE.keys())):
-            return False
-        elif (DBNODEINFO_IGNORE_TABLE[member] is None or not callable(
-                DBNODEINFO_IGNORE_TABLE[member])):
-            return True
-        else:
-            return INSTANCEINFO_IGNORE_TABLE[member](Object)
-    elif (isinstance(Object, dbClusterInfo)):
-        if (member not in list(DBCLUSTERINFO_IGNORE_TABLE.keys())):
-            return False
-        elif (DBCLUSTERINFO_IGNORE_TABLE[member] is None or not callable(
-                DBCLUSTERINFO_IGNORE_TABLE[member])):
-            return True
-        else:
-            return DBCLUSTERINFO_IGNORE_TABLE[member](Object)
-    else:
-        return False
-
-
 def checkPathVaild(obtainpath):
     """
     function: check path vaild
@@ -250,219 +180,6 @@ def checkPathVaild(obtainpath):
     if any(ill_char in obtainpath for ill_char in PATH_CHECK_LIST):
         raise Exception(ErrorCode.GAUSS_502["GAUSS_50219"] % obtainpath +
                         " There are illegal characters in the path.")
-
-
-def obtainInstStr(objectList):
-    '''
-    function : Obtain information of instance.
-    input : []
-    output : String
-    '''
-    info = ""
-    if (isinstance(objectList, list)):
-        for obj in objectList:
-            info += "%s\n" % str(obj)
-    return info
-
-
-def compareObject(Object_A, Object_B, instName, tempbuffer=None, model=None,
-                  manageCNinfo=None):
-    '''
-    function : Compare object_A and Object_B.
-    input : Object, Object, instName, tempbuffer, model, manageCNinfo
-    output : boolean, tempbuffer
-    '''
-    if tempbuffer is None:
-        tempbuffer = []
-    if isinstance(Object_A, bytes) or isinstance(Object_A, str):
-        if (Object_A != Object_B):
-            tempbuffer.append(instName)
-            tempbuffer.append(Object_A)
-            tempbuffer.append(Object_B)
-            return False, tempbuffer
-    ### not the same type
-    elif (type(Object_A) != type(Object_B)):
-        tempbuffer.append(instName)
-        tempbuffer.append(str(Object_A))
-        tempbuffer.append(str(Object_B))
-        return False, tempbuffer
-    ### string, int, long, float, bool type
-    elif (isinstance(Object_A, bytes)):
-        if (Object_A != Object_B):
-            tempbuffer.append(instName)
-            tempbuffer.append(Object_A)
-            tempbuffer.append(Object_B)
-            return False, tempbuffer
-    elif (isinstance(Object_A, type(None))):
-        if (Object_A != Object_B):
-            tempbuffer.append(instName)
-            tempbuffer.append(Object_A)
-            tempbuffer.append(Object_B)
-            return False, tempbuffer
-    elif (isinstance(Object_A, int) or isinstance(Object_A, int)
-          or isinstance(Object_A, float) or isinstance(Object_A, bool)):
-        if (Object_A != Object_B):
-            tempbuffer.append(instName)
-            tempbuffer.append(Object_A)
-            tempbuffer.append(Object_B)
-            return False, tempbuffer
-    ### list type
-    elif (isinstance(Object_A, list)):
-        if (model == "manageCN"):
-            if (len(Object_A) != len(Object_B)):
-                theSame, tempbuffer = checkObject(Object_A, Object_B,
-                                                  tempbuffer, manageCNinfo)
-                if (not theSame):
-                    return False, tempbuffer
-                if (len(Object_A) != 0 and len(Object_B) != 0):
-                    Object_A1 = []
-                    Object_B1 = []
-                    for Obj_A in Object_A:
-                        for Obj_B in Object_B:
-                            if (Obj_A.name == Obj_B.name):
-                                Object_A1.append(Obj_A)
-                                Object_B1.append(Obj_B)
-                                continue
-                    for idx in range(len(Object_A1)):
-                        result, tempbuffer = compareObject(Object_A1[idx],
-                                                           Object_B1[idx],
-                                                           "%s[%d]" % (
-                                                               instName, idx),
-                                                           tempbuffer,
-                                                           model,
-                                                           manageCNinfo)
-                        if (not result):
-                            return False, tempbuffer
-            else:
-                for idx in range(len(Object_A)):
-                    result, tempbuffer = compareObject(Object_A[idx],
-                                                       Object_B[idx],
-                                                       "%s[%d]" % (
-                                                           instName, idx),
-                                                       tempbuffer,
-                                                       model,
-                                                       manageCNinfo)
-                    if (not result):
-                        return False, tempbuffer
-        else:
-            if len(Object_A) != len(Object_B):
-                tempbuffer.append(instName)
-                tempbuffer.append(obtainInstStr(Object_A))
-                tempbuffer.append(obtainInstStr(Object_B))
-                return False, tempbuffer
-
-            for idx in range(len(Object_A)):
-                result, tempbuffer = compareObject(Object_A[idx],
-                                                   Object_B[idx],
-                                                   "%s[%d]" % (instName, idx),
-                                                   tempbuffer,
-                                                   model,
-                                                   manageCNinfo)
-                if (not result):
-                    return False, tempbuffer
-    ### function type 
-    elif isinstance(Object_A, types.FunctionType) or \
-            isinstance(Object_A, types.MethodType):
-        return True, tempbuffer
-    elif isinstance(Object_A, type(dbClusterInfo())) or \
-            isinstance(Object_A, type(dbNodeInfo())) or \
-            isinstance(Object_A, type(instanceInfo())):
-        Object_A_list = dir(Object_A)
-        Object_B_list = dir(Object_B)
-        if (len(Object_A_list) != len(Object_B_list)):
-            tempbuffer.append(instName)
-            tempbuffer.append(str(Object_A))
-            tempbuffer.append(str(Object_B))
-            return False, tempbuffer
-        need_ignore = ["float_ips"]
-        for i in Object_A_list:
-            if i.startswith("_") or i in need_ignore:
-                continue
-            Inst_A = getattr(Object_A, i)
-            try:
-                Inst_B = getattr(Object_B, i)
-            except Exception as e:
-                tempbuffer.append(instName)
-                tempbuffer.append(str(Object_A))
-                tempbuffer.append(str(Object_B))
-                return False, tempbuffer
-            result, tempbuffer = compareObject(Inst_A, Inst_B, i, tempbuffer,
-                                               model, manageCNinfo)
-            if (not result):
-                return False, tempbuffer
-    else:
-        tempbuffer.append(instName)
-        tempbuffer.append(str(Object_A))
-        tempbuffer.append(str(Object_B))
-        return False, tempbuffer
-    return True, tempbuffer
-
-
-def checkObject(Object_A, Object_B, checkbuffer, manageCNinfo):
-    """
-    """
-    Join = []
-    if (len(Object_A)):
-        Join.extend(Object_A)
-    if (len(Object_B)):
-        Join.extend(Object_B)
-
-    # CN instance
-    if (isinstance(Join[0], instanceInfo)):
-
-        # check instance role
-        if (Join[0].instanceRole != 3):
-            raise Exception(ErrorCode.GAUSS_528["GAUSS_52809"])
-        # xml must match action
-        if (len(Object_A) == 1 and len(Object_B) == 0):
-            if (manageCNinfo.mode != "delete"):
-                raise Exception(
-                    ErrorCode.GAUSS_528["GAUSS_52808"] % ("deletion", "add"))
-        elif (len(Object_A) == 0 and len(Object_B) == 1):
-            if (manageCNinfo.mode != "add"):
-                raise Exception(ErrorCode.GAUSS_528["GAUSS_52808"] % (
-                    "increased", "delete"))
-        else:
-            raise Exception(ErrorCode.GAUSS_528["GAUSS_52809"])
-
-        # at most add or delete one CN
-        if (len(manageCNinfo.nodeInfo) != 0 or len(manageCNinfo.cooInfo) != 0):
-            raise Exception(ErrorCode.GAUSS_528["GAUSS_52809"])
-
-        manageCNinfo.cooInfo.extend(Join)
-    # GaussDB nodes
-    elif (isinstance(Join[0], dbNodeInfo)):
-        # get added or deleted node
-        oa_names = [Obj_A.name for Obj_A in Object_A]
-        ob_names = [Obj_B.name for Obj_B in Object_B]
-        Object_AA = [Obj_A for Obj_A in Object_A if Obj_A.name not in ob_names]
-        Object_BB = [Obj_B for Obj_B in Object_B if Obj_B.name not in oa_names]
-
-        # xml must match action
-        if (len(Object_AA) == 1 and len(Object_BB) == 0):
-            if (manageCNinfo.mode != "delete"):
-                raise Exception(
-                    ErrorCode.GAUSS_528["GAUSS_52808"] % ("deletion", "add"))
-        elif (len(Object_AA) == 0 and len(Object_BB) == 1):
-            if (manageCNinfo.mode != "add"):
-                raise Exception(ErrorCode.GAUSS_528["GAUSS_52808"] % (
-                    "increased", "delete"))
-        else:
-            raise Exception(ErrorCode.GAUSS_528["GAUSS_52809"])
-
-        # at most add or delete one node
-        if (len(manageCNinfo.nodeInfo) != 0 or len(manageCNinfo.cooInfo) != 0):
-            raise Exception(ErrorCode.GAUSS_528["GAUSS_52809"])
-
-        if (len(Object_AA)):
-            manageCNinfo.nodeInfo.extend(Object_AA)
-        if (len(Object_BB)):
-            manageCNinfo.nodeInfo.extend(Object_BB)
-    else:
-        raise Exception(ErrorCode.GAUSS_528["GAUSS_52809"])
-
-    return True, checkbuffer
-
 
 ####################################################################
 ##read cluster functions
@@ -876,8 +593,6 @@ class dbNodeInfo():
                 port += 2
 
         return port
-
-
 class dbClusterInfo():
     """
     Cluster info
@@ -4737,6 +4452,58 @@ EOF
                 raise Exception(f"failed to clean oGRecorder directory. Error output:\n{output}")
         self.logger.log("Successfully uninstall oGRecorder.")
 
+def getEnvParam(envFile, param):
+    cmd = "source {envFile}; echo ${param}".format(envFile=envFile, param=param)
+    status, output = subprocess.getstatusoutput(cmd)
+    if status != 0:
+        errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s\n" % (
+            cmd, status, output)
+        CMLog.exitWithError(ErrorCode.GAUSS_518["GAUSS_51802"] % param)
+    return output
+
+def getLocalhostName():
+    import socket
+    return socket.gethostname()
+
+def executeCmdOnHost(host, cmd, isLocal = False):
+    if not isLocal:
+        cmd = 'ssh -q -o ConnectTimeout=5 %s \"%s\"' % (host, cmd)
+    status, output = subprocess.getstatusoutput(cmd)
+    return status, output
+
+def checkXMLFile(xmlFile):
+    """
+    function: check XML file
+            1.check whether XML file exists
+            2.check whether XML file is file
+            3.permission
+    input : NA
+    output: NA
+    """
+    if xmlFile.startswith('~/'):
+        homePath = os.path.expanduser('~')
+        xmlFile = homePath + xmlFile[1:]
+    if not os.path.exists(xmlFile):
+        CMLog.exitWithError(ErrorCode.GAUSS_502["GAUSS_50201"] % "xmlFile")
+    if not os.path.isfile(xmlFile):
+        CMLog.exitWithError(ErrorCode.GAUSS_502["GAUSS_50210"] % "xmlFile")
+    if not os.access(xmlFile, os.R_OK):
+        CMLog.exitWithError(ErrorCode.GAUSS_501["GAUSS_50100"] % (xmlFile, "current user"))
+
+def checkHostsTrust(hosts):
+    """
+    check trust between current host and the given hosts
+    """
+    hostsWithoutTrust = []
+    for host in hosts:
+        checkTrustCmd = "ssh -o ConnectTimeout=3 -o ConnectionAttempts=5 -o PasswordAuthentication=no " \
+            "-o StrictHostKeyChecking=no %s 'pwd > /dev/null'" % host
+        status, output = subprocess.getstatusoutput(checkTrustCmd)
+        if status != 0:
+            hostsWithoutTrust.append(host)
+    if hostsWithoutTrust != []:
+        CMLog.exitWithError(ErrorCode.GAUSS_511["GAUSS_51100"] % ','.join(hostsWithoutTrust))
+
 def GetHostIpOrName():
     """
     function: Obtaining the local IP address
@@ -4997,6 +4764,506 @@ def getEnv(env_param, default_value=None):
 
     return env_value
 
+class InstallImpl:
+    def __init__(self, install):
+        self.cmpkg = install.cmpkg
+        self.context = install
+        self.envFile = install.envFile
+        self.xmlFile = install.xmlFile
+        self.cmDirs = install.cmDirs
+        self.hostnames = install.hostnames
+        self.gaussHome = install.gaussHome
+        self.gaussLog = install.gaussLog
+        self.toolPath = install.toolPath
+        self.tmpPath = install.tmpPath
+        self.localhostName = install.localhostName
+        self.logger = install.logger
+        self.clusterStopped = install.clusterStopped
+        self.primaryTermAbnormal = install.primaryTermAbnormal
+
+    def executeCmdOnHost(self, host, cmd, isLocal = False):
+        if host == self.localhostName:
+            isLocal = True
+        return executeCmdOnHost(host, cmd, isLocal)
+
+    def prepareCMPath(self):
+        """
+        create path: cmdir、cmdir/cm_server、cmdir/cm_agent
+        """
+        self.logger.log("Preparing CM path.")
+        for (cmdir, host) in zip(self.cmDirs, self.hostnames):
+            cmd = "mkdir -p {cmdir}/cm_server {cmdir}/cm_agent".format(cmdir=cmdir)
+            status, output = self.executeCmdOnHost(host, cmd)
+            if status != 0:
+                self.logger.debug("Command: " + cmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit("Failed to create CM path." + errorDetail)
+
+    def decompressCMPkg(self):
+        self.logger.log("Decompressing CM pacakage.")
+        if self.cmpkg == "":
+            return
+        # decompress cm pkg on localhost
+        decompressCmd = "tar -zxf %s -C %s" % (self.cmpkg, self.gaussHome)
+        status, output = subprocess.getstatusoutput(decompressCmd)
+        if status != 0:
+            self.logger.debug("Command: " + decompressCmd)
+            errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+            self.logger.logExit("Failed to decompress cm pacakage to on localhost." + errorDetail)
+
+        # If the version of CM pacakage is inconsistent with that of gaussdb,
+        # then exit. So no need to send CM pacakage to other nodes.
+        # self.checkCMPkgVersion()
+
+        # decompress cmpkg on other hosts
+        cmpkgName = os.path.basename(self.cmpkg)
+        for host in self.hostnames:
+            if host == self.localhostName:
+                continue
+            # copy cm pacakage to other hosts
+            if ":" in host:
+                host = "[" + host + "]"
+            scpCmd = "scp %s %s:%s" % (self.cmpkg, host, self.toolPath)
+            status, output = subprocess.getstatusoutput(scpCmd)
+            if status != 0:
+                self.logger.debug("Command: " + scpCmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit(("Failed to send cm pacakage to %s." % host) + errorDetail)
+            pkgPath = os.path.join(self.toolPath, cmpkgName)
+            decompressCmd = "tar -zxf %s -C %s" % (pkgPath, self.gaussHome)
+            status, output = self.executeCmdOnHost(host, decompressCmd)
+            if status != 0:
+                self.logger.debug("Command: " + decompressCmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit(("Failed to decompress cm pacakage to on host %s." % host) + errorDetail)
+
+    def checkCMPkgVersion(self):
+        getCMVersionCmd = "source %s; cm_ctl -V" % self.envFile
+        status, output = subprocess.getstatusoutput(getCMVersionCmd)
+        if status != 0:
+            self.logger.logExit("Failed to get CM pacakage version.")
+        cmVersionList = re.findall(r'.*CM (\d.*\d) build', output)
+        if len(cmVersionList) == 0:
+            self.logger.logExit("Failed to get CM pacakage version.")
+        cmVersion = cmVersionList[0]
+
+        # getGaussdbVersionCmd = "source %s; gaussdb -V" % self.envFile
+        # status, output = subprocess.getstatusoutput(getGaussdbVersionCmd)
+        # if status != 0:
+        #     self.logger.logExit("Failed to get gaussdb version.")
+        # gaussdbVersionList = re.findall(r'openGauss (\d.*\d) build', output)
+        # if len(gaussdbVersionList) == 0:
+        #     self.logger.logExit("Failed to get gaussdb version.")
+        # gaussdbVersion = gaussdbVersionList[0]
+
+        # if gaussdbVersion != cmVersion:
+        #     self.logger.logExit("The version of CM pacakage(%s) is inconsistent "
+        #         "with that of gaussdb(%s)." % (cmVersion, gaussdbVersion))
+
+    def createManualStartFile(self):
+        self.logger.log("Creating cluster_manual_start file.")
+        cmd = """
+            if [ ! -f {gaussHome}/bin/cluster_manual_start ]; then
+                touch {gaussHome}/bin/cluster_manual_start
+            fi
+            """.format(gaussHome=self.gaussHome)
+        for host in self.hostnames:
+            status, output = self.executeCmdOnHost(host, cmd)
+            if status != 0:
+                self.logger.debug("Command: " + cmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit("Failed to create cluster_manual_start file." + errorDetail)
+
+    def initCMServer(self):
+        self.logger.log("Initializing cm_server.")
+        for (cmdir, host) in zip(self.cmDirs, self.hostnames):
+            cmd = """
+                cp {gaussHome}/share/config/cm_server.conf.sample {cmdir}/cm_server/cm_server.conf
+                sed 's#log_dir = .*#log_dir = {gaussLog}/cm/cm_server#' {cmdir}/cm_server/cm_server.conf -i
+                """.format(gaussHome=self.gaussHome, gaussLog=self.gaussLog, cmdir=cmdir)
+            status, output = self.executeCmdOnHost(host, cmd)
+            if status != 0:
+                self.logger.debug("Command: " + cmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit("Failed to initialize cm_server." + errorDetail)
+
+    def initCMAgent(self):
+        self.logger.log("Initializing cm_agent.")
+        for (cmdir, host) in zip(self.cmDirs, self.hostnames):
+            cmd = """
+                cp {gaussHome}/share/config/cm_agent.conf.sample {cmdir}/cm_agent/cm_agent.conf && 
+                sed 's#log_dir = .*#log_dir = {gaussLog}/cm/cm_agent#' {cmdir}/cm_agent/cm_agent.conf -i && 
+                sed 's#unix_socket_directory = .*#unix_socket_directory = {gaussHome}#' {cmdir}/cm_agent/cm_agent.conf -i
+                """.format(gaussHome=self.gaussHome, gaussLog=self.gaussLog, cmdir=cmdir)
+            status, output = self.executeCmdOnHost(host, cmd)
+            if status != 0:
+                self.logger.debug("Command: " + cmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit("Failed to initialize cm_agent." + errorDetail)
+
+    def AddWrResource(self):
+        """
+        Add wr Resource
+        """
+        self.logger.log("Add wr resource.")
+        cmd = "source %s ; sh %s/wr_res.sh" % (self.envFile, self.toolPath)
+        for host in self.hostnames:
+            status, output = self.executeCmdOnHost(host, cmd)
+            if status != 0:
+                self.logger.debug("Command: " + cmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit(("Failed to add wr resource to %s." % host) + errorDetail)
+
+    def setMonitorCrontab(self):
+        """
+        set om_monitor crontab
+        """
+        self.logger.log("Setting om_monitor crontab.")
+        # save old crontab content to cronContentTmpFile
+        cronContentTmpFile = os.path.join(self.tmpPath, "cronContentTmpFile_" + str(os.getpid()))
+        listCronCmd = "crontab -l > %s" % cronContentTmpFile
+        status, output = self.executeCmdOnHost(self.localhostName, listCronCmd)
+        is_no_crontab = ("no crontab" in output.lower() and status == 1)
+        if status != 0 and not is_no_crontab:
+            self.logger.debug("Command: " + listCronCmd)
+            errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+            self.logger.logExit(ErrorCode.GAUSS_508["GAUSS_50804"] + errorDetail)
+        # if old crontab content contains om_monitor, clear it
+        clearMonitorCmd = "sed '/.*om_monitor.*/d' %s -i" % cronContentTmpFile
+        status, output = subprocess.getstatusoutput(clearMonitorCmd)
+        if status != 0:
+            os.remove(cronContentTmpFile)
+            self.logger.debug("Command: " + clearMonitorCmd)
+            errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+            self.logger.logExit("Failed to clear old om_monitor crontab." + errorDetail)
+
+        # generate om_monitor crontab command and append it to cronContentTmpFile
+        startMonitorCmd = "source /etc/profile;(if [ -f ~/.profile ];" \
+                      "then source ~/.profile;fi);source ~/.bashrc;"
+        if self.envFile != "~/.bashrc":
+            startMonitorCmd += "source %s; " % (self.envFile)
+        monitorLogPath = os.path.join(self.gaussLog, "cm")
+        if not os.path.exists(monitorLogPath):
+            os.makedirs(monitorLogPath)
+        startMonitorCmd += "nohup om_monitor -L %s/om_monitor >>/dev/null 2>&1 &" % monitorLogPath
+        monitorCron = "*/1 * * * * " + startMonitorCmd + os.linesep
+        with open(cronContentTmpFile, 'a+', encoding='utf-8') as fp:
+            fp.writelines(monitorCron)
+            fp.flush()
+
+        # set crontab on other hosts
+        setCronCmd = "crontab %s" % cronContentTmpFile
+        cleanTmpFileCmd = "rm %s -f" % cronContentTmpFile
+        username = getpass.getuser()
+        killMonitorCmd = "pkill om_monitor -u %s; " % username
+        for host in self.hostnames:
+            if host == self.localhostName:
+                continue
+            # copy cronContentTmpFile to other host
+            if ":" in host:
+                host = "[" + host + "]"
+            scpCmd = "scp %s %s:%s" % (cronContentTmpFile, host, self.tmpPath)
+            status, output = subprocess.getstatusoutput(scpCmd)
+            if status != 0:
+                self.logger.debug("Command: " + scpCmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit(("Failed to copy cronContentTmpFile to %s." % host) + errorDetail)
+            # set om_monitor crontab
+            status, output = self.executeCmdOnHost(host, setCronCmd)
+            # cleanup cronContentTmpFile
+            self.executeCmdOnHost(host, cleanTmpFileCmd)
+            if status != 0:
+                self.logger.debug("Command: " + setCronCmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit(ErrorCode.GAUSS_508["GAUSS_50801"] + errorDetail)
+
+            # start om_monitor
+            # Firstly, kill residual om_monitor, otherwise cm_agent won't be started if there are residual om_monitor process.
+            status, output = self.executeCmdOnHost(host, killMonitorCmd + startMonitorCmd)
+            if status != 0:
+                self.logger.debug("Command: " + startMonitorCmd)
+                errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+                self.logger.logExit((ErrorCode.GAUSS_516["GAUSS_51607"] % "om_monitor") + errorDetail)
+
+        # set crontab on localhost
+        status, output = subprocess.getstatusoutput(setCronCmd)
+        os.remove(cronContentTmpFile)
+        if status != 0:
+            self.logger.debug("Command: " + setCronCmd)
+            errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+            self.logger.logExit(ErrorCode.GAUSS_508["GAUSS_50801"] + errorDetail)
+
+        status, output = subprocess.getstatusoutput(killMonitorCmd + startMonitorCmd)
+        if status != 0:
+            self.logger.debug("Command: " + startMonitorCmd)
+            errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+            self.logger.logExit((ErrorCode.GAUSS_516["GAUSS_51607"] % "om_monitor") + errorDetail)
+
+    def startCluster(self):
+        self.logger.log("Starting cluster.")
+        startCmd = "source %s; cm_ctl start" % self.envFile
+        status, output = subprocess.getstatusoutput(startCmd)
+        if status != 0:
+            self.logger.debug("Command: " + startCmd)
+            errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+            self.logger.logExit("Failed to start cluster." + errorDetail)
+
+        # status, output = InstallImpl.refreshDynamicFile(self.envFile)
+        # if status != 0:
+        #     self.logger.error("Failed to refresh dynamic file." + output)
+
+        queryCmd = "source %s; cm_ctl query -Cv" % self.envFile
+        status, output = subprocess.getstatusoutput(queryCmd)
+        if status != 0:
+            self.logger.debug("Command: " + queryCmd)
+            errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
+            self.logger.logExit("Failed to query cluster status." + errorDetail)
+        self.logger.log(output)
+        self.logger.log("Install CM tool success.")
+        if self.primaryTermAbnormal:
+            self.logger.warn("Term of primary is invalid or not maximal.\n"
+                "Hint: To avoid CM arbitration anomalies in this situation, "
+                "please restart the database.\n"
+                "Command : cm_ctl stop && cm_ctl start")
+
+    @staticmethod
+    def refreshStaticFile(envFile, xmlFile):
+        """
+        refresh static and dynamic file using xml file with cm
+        """
+        # refresh static file
+        cmd = """
+            source {envFile};
+            gs_om -t generateconf -X {xmlFile} --distribute
+            """.format(envFile=envFile, xmlFile=xmlFile)
+        status, output = subprocess.getstatusoutput(cmd)
+        errorDetail = ""
+        if status != 0:
+            errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (cmd, status, output)
+        return status, errorDetail
+
+    @staticmethod
+    def refreshDynamicFile(envFile):
+        # refresh dynamic file
+        refreshDynamicFileCmd = "source %s; gs_om -t refreshconf" % envFile
+        status, output = subprocess.getstatusoutput(refreshDynamicFileCmd)
+        errorDetail = ""
+        if status != 0:
+            errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (refreshDynamicFileCmd, status, output)
+        return status, errorDetail
+
+    @staticmethod
+    def checkPassword(passwordCA):
+        minPasswordLen = 8
+        maxPasswordLen = 15
+        kinds = [0, 0, 0, 0]
+        specLetters = "~!@#$%^&*()-_=+\\|[{}];:,<.>/?"
+        if len(passwordCA) < minPasswordLen:
+            print("Invalid password, it must contain at least eight characters.")
+            return False
+        if len(passwordCA) > maxPasswordLen:
+            print("Invalid password, it must contain at most fifteen characters.")
+            return False
+        for c in passwordCA:
+            if isdigit(c):
+                kinds[0] += 1
+            elif isupper(c):
+                kinds[1] += 1
+            elif islower(c):
+                kinds[2] += 1
+            elif c in specLetters:
+                kinds[3] += 1
+            else:
+                print("The password contains illegal character: %s." % c)
+                return False
+        kindsNum = 0
+        for k in kinds:
+            if k > 0:
+                kindsNum += 1
+        if kindsNum < 3:
+            print("The password must contain at least three kinds of characters.")
+            return False
+        return True
+
+    def _getPassword(self):
+        passwordCA = ""
+        passwordCA2 = ""
+        tryCount = 0
+        while tryCount < 3:
+            passwordCA = getpass.getpass("Please input the password for ca cert:")
+            passwordCA2 = getpass.getpass("Please input the password for ca cert again:")
+            if passwordCA != passwordCA2:
+                tryCount += 1
+                self.logger.printMessage("The password enterd twice do not match.")
+                continue
+            if not InstallImpl.checkPassword(passwordCA):
+                tryCount += 1
+                continue
+            break
+        if tryCount == 3:
+            self.logger.logExit("Maximum number of attempts has been reached.")
+        return passwordCA
+
+    def _createCMSslConf(self, certPath):
+        """
+        Generate config file.
+        """
+        self.logger.debug("OPENSSL: Create config file.")
+        v3CaL = [
+            "[ v3_ca ]",
+            "subjectKeyIdentifier=hash",
+            "authorityKeyIdentifier=keyid:always,issuer:always",
+            "basicConstraints = CA:true",
+            "keyUsage = keyCertSign,cRLSign",
+        ]
+        v3Ca = os.linesep.join(v3CaL)
+
+        # Create config file.
+        with open(os.path.join(certPath, "openssl.cnf"), "w") as fp:
+            # Write config item of Signature
+            fp.write(v3Ca)
+        self.logger.debug("OPENSSL: Successfully create config file.")
+
+    def _cleanUselessFile(self):
+        """
+        Clean useless files
+        :return: NA
+        """
+        certPath = os.path.join(self.gaussHome, "share/sslcert/cm")
+        keyFiles = ["cacert.pem", "server.crt", "server.key", "client.crt", "client.key",
+            "server.key.cipher", "server.key.rand", "client.key.cipher", "client.key.rand"]
+        for fileName in os.listdir(certPath):
+            filePath = os.path.join(certPath, fileName)
+            if fileName not in keyFiles:
+                os.remove(filePath)
+
+    def _createCMCALocal(self):
+        self.logger.debug("Creating Cm ca files locally.")
+        certPath = os.path.join(self.gaussHome, "share/sslcert/cm")
+        mkdirCmd = f"rm -rf {certPath}; mkdir -p {certPath}"
+        status, output = subprocess.getstatusoutput(mkdirCmd)
+        if status != 0:
+            self.logger.debug(f"Command: {mkdirCmd}\nStatus: {status}\nOutput: {output}")
+            self.logger.logExit("Failed to create cert path.")
+        self._createCMSslConf(certPath)
+        passwd = self._getPassword()
+        activePeriod = "10950"
+        opensslConf = os.path.join(certPath, "openssl.cnf")
+        if not os.path.isfile(opensslConf):
+            self.logger.logExit("CM ssl conf does not exist.")
+
+        old_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
+        if "LD_LIBRARY_PATH" in os.environ:
+            del os.environ["LD_LIBRARY_PATH"]
+
+        # 生成 cakey.pem
+        gen_cakey_cmd = f'echo "{passwd}" | openssl genrsa -aes256 -f4 -passout stdin -out {certPath}/cakey.pem 2048'
+        status, output = subprocess.getstatusoutput(gen_cakey_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to generate cakey.pem.\n" + output)
+
+        # 生成 cacert.pem
+        gen_cacert_cmd = f'echo "{passwd}" | openssl req -new -x509 -passin stdin -days {activePeriod} -key {certPath}/cakey.pem -out {certPath}/cacert.pem -subj "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA"'
+        status, output = subprocess.getstatusoutput(gen_cacert_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to generate cacert.pem.\n" + output)
+
+        for role in ["server", "client"]:
+            # 生成 key
+            gen_key_cmd = f'echo "{passwd}" | openssl genrsa -aes256 -passout stdin -out {certPath}/{role}.key 2048'
+            status, output = subprocess.getstatusoutput(gen_key_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate {role}.key.\n" + output)
+            # 生成 csr
+            gen_csr_cmd = f'echo "{passwd}" | openssl req -new -key {certPath}/{role}.key -passin stdin -out {certPath}/{role}.csr -subj "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN={role}"'
+            status, output = subprocess.getstatusoutput(gen_csr_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate {role}.csr.\n" + output)
+            # 生成 crt
+            gen_crt_cmd = f'echo "{passwd}" | openssl x509 -req -days {activePeriod} -in {certPath}/{role}.csr -CA {certPath}/cacert.pem -CAkey {certPath}/cakey.pem -passin stdin -CAcreateserial -out {certPath}/{role}.crt -extfile {certPath}/openssl.cnf'
+            status, output = subprocess.getstatusoutput(gen_crt_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate {role}.crt.\n" + output)
+            # 删除 csr 文件
+            rm_csr_cmd = f'rm -f {certPath}/{role}.csr'
+            subprocess.getstatusoutput(rm_csr_cmd)
+
+        # 恢复 LD_LIBRARY_PATH
+        os.environ["LD_LIBRARY_PATH"] = old_ld_library_path
+
+        # 生成 server cipher 和 rand
+        expect_server_cmd = (
+            f'expect -c \'spawn cm_ctl encrypt -M server -D {certPath}; '
+            f'expect "*password*" {{ send "{passwd}\\r"; exp_continue }}\''
+        )
+        status, output = subprocess.getstatusoutput(expect_server_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to encrypt server key.\n" + output)
+
+        # 生成 client cipher 和 rand
+        expect_client_cmd = (
+            f'expect -c \'spawn cm_ctl encrypt -M client -D {certPath}; '
+            f'expect "*password*" {{ send "{passwd}\\r"; exp_continue }}\''
+        )
+        status, output = subprocess.getstatusoutput(expect_client_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to encrypt client key.\n" + output)
+
+        # 密码置空
+        passwd = ""
+        del passwd
+
+        # 设置只读权限
+        chmod_cmd = f'chmod 400 {certPath}/*'
+        status, output = subprocess.getstatusoutput(chmod_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to set readonly for cert files.\n" + output)
+
+        self._cleanUselessFile()
+
+    def _distributeCA(self):
+        self.logger.debug("Distributing CM ca files to other hosts.")
+        certPath = os.path.join(self.gaussHome, "share/sslcert/cm")
+        createCertPathCmd = "rm {certPath} -rf; mkdir -p {certPath}; chmod 700 {certPath}".format(
+            certPath=certPath)
+        for host in self.hostnames:
+            if host == self.localhostName:
+                continue
+            status, output = self.executeCmdOnHost(host, createCertPathCmd)
+            if status != 0:
+                errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (createCertPathCmd, status, output)
+                self.logger.debug(errorDetail)
+                self.logger.logExit("Failed to create path of CA for CM on host %s." % host)
+            # Determine if the host is an IPv6 address and format accordingly
+            if ":" in host:
+                formatted_host = "[{}]".format(host)
+            else:
+                formatted_host = host
+        
+            # Create the scp command with the formatted host
+            scpCmd = "scp {certPath}/* {host}:{certPath}".format(certPath=certPath, host=formatted_host)
+            status, output = subprocess.getstatusoutput(scpCmd)
+            if status != 0:
+                errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (scpCmd, status, output)
+                self.logger.debug(errorDetail)
+                self.logger.logExit("Failed to create CA for CM.")
+
+    def createCMCA(self):
+        self.logger.log("Creating CM ca files.")
+        self._createCMCALocal()
+        self._distributeCA()
+
+    def run(self):
+        self.logger.log("Start to install cm tool.")
+        self.prepareCMPath()
+        self.decompressCMPkg()
+        self.createManualStartFile()
+        self.initCMServer()
+        self.initCMAgent()
+        self.createCMCA()
+        self.setMonitorCrontab()
+        self.AddWrResource()
+        self.startCluster()
 class Install:
     """
     The class is used to do perform installation
@@ -5322,25 +5589,25 @@ def main():
     gen_parser.add_argument('xmlFile', help='XML configuration file')
 
     # WR Install command
-    install_parser = subparsers.add_parser('wr_install', help='Install WR package')
-    install_parser.add_argument('xmlFile', help='XML configuration file')
-    install_parser.add_argument('wrPkgPath', help='Path to WR installation package')
+    wr_install_parser = subparsers.add_parser('wr_install', help='Install WR package')
+    wr_install_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
+    wr_install_parser.add_argument('--pkg', dest='wrPkgPath', required=True, help='Path to WR installation package')
 
     # WR Preinstall command
-    view_parser = subparsers.add_parser('preinstall', help='preinstall cluster')
-    view_parser.add_argument('xmlFile', help='XML configuration file')
-    view_parser.add_argument('user', help='install user')
-    view_parser.add_argument('envf', help='envfile path')
+    preinstall_parser = subparsers.add_parser('preinstall', help='Preinstall cluster')
+    preinstall_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
+    preinstall_parser.add_argument('-u', dest='user', required=True, help='Install user')
+    preinstall_parser.add_argument('-e', dest='envf', required=True, help='Envfile path')
 
     # CM Install command
     cm_install_parser = subparsers.add_parser('cm_install', help='Deploy CM tool to openGauss cluster')
     cm_install_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
     cm_install_parser.add_argument('-e', dest='envFile', default='', help='env file path')
-    cm_install_parser.add_argument('--cmpkg', dest='cmpkg', required=True, help='CM package path')
+    cm_install_parser.add_argument('--pkg', dest='cmpkg', required=True, help='CM package path')
 
     # WR uninstall command
-    view_parser = subparsers.add_parser('wr_uninstall', help='uninstall cluster')
-    view_parser.add_argument('xmlFile', help='XML configuration file')
+    wr_uninstall_parser = subparsers.add_parser('wr_uninstall', help='Uninstall cluster')
+    wr_uninstall_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
 
     args = parser.parse_args()    
     
@@ -5359,13 +5626,10 @@ def main():
         install.cmpkg = args.cmpkg
         install.run()
     elif args.command == 'wr_install':
-        # clusterInfo.initFromXml(args.xmlFile)
         clusterInfo.wr_install(args.xmlFile, args.wrPkgPath)
     elif args.command == 'preinstall':
-        # clusterInfo.initFromXml(args.xmlFile)
         clusterInfo.preinstall(args.xmlFile, args.user, args.envf)
     elif args.command == 'wr_uninstall':
-        # clusterInfo.initFromXml(args.xmlFile)
         clusterInfo.wr_uninstall(args.xmlFile)
     else:
         print("Invalid command")
