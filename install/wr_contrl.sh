@@ -21,7 +21,7 @@ SCRIPT_NAME=$0
 
 usage()
 {
-    echo "Usage: $0 [cmd] [wrserver_id] [WR_HOME] [GSDB_HOME]"
+    echo "Usage: $0 [cmd] [wrserver_id] [DSS_HOME] [GSDB_HOME]"
     echo "cmd:"
     echo "    -start: start wrserver"
     echo "    -stop: stop wrserver"
@@ -47,7 +47,7 @@ fi
 log()
 {
    time=`date "+%Y-%m-%d %H:%M:%S"`
-   echo "[$time][WR]$1" >> ${startwr_log} 2>&1
+   echo "[$time][DSS]$1" >> ${startdss_log} 2>&1
    return
 }
 
@@ -144,7 +144,7 @@ function check_wr_config()
     log "[START]Checking wr_inst.ini before start wr..."
     if [[ ! -e ${WR_HOME}/cfg/wr_inst.ini ]]
     then
-        log "[START]${WR_HOME}/cfg/wr_inst.ini must exist"
+        log "[START]${DSS_HOME}/cfg/wr_inst.ini must exist"
         exit 1
     fi
 }
@@ -157,7 +157,7 @@ function Check()
         log "[CHECK]wrserver is offline."
         exit 1
     fi
-    if [[ "${wr_status}" == "D" || "${wr_status}" == "T" || "${wr_status}" == "Z" ]]
+    if [[ "${wr_status}" == "D" || "${dss_status}" == "T" || "${wr_status}" == "Z" ]]
     then
         log "[CHECK]wrserver is dead."
         exit 3
@@ -175,7 +175,7 @@ CMD=${1}
 INSTANCE_ID=${2}
 export WR_HOME=${3}
 CONN_PATH=UDS:${WR_HOME}/.wr_unix_d_socket
-startwr_log=${WR_HOME}/startwr.log
+startdss_log=${WR_HOME}/startwr.log
 
 get_startwr_log()
 {
@@ -201,10 +201,12 @@ kill_wr()
         log "[${1}]wrserver not exist."
         echo "wrserver not exist"
     fi
-    kill_program wrserver ${WR_HOME}
+    kill_program wrserver ${DSS_HOME}
     log "[${1}]Success to kill wrserver."
 }
 
+# 1st step: if database exists, kill it
+# 2nd step: if dssserver no exists, start it
 function Start()
 {
     pid=`program_pid ${WR_BIN_FULL} ${WR_HOME}`

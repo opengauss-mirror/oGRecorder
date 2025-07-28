@@ -283,6 +283,20 @@ class ErrorCode():
     }
 
     ###########################################################################
+    # memory
+    ###########################################################################
+    GAUSS_505 = {
+        'GAUSS_50500': "[GAUSS-50500] : The SWAP partition is smaller than "
+                       "the actual memory.",
+        'GAUSS_50501': "[GAUSS-50501] : Shared_buffers must be less than "
+                       "shmmax. Please check it.",
+        'GAUSS_50502': "[GAUSS-50502] : Failed to obtain %s information.",
+        'GAUSS_50503': "[GAUSS-50503] : %s, program exists abnormally.",
+        'GAUSS_50504': "[GAUSS-50504] : Failed to execute the command: %s.\n"
+                       "ERROR: %s"
+    }
+
+    ###########################################################################
     # network
     ###########################################################################
     GAUSS_506 = {
@@ -334,6 +348,14 @@ class ErrorCode():
     }
 
     ###########################################################################
+    # firwall
+    ###########################################################################
+    GAUSS_507 = {
+        'GAUSS_50700': "[GAUSS-50700] : The firewall should be disabled.",
+        'GAUSS_50701': "[GAUSS-50701] : The firewall should be opened."
+    }
+
+    ###########################################################################
     # crontab
     ###########################################################################
     GAUSS_508 = {
@@ -341,6 +363,15 @@ class ErrorCode():
         'GAUSS_50801': "[GAUSS-50801] : Failed to set up tasks.",
         'GAUSS_50802': "[GAUSS-50802] : Failed to %s service.",
         'GAUSS_50803': "[GAUSS-50803] : Failed to check user cron."
+    }
+
+    ###########################################################################
+    # Clock service
+    ###########################################################################
+    GAUSS_509 = {
+        'GAUSS_50900': "[GAUSS-50900] : The NTPD service is not installed.",
+        'GAUSS_50901': "[GAUSS-50901] : The NTPD service is not started.",
+        'GAUSS_50902': "[GAUSS-50902] : The system time is different."
     }
 
     ###########################################################################
@@ -483,6 +514,28 @@ class ErrorCode():
     }
 
     ###########################################################################
+    # SQL exception
+    ###########################################################################
+    GAUSS_513 = {
+        'GAUSS_51300': "[GAUSS-51300] : Failed to execute SQL: %s.",
+        'GAUSS_51301': "[GAUSS-51301] : Execute SQL time out. \nSql: %s.",
+        'GAUSS_51302': "[GAUSS-51302] : The table '%s.%s' does not exist "
+                       "or is private table!",
+        'GAUSS_51303': "[GAUSS-51303] : Query '%s' has no record!.",
+        'GAUSS_51304': "[GAUSS-51304] : Query '%s' result '%s' is incorrect!.",
+        'GAUSS_51305': "[GAUSS-51305] : The table '%s.%s' exists!",
+        'GAUSS_51306': "[GAUSS-51306] : %s: Abnormal reason:%s",
+        'GAUSS_51307': "[GAUSS-51307] : Error: can not get sql execute "
+                       "status.",
+        'GAUSS_51308': "[GAUSS-51308] : Error: can not load result data.",
+        'GAUSS_51309': "[GAUSS-51309] : Can not get correct result"
+                       " by executing sql: %s",
+        'GAUSS_51310': "[GAUSS-51310] : Failed to get connection"
+                       " with database %s"
+
+    }
+
+    ###########################################################################
     # Shell exception
     ###########################################################################
     GAUSS_514 = {
@@ -495,6 +548,14 @@ class ErrorCode():
         'GAUSS_51405': "[GAUSS-51405] : You need to install software:%s\n",
         'GAUSS_51406': "[GAUSS-51406] : The uuid of disk '%s' is the same " \
             "configuration under directory '%s'."
+    }
+
+    ###########################################################################
+    # interface calls exception
+    ###########################################################################
+    GAUSS_515 = {
+        'GAUSS_51500': "[GAUSS-51500] : Failed to call the interface %s. "
+                       "Exception: %s."
     }
 
     ###########################################################################
@@ -590,6 +651,26 @@ class ErrorCode():
     }
 
     ###########################################################################
+    # Check system table
+    ###########################################################################
+    GAUSS_517 = {
+        'GAUSS_51700': "[GAUSS-51700] : There must be only one record in the "
+                       "pgxc_group table.",
+        'GAUSS_51701': "[GAUSS-51701] : The current node group is incorrect.",
+        'GAUSS_51702': "[GAUSS-51702] : Failed to obtain node group "
+                       "information.",
+        'GAUSS_51703': "[GAUSS-51703] : Failed to drop record from "
+                       "PGXC_NODE.",
+        'GAUSS_51704': "[GAUSS-51704] : Failed to set Cgroup.",
+        'GAUSS_51705': "[GAUSS-51705] : Failed to update PGXC_NODE.",
+        'GAUSS_51706': "[GAUSS-51706] : Failed to check Cgroup.",
+        'GAUSS_51707': "[GAUSS-51707] : Failed to install Cgroup.",
+        'GAUSS_51708': "[GAUSS-51708] : Failed to uninstall Cgroup.",
+        'GAUSS_51709': "[GAUSS-51709] : Failed to clean Cgroup "
+                       "configuration file."
+    }
+
+    ###########################################################################
     # environmental variable
     ###########################################################################
     GAUSS_518 = {
@@ -611,12 +692,54 @@ class ErrorCode():
     }
 
     ###########################################################################
+    # OS version
+    ###########################################################################
+    GAUSS_519 = {
+        'GAUSS_51900': "[GAUSS-51900] : The current OS is not supported.",
+        'GAUSS_51901': "[GAUSS-51901] : The OS versions are different "
+                       "among cluster nodes."
+    }
+
+    ###########################################################################
+    # database version
+    ###########################################################################
+    GAUSS_520 = {
+        'GAUSS_52000': "[GAUSS-52000] : Failed to obtain time zone "
+                       "information about the cluster node.",
+        'GAUSS_52001': "[GAUSS-52001] : Time zone information is "
+                       "different among cluster nodes."
+    }
+
+    ###########################################################################
+    # OS time zone
+    ###########################################################################
+    GAUSS_521 = {
+        'GAUSS_52100': "[GAUSS-52100] : Failed to obtain cluster node "
+                       "character sets.",
+        'GAUSS_52101': "[GAUSS-52101] : Character sets are different "
+                       "among cluster nodes.",
+        'GAUSS_52102': "[GAUSS-52102] : The parameter [%s] value is not equal "
+                       "to the expected value.",
+        'GAUSS_52103': "[GAUSS-52103] : Failed to forcibly make the character "
+                       "sets to take effect."
+    }
+
+    ###########################################################################
     # OS character set
     ###########################################################################
     GAUSS_522 = {
         'GAUSS_52200': "[GAUSS-52200] : Unable to import module: %s.",
         'GAUSS_52201': "[GAUSS-52201] : The current python version %s "
                        "is not supported."
+    }
+
+    ###########################################################################
+    # Operating system parameters
+    ###########################################################################
+    GAUSS_523 = {
+        'GAUSS_52300': "[GAUSS-52300] : Failed to set OS parameters.",
+        'GAUSS_52301': "[GAUSS-52301] : Failed to check OS parameters."
+
     }
 
     ###########################################################################
@@ -645,6 +768,99 @@ class ErrorCode():
     }
 
     ###########################################################################
+    # expand and shrik
+    ###########################################################################
+    GAUSS_526 = {
+        'GAUSS_52600': "[GAUSS-52600] : Can not obtain any cluster ring.",
+        'GAUSS_52601': "[GAUSS-52601] : Redistribution failed due to"
+                       " user request.",
+        'GAUSS_52602': "[GAUSS-52602] : There is no CN in old nodes.",
+        'GAUSS_52603': "[GAUSS-52603] : There is no CN on the contraction of "
+                       "the remaining nodes.",
+        'GAUSS_52604': "[GAUSS-52604] : Parameter '-r'[%s] can not be "
+                       "more than the numbers of cluster ring[%s].",
+        'GAUSS_52605': "[GAUSS-52605] : Can not contract local node(%s).",
+        'GAUSS_52606': "[GAUSS-52606] : Contract too many nodes. "
+                       "It should left three nodes to format "
+                       "a cluster at least.",
+        'GAUSS_52607': "[GAUSS-52607] : [%s] does not at the "
+                       "end of instance list.",
+        'GAUSS_52608': "[GAUSS-52608] : [%s] contains %s instance.",
+        'GAUSS_52609': "[GAUSS-52609] : All contracted nodes do not "
+                       "contain database node instance.",
+        'GAUSS_52610': "[GAUSS-52610] : The current node group are "
+                       "node group after contraction.",
+        'GAUSS_52611': "[GAUSS-52611] : There must be only one record "
+                       "in the current node group.",
+        'GAUSS_52612': "[GAUSS-52612] : All dilatation nodes do not contain "
+                       "the database node instance.",
+        'GAUSS_52613': "[GAUSS-52613] : Static configuration is not matched "
+                       "on some nodes. Please handle it first.",
+        'GAUSS_52614': "[GAUSS-52614] : Timeout. The current "
+                       "cluster status is %s.",
+        'GAUSS_52615': "[GAUSS-52615] : Cluster lock unlocked due to timeout.",
+        'GAUSS_52616': "[GAUSS-52616] : Can not find a similar "
+                       "instance for [%s %s].",
+        'GAUSS_52617': "[GAUSS-52617] : Invalid check type.",
+        'GAUSS_52618': "[GAUSS-52618] : Failed to delete etcd from node.",
+        'GAUSS_52619': "[GAUSS-52619] : Failed to uninstall application.",
+        'GAUSS_52620': "[GAUSS-52620] : Not all nodes found. The following "
+                       "is what we found: %s.",
+        'GAUSS_52621': "[GAUSS-52621] : No DNs specified in target "
+                       "create new group.",
+        'GAUSS_52622': "[GAUSS-52622] : No new group name specified in "
+                       "target create new group.",
+        'GAUSS_52623': "[GAUSS-52623] : Failed to check node group "
+                       "numbers: Node group numbers is [%d].",
+        'GAUSS_52624': "[GAUSS-52624] : Failed to check %s node "
+                       "group members: Invaild group name or nodes.",
+        'GAUSS_52625': "[GAUSS-52625] : The local instance and peer instance "
+                       "does not both in contracted nodes.",
+        'GAUSS_52626': "[GAUSS-52626] : The CN connection on the old "
+                       "nodes are abnormal.",
+        'GAUSS_52627': "[GAUSS-52627] : The current cluster is locked.",
+        'GAUSS_52628': "[GAUSS-52628] : Static configuration has already "
+                       "been updated on all nodes, expansion has been "
+                       "completed possibly.",
+        'GAUSS_52629': "[GAUSS-52629] : Cluster ring(%s) can not obtain "
+                       "less than three nodes.",
+        'GAUSS_52630': "[GAUSS-52630] : Failed to set the read-only mode "
+                       "parameter for all database node instances.",
+        'GAUSS_52631': "[GAUSS-52631] : Invalid value for GUC parameter "
+                       "comm_max_datanode: %s.",
+        'GAUSS_52632': "[GAUSS-52632] : Cluster breakdown or "
+                       "abnormal operation during "
+                       "expanding online, lock process for expansion is lost.",
+        'GAUSS_52633': "[GAUSS-52633] : Can not excute redistribution "
+                       "for shrink excuted failed."
+
+
+    }
+
+    ###########################################################################
+    # replace
+    ###########################################################################
+    GAUSS_527 = {
+        'GAUSS_52700': "[GAUSS-52700] : Failed to update ETCD.",
+        'GAUSS_52701': "[GAUSS-52701] : All the CMAgents instances are "
+                       "abnormal. Cannot fix the cluster.",
+        'GAUSS_52702': "[GAUSS-52702] : The cluster status is Normal. "
+                       "There is no instance to fix.",
+        'GAUSS_52703': "[GAUSS-52703] : The number of normal ETCD must "
+                       "be greater than half.",
+        'GAUSS_52704': "[GAUSS-52704] : Failed to check the %s condition.",
+        'GAUSS_52705': "[GAUSS-52705] : Failed to obtain ETCD key.",
+        'GAUSS_52706': "[GAUSS-52706] : Failed to clean ETCD and touch "
+                       "flag file on %s.",
+        'GAUSS_52707': "[GAUSS-52707] : Failed to install on %s.",
+        'GAUSS_52708': "[GAUSS-52708] : Failed to configure on %s.",
+        'GAUSS_52709': "[GAUSS-52709] : Failed to check the cluster "
+                       "configuration differences:",
+        'GAUSS_52710': "[GAUSS-52710] : Replacement failed.",
+        'GAUSS_52711': "[GAUSS-52711] : Failed to set CMAgent start mode."
+    }
+
+    ###########################################################################
     # manageCN and changeIP
     ###########################################################################
     GAUSS_528 = {
@@ -666,6 +882,161 @@ class ErrorCode():
     }
 
     ###########################################################################
+    # upgrade
+    ###########################################################################
+    GAUSS_529 = {
+        'GAUSS_52900': "[GAUSS-52900] : Failed to upgrade strategy: %s.",
+        'GAUSS_52901': "[GAUSS-52901] : New cluster commitid cannot be same "
+                       "with old cluster commitid.",
+        'GAUSS_52902': "[GAUSS-52902] : Can not support upgrade from %s to %s",
+        'GAUSS_52903': "[GAUSS-52903] : The new cluster version number[%s] "
+                       "should be bigger than the old cluster[%s].",
+        'GAUSS_52904': "[GAUSS-52904] : Please choose right upgrade strategy.",
+        'GAUSS_52905': "[GAUSS-52905] : Upgrade nodes number cannot "
+                       "be more than %d.",
+        'GAUSS_52906': "[GAUSS-52906] : Grey upgrade nodes number cannot "
+                       "be more than cluster nodes.",
+        'GAUSS_52907': "[GAUSS-52907] : Failed to cancel the cluster "
+                       "read-only mode",
+        'GAUSS_52908': "[GAUSS-52908] : Failed to set cluster read-only mode.",
+        'GAUSS_52909': "[GAUSS-52909] : Specified upgrade nodes with "
+                       "same step can do upgrade task.",
+        'GAUSS_52910': "[GAUSS-52910] : These nodes %s have been successfully "
+                       "upgraded to new version, no need to upgrade again.",
+        'GAUSS_52911': "[GAUSS-52911] : Last unsuccessfully upgrade nodes "
+                       "%s are not same with current upgrade nodes.",
+        'GAUSS_52912': "[GAUSS-52912] : All nodes have been upgraded, so "
+                       "cannot use --continue.",
+        'GAUSS_52913': "[GAUSS-52913] : All nodes have been upgraded. "
+                       "No need to use --continue.",
+        'GAUSS_52914': "[GAUSS-52914] : The record commitid is not same "
+                       "with current commitid.",
+        'GAUSS_52915': "[GAUSS-52915] : $GAUSSHOME is not a symbolic link.",
+        'GAUSS_52916': "[GAUSS-52916] : Current upgrade status is "
+                       "not pre commit.",
+        'GAUSS_52917': "[GAUSS-52917] : Failed to drop old pmk schema.",
+        'GAUSS_52918': "[GAUSS-52918] : Failed to record node upgrade step "
+                       "in table %s.%s.",
+        'GAUSS_52919': "[GAUSS-52919] : Upgrade has already been committed "
+                       "but not finished commit.",
+        'GAUSS_52920': "[GAUSS-52920] : Can not use grey upgrade option "
+                       "--continue before upgrade grey nodes.",
+        'GAUSS_52921': "[GAUSS-52921] : Failed to query disk usage "
+                       "with gs_check tool.",
+        'GAUSS_52922': "[GAUSS-52922] : Disk usage exceeds %s, "
+                       "please clean up before upgrading.",
+        'GAUSS_52923': "[GAUSS-52923] : .",
+        'GAUSS_52924': "[GAUSS-52924] : .",
+        'GAUSS_52925': "[GAUSS-52925] : Input upgrade type [%s] is not same "
+                       "with record upgrade type [%s].",
+        'GAUSS_52926': "[GAUSS-52926] : The step of upgrade should be digit.",
+        'GAUSS_52927': "[GAUSS-52927] : ",
+        'GAUSS_52928': "[GAUSS-52928] : .",
+        'GAUSS_52929': "[GAUSS-52929] : Failed to check application version. "
+                       "Output: \n%s.",
+        'GAUSS_52930': "[GAUSS-52930] : .",
+        'GAUSS_52931': "[GAUSS-52931] : .",
+        'GAUSS_52932': "[GAUSS-52932] : There is no CN in the remaining "
+                       "old nodes.",
+        'GAUSS_52933': "[GAUSS-52933] : There is not a majority of %s on the "
+                       "remaining old nodes.",
+        'GAUSS_52934': "[GAUSS-52934] : .",
+        'GAUSS_52935': "[GAUSS-52935] : Current upgrade version is not same "
+                       "with unfinished upgrade version record.",
+        'GAUSS_52936': "[GAUSS-52936] : Upgrade is not finished, "
+                       "cannot do another task.",
+        'GAUSS_52937': "[GAUSS-52937] : Clean install directory option is "
+                       "invalid, can only be 'new' or 'old'!",
+        'GAUSS_52938': "[GAUSS-52938] : Can not find %s.",
+        'GAUSS_52939': "[GAUSS-52939] : Can not get %s.",
+        'GAUSS_52940': "[GAUSS-52940] : Invalid node type:%s.",
+        'GAUSS_52941': "[GAUSS-52941] : Invalid node role:%s.",
+        'GAUSS_52942': "[GAUSS-52942] : No such key to check guc value.",
+        'GAUSS_52943': "[GAUSS-52943] : Invalid instance type:%s.",
+        'GAUSS_52944': "[GAUSS-52944] : Not all nodes are upgraded.",
+        'GAUSS_52945': "[GAUSS-52945] : It is generally not allowed to upgrade to a previous release, from %s to %s. "
+                       "If required, consider using the --bypass-stale-check option.",
+        'GAUSS_92946': "[GAUSS-52946] : Illegal cluster version."
+    }
+
+    ###########################################################################
+    # check
+    ###########################################################################
+    GAUSS_530 = {
+        'GAUSS_53000': "[GAUSS-53000] : The database user [%s] is not "
+                       "match with the old user [%s].",
+        'GAUSS_53001': "[GAUSS-53001] : The result of query table "
+                       "is incorrect: %s.",
+        'GAUSS_53002': "[GAUSS-53002] : Failed to obtain SSD device.",
+        'GAUSS_53003': "[GAUSS-53003] : The checked item does not meet "
+                       "the standards.",
+        'GAUSS_53004': "[GAUSS-53004] : Failed to collect statistics "
+                       "on all nodes.",
+        'GAUSS_53005': "[GAUSS-53005] : Unable to obtain SSD disk "
+                       "on current node.",
+        'GAUSS_53006': "[GAUSS-53006] : No database node instance uses data "
+                       "directory %s on %s.",
+        'GAUSS_53007': "[GAUSS-53007] : Failed to switch %s.",
+        'GAUSS_53008': "[GAUSS-53008] : The current node do not install SSD. "
+                       "Can not check SSD performance.",
+        'GAUSS_53009': "[GAUSS-53009] : Failed to format cu of directory: %s.",
+        'GAUSS_53010': "[GAUSS-53010] : The function name of %s is not exist "
+                       "in the %s.",
+        'GAUSS_53011': "[GAUSS-53011] : Failed to check %s.",
+        'GAUSS_53012': "[GAUSS-53012] : Failed to insert pmk data to "
+                       "database.",
+        'GAUSS_53013': "[GAUSS-53013] : %s can not be empty.",
+        'GAUSS_53014': "[GAUSS-53014] : %s must be a nonnegative integer.",
+        'GAUSS_53015': "[GAUSS-53015] : The threshold Threshold_NG[%d] "
+                       "must be greater than Threshold_Warning[%d].",
+        'GAUSS_53016': "[GAUSS-53016] : The threshold Threshold_NG[%d] and "
+                       "Threshold_Warning[%d] must be integer from 1 to 99.",
+        'GAUSS_53017': "[GAUSS-53017] : Unsupported operating system %s.",
+        'GAUSS_53018': "[GAUSS-53018] : Failed to get file handler "
+                       "of process %s by use cmd %s.",
+        'GAUSS_53019': "[GAUSS-53019] : Failed to delete variable '%s %s'"
+                       " from /etc/sysctl.conf.",
+        'GAUSS_53020': "[GAUSS-53020] : Failed to set %s.",
+        'GAUSS_53021': "[GAUSS-53021] : %s only can be supported"
+                       " on %s Platform.",
+        'GAUSS_53022': "[GAUSS-53022] : Platform %s%s is not supported.",
+        'GAUSS_53023': "[GAUSS-53023] : Failed to get CPUcores and MemSize."
+                       " Error: %s",
+        'GAUSS_53024': "[GAUSS-53024] : Failed to get ip string for"
+                       " config pg_hba.conf.",
+        'GAUSS_53025': "[GAUSS-53025] : content's type must be bytes.",
+        'GAUSS_53026': "[GAUSS-53026] : bytes's type must be in (bytes, str).",
+        'GAUSS_53027': "[GAUSS-53027] : content's len must >= (iv_len + 16).",
+        'GAUSS_53028': "[GAUSS-53028] : Test PMK schema failed. "
+                       "Output: \n%s",
+        'GAUSS_53029': "[GAUSS-53029] : Failed to install pmk schema,"
+                       "Error: \n%s",
+        'GAUSS_53030': "[GAUSS-53030] : The class must have %s",
+        'GAUSS_53031': "[GAUSS-53031] : The cluster is None.",
+        'GAUSS_53032': "[GAUSS-53032] : The speed limit must "
+                       "be a nonnegative integer.",
+        'GAUSS_53033': "[GAUSS-53033] : Invalid User : %s.",
+        'GAUSS_53034': "[GAUSS-53034] : In the resource pooling environment, do not run "
+                       "gs_install after gs_uninstall. please gs_preinstall first."
+    }
+
+    ###########################################################################
+    # check interface
+    ###########################################################################
+    GAUSS_531 = {
+        'GAUSS_53100': "[GAUSS-53100] : [%s] is not supported in single "
+                       "cluster.",
+        'GAUSS_53101': "[GAUSS-53101] : This interface is not supported "
+                       "in %s cluster.",
+        'GAUSS_53102': "[GAUSS-53102] : [%s] is not supported in "
+                       "express cluster.",
+        'GAUSS_53103': "[GAUSS-53103] : The single primary multi standby "
+                       "cluster does not support the product"
+                       " version '%s'.",
+        'GAUSS_53104': "[GAUSS-53104] : [%s] is not supported in "
+                       "single instance cluster."
+    }
+    ###########################################################################
     # Single Primary MultiStandby cluster
     ###########################################################################
     GAUSS_532 = {
@@ -685,6 +1056,202 @@ class ErrorCode():
         'GAUSS_53206': "[GAUSS-53206] : The value of %s must be greater "
                        "than 0 and less than 11. Please set it."
     }
+    ###########################################################################
+    # License
+    ###########################################################################
+    GAUSS_533 = {
+        'GAUSS_53300': "[GAUSS-53300] : The current product version '%s' "
+                       "does not support the license "
+                       "register/unregister operation.",
+        'GAUSS_53301': "[GAUSS-53301] : The license control files are not "
+                       "consistent on the cluster.",
+        'GAUSS_53302': "[GAUSS-53302] : The current cluster does not apply "
+                       "the license control, please upgrade it"
+                       " first.",
+        'GAUSS_53303': "[GAUSS-53303] : The DWS cluster does not support the "
+                       "license register/unregister operation.",
+        'GAUSS_53304': "[GAUSS-53304] : Can not register the enabled "
+                       "features.",
+        'GAUSS_53305': "[GAUSS-53304] : Can not un-register "
+                       "the disabled features.",
+        'GAUSS_53306': "[GAUSS-53306] : Can not register the unsupported "
+                       "features of the product version '%s'.",
+        'GAUSS_53307': "[GAUSS-53307] : No need to un-register the "
+                       "unsupported "
+                       "features of the product version '%s'."
+    }
+    ###########################################################################
+    # ROACH
+    # [GAUSS-53400] : Roach etcd operator failded
+    ###########################################################################
+    GAUSS_534 = {
+        'GAUSS_53400': "[GAUSS-53400] : Roach ETCD term operate failed.",
+        'GAUSS_53401': "[GAUSS-53401] : Roach delete/clean operate failed, "
+                       "Failed to clean %s",
+        'GAUSS_53402': "[GAUSS-53402] : Get %s cluster infomation/env "
+                       "failed, %s",
+        'GAUSS_53403': "[GAUSS-53403] : Cluster balance check failed",
+        'GAUSS_53404': "[GAUSS-53404] : backup key %s does not exist"
+    }
+    ##########################################################################
+    # gs_collector
+    # [GAUSS-53500] : gs_collector failed
+    ##########################################################################
+    GAUSS_535 = {
+        'GAUSS_53500': "[GAUSS-53500] : Relation %s does not exist.",
+        'GAUSS_53501': "[GAUSS-53501] : Connect to server failed, "
+                       "connection refused",
+        'GAUSS_53502': "[GAUSS-53502] : Please check database status",
+        'GAUSS_53503': "[GAUSS-53503] : There is no coordinator inst in "
+                       "this host",
+        'GAUSS_53504': "[GAUSS-53504] : There is no %s files: "
+                       "please check start-time and end-time.",
+        'GAUSS_53505': "[GAUSS-53505] : There is no log files: "
+                       "please check cluster info.",
+        'GAUSS_53506': "[GAUSS-53506] : Failed to mkdir.",
+        'GAUSS_53507': "[GAUSS-53507] : Failed to execute %s command.",
+        'GAUSS_53508': "[GAUSS-53508] : Core pattern is not core-e-p-t.",
+        'GAUSS_53509': "[GAUSS-53509] : There is no core files: "
+                       "please check core file name pattern.",
+        'GAUSS_53510': "[GAUSS-53510] : Please check db status or "
+                       "database name.",
+        'GAUSS_53511': "[GAUSS-53511] : There is no %s process.",
+        'GAUSS_53512': "[GAUSS-53512] : Gstack command not found.",
+        'GAUSS_53513': "[GAUSS-53513] : Schema '%s' is not in white list.",
+        'GAUSS_53514': "[GAUSS-53514] : Relation '%s' does not belong "
+                       "to '%s' schema.",
+        'GAUSS_53515': "[GAUSS-53515] : Database content '%s' is invalid, "
+                       "only support 'schema.relation'.",
+        'GAUSS_53516': "[GAUSS-53516] : There is no info should be collected ,"
+                                        "gs_collector is finished. "
+    }
+
+    GAUSS_536 = {
+        'GAUSS_53600': "[GAUSS-53600]: Can not start the database, "
+                       "the cmd is %s,  Error:\n%s.",
+        'GAUSS_53601': "[GAUSS-53601]: Can not start the primary database, "
+                       "Error:\n%s.",
+        'GAUSS_53602': "[GAUSS-53602]: Can not start the standby database, "
+                       "Error:\n%s.",
+        'GAUSS_53603': "[GAUSS-53603]: The dataDir can not be empty.",
+        'GAUSS_53604': "[GAUSS_53604]: The hostName %s has not %s process.",
+        'GAUSS_53605': "[GAUSS_53605]: The %s in hostName %s is running.",
+        'GAUSS_53606': "[GAUSS-53606]: Can not stop the database, "
+                       "the cmd is %s,  Error:\n%s.",
+        'GAUSS_53607': "[GAUSS-53607]: Fail to remove the file %s, "
+                       "Error:\n%s.",
+        'GAUSS_53608': "[GAUSS-53608]: Can not start the database, "
+                       "Error:\n%s.",
+        'GAUSS_53609': "[GAUSS-53609]: Can not stop the database, "
+                       "Error:\n%s.",
+        'GAUSS_53610': "[GAUSS-53610]: The input dataDir(%s) "
+                       "may be incorrect.",
+        'GAUSS_53611': "[GAUSS-53611]: Error information is :\n%s",
+        'GAUSS_53612': "[GAUSS-53612]: Can not find any catalog in database %s"
+    }
+    
+    ###########################################################################
+    # openssl error
+    ###########################################################################
+    GAUSS_537 = {
+        'GAUSS_53700': "[GAUSS-53700] : Failed to execute the command: %s.\n"
+                       "This is because the OpenSSL random number generator"
+                       "does not work properly. This may be due to a lack of"
+                       "sufficient entropy in the system, or an issue with "
+                       "the configuration of OpenSSL.\n"
+
+                        "The following are commonly used inspection items:\n"
+
+                        "1. Increase system entropy pool: If the system lacks"
+                        "sufficient entropy, the randomness of the entropy pool"
+                        "can be increased by increasing system activity. For "
+                        "example, several terminal windows can be opened and"
+                        "random operations can be performed, such as moving "
+                        "the mouse, keyboard input, etc.\n"
+
+                        "2. Check OpenSSL configuration: Ensure that the OpenSSL"
+                        "configuration is correct. You can check the OpenSSL "
+                        "configuration files and environment variables to ensure"
+                        "that they point to the correct path and file.\n"
+
+                        "3. Update OpenSSL version: If the OpenSSL version is "
+                        "older, there may be some known issues and bugs. Try"
+                        "updating to the latest stable version.\n"
+
+                        "4. Check file permissions: Ensure that the directory"
+                        "and file where the certificate is being generated"
+                        "have sufficient permissions so that OpenSSL can generate"
+                        "the certificate.\n"
+
+                        "5. Use other random number generators: If the above methods"
+                        "do not solve the problem, you can try to use other random"
+                        "number generators instead of the default OpenSSL random "
+                        "number generators.\n"
+    }
+
+    ##########################################################################
+    # gs_expansion
+    # [GAUSS-537] : gs_expansion failed
+    ##########################################################################
+    GAUSS_357 = {
+        "GAUSS_35700": "[GAUSS-35700] Expansion standby node failed.",
+        "GAUSS_35701": "[GAUSS-35701] Empty parameter. The %s parameter is" 
+                       "missing in the command.",
+        "GAUSS_35702": "[GAUSS-35702] Unrecognized parameter, standby host "
+                       "backip %s is not in the "
+                       "XML configuration file",
+        "GAUSS_35703": "[GAUSS-35703] Check standby database Failed. The "
+                       "database on node is abnormal. \n"
+                       "node [%s], user [%s], dataNode [%s]. \n"
+                       "You can use command \"gs_ctl query -D %s\" for more "
+                       "detail.",
+        "GAUSS_35704": "[GAUSS-35704] %s [%s] does not exist on node [%s].",
+        "GAUSS_35705": "[GAUSS-35705] Error, the database version is "
+                       "inconsistent in %s: %s",
+        "GAUSS_35706": "[GAUSS-35706] Fail to %s on all new hosts.",
+        "GAUSS_35707": "[GAUSS-35707] Fail to check %s version on:\n%s",
+        "GAUSS_35708": "[GAUSS-35708] Inconsistent %s version with primary on \n%s",
+        "GAUSS_35709": "[GAUSS-35709] The %s of %s is not %s.",
+        "GAUSS_35710": "[GAUSS-35710] Generate static file [%s] not found.",
+        "GAUSS_35711": "[GAUSS-35711] %s in xml is not consistent with that in cluster.",
+        "GAUSS_35712": "[GAUSS-35712] User [%s] is not in the group [%s].",
+        "GAUSS_35713": "[GAUSS-35713] The number of parameter hostname is %s, the number of parameter hostip is %s,"
+                       "The values of these two parameters are different."
+    }
+
+    ##########################################################################
+    # gs_dropnode
+    # [GAUSS-358] : gs_dropnode failed
+    ##########################################################################
+    GAUSS_358 = {
+        "GAUSS_35800": "[GAUSS-35800] Expansion standby node failed.",
+        "GAUSS_35801": "[GAUSS-35801] Empty parameter. The %s parameter is "
+                       "missing in the command.",
+        "GAUSS_35802": "[GAUSS-35802] The IP list of target node: %s"
+                       "is not in the current cluster. Please check!",
+        "GAUSS_35803": "[GAUSS-35803] The IP of local host %s is in the "
+                       "target node list. \n"
+                       "Can not drop local host!\n",
+        "GAUSS_35804": "[GAUSS-35804] The dropnode operation can only be executed"
+                       " at the primary node. \n ",
+        "GAUSS_35805": "[GAUSS-35805] Input %s. Operation aborted. ",
+        "GAUSS_35806": "[GAUSS-35806] Current status of cluster is %s .\n"
+                       "It doesn't meet the requirement! ",
+        "GAUSS_35807": "[GAUSS-35807] The host %s which still exist in the "
+                       "cluster can't be connected.\n"
+                       "It doesn't meet the requirement!\nPlease add it to the "
+                       "list of hosts to be dropped if it is a target host.",
+        "GAUSS_35808": "[GAUSS-35808] The %s is running switchover/failover!\n"
+                       "The dropnode operation can only be executed when there is"
+                       " no such operation!",
+        "GAUSS_35809": "[GAUSS-35809] Some important steps failed to execute. "
+                       "Please refer to log for detail!",
+        "GAUSS_35810": "[GAUSS-35810] A same process is already running! ",
+        "GAUSS_35811": "[GAUSS-35811] In a cluster with the CM component, "
+                       "the number of nodes must be greater than two to "
+                       "perform the drop node operation. "
+    }
+
 
 class OmError(BaseException):
     """
