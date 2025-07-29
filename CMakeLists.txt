@@ -22,7 +22,7 @@ else ()
     message(STATUS "unknown CMAKE_BUILD_TYPE = " ${CMAKE_BUILD_TYPE})
 endif ()
 
-set(COMPONENT "GaussDB Kernel")
+set(COMPONENT "oGRecorder Kernel")
 
 option(OPENGAUSS_FLAG OFF)
 if (OPENGAUSS_FLAG)

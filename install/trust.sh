@@ -1,7 +1,7 @@
 #!/bin/bash
 # 全集群SSH互信自动化配置脚本
 # 功能：在单节点执行后，自动配置所有节点间的双向无密码登录
-# 使用方法：./cluster_ssh_trust.sh <节点列表文件>
+# 使用方法：./trust.sh <节点列表文件>
 
 set -eo pipefail
 
@@ -32,7 +32,7 @@ ADMIN_NODE=$(hostname)
 # 检查依赖项
 check_dependencies() {
     local missing=()
-    for cmd in ssh ssh-keygen ssh-keyscan rsync; do
+    for cmd in ssh ssh-keygen ssh-keyscan; do
         if ! command -v $cmd &> /dev/null; then
             missing+=("$cmd")
         fi
