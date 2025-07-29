@@ -202,10 +202,12 @@ if [ "$pkg_flag"x == "ON"x ]; then
     mkdir -p $tmp_dir/bin
     mkdir -p $tmp_dir/lib
     mkdir -p $tmp_dir/include
+    mkdir -p $tmp_dir/install
 
     cp -r output/bin/wr* $tmp_dir/bin/
     cp -r output/lib/libwr* $tmp_dir/lib/
     cp -r src/interface/*.h $tmp_dir/include/
+    cp -r install/* $tmp_dir/install/
 
     tar -czvf $pkg_name -C $tmp_dir .
     rm -rf $tmp_dir
