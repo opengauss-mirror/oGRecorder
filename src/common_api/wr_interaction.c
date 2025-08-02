@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -36,7 +36,7 @@ void wr_cli_get_err(wr_packet_t *pack, int32_t *errcode, char **errmsg)
     (void)wr_get_int32(pack, errcode);
     (void)wr_get_str(pack, errmsg);
     if (*errcode == ERR_WR_MES_ILL) {
-        LOG_RUN_ERR("[WR API] ABORT INFO : server broadcast failed, errcode:%d, errmsg:%s.", *errcode, *errmsg);
+        LOG_RUN_ERR("[GR API] ABORT INFO : server broadcast failed, errcode:%d, errmsg:%s.", *errcode, *errmsg);
         cm_fync_logfile();
         wr_exit_error();
     }

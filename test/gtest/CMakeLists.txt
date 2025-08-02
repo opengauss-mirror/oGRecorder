@@ -31,12 +31,12 @@ add_executable(test_appendwrite test_appendwrite.cc)
 add_executable(test_insthandle test_insthandle.cc)
 
 # 链接 Google Test 库和项目库
-target_link_libraries(test_wr_api ${GTEST_LIBRARIES} pthread wrapi)
-target_link_libraries(test_performance ${GTEST_LIBRARIES} pthread wrapi)
-target_link_libraries(test_rw ${GTEST_LIBRARIES} pthread wrapi)
-target_link_libraries(test_mutliwrite ${GTEST_LIBRARIES} pthread wrapi)
-target_link_libraries(test_appendwrite ${GTEST_LIBRARIES} pthread wrapi)
-target_link_libraries(test_insthandle ${GTEST_LIBRARIES} pthread wrapi)
+target_link_libraries(test_wr_api ${GTEST_LIBRARIES} pthread grapi)
+target_link_libraries(test_performance ${GTEST_LIBRARIES} pthread grapi)
+target_link_libraries(test_rw ${GTEST_LIBRARIES} pthread grapi)
+target_link_libraries(test_mutliwrite ${GTEST_LIBRARIES} pthread grapi)
+target_link_libraries(test_appendwrite ${GTEST_LIBRARIES} pthread grapi)
+target_link_libraries(test_insthandle ${GTEST_LIBRARIES} pthread grapi)
 
 # 启用测试
 enable_testing()

@@ -1,7 +1,7 @@
 ﻿/*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -13,11 +13,11 @@
  * See the Mulan PSL v2 for more details.
  * -------------------------------------------------------------------------
  *
- * wrserver.c
+ * grserver.c
  *
  *
  * IDENTIFICATION
- *    src/service/wrserver.c
+ *    src/service/grserver.c
  *
  * -------------------------------------------------------------------------
  */
@@ -238,8 +238,8 @@ status_t wr_srv_parse_agrs(int argc, char **argv, wr_srv_args_t *wr_args)
 static void wr_srv_usage()
 {
     (void)printf("Usage:\n"
-                 "       wrserver [-h]\n"
-                 "       wrserver [-D wr_home_path]\n"
+                 "       grserver [-h]\n"
+                 "       grserver [-D wr_home_path]\n"
                  "Option:\n"
                  "\t -M                 WR_MAINTAIN mode.\n"
                  "\t -h                 show the help information.\n"
@@ -251,7 +251,7 @@ int main(int argc, char **argv)
 #ifndef WIN32
     // check root
     if (geteuid() == 0 || getuid() != geteuid()) {
-        (void)printf("The root user is not permitted to execute the wrserver "
+        (void)printf("The root user is not permitted to execute the grserver "
                      "and the real uids must be the same as the effective uids.\n");
         (void)fflush(stdout);
         return CM_ERROR;
@@ -284,20 +284,20 @@ int main(int argc, char **argv)
         wr_exit_error();
     }
     if (wr_init_background_tasks() != CM_SUCCESS) {
-        (void)printf("WR SERVER END.\n");
+        (void)printf("GR SERVER END.\n");
         fflush(stdout);
         wr_clean_server();
         LOG_RUN_ERR("wr failed to startup.");
-        LOG_RUN_INF("WR SERVER STARTED.\n");
+        LOG_RUN_INF("GR SERVER STARTED.\n");
         wr_exit_error();
     }
-    (void)printf("WR SERVER STARTED.\n");
-    LOG_RUN_INF("WR SERVER STARTED.\n");
+    (void)printf("GR SERVER STARTED.\n");
+    LOG_RUN_INF("GR SERVER STARTED.\n");
     log_param_t *log_param = cm_log_param_instance();
     log_param->log_instance_starting = CM_FALSE;
     handle_main_wait();
-    (void)printf("WR SERVER END.\n");
-    LOG_RUN_INF("WR SERVER END.\n");
+    (void)printf("GR SERVER END.\n");
+    LOG_RUN_INF("GR SERVER END.\n");
     return 0;
 }
 

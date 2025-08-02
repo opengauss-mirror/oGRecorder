@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -625,7 +625,7 @@ static status_t wr_init_shm(wr_env_t *wr_env, char *home)
 {
     status_t status = wr_set_cfg_dir(home, &wr_env->inst_cfg);
     if (status != CM_SUCCESS) {
-        return wr_init_err_proc(wr_env, CM_FALSE, CM_FALSE, "Environment variant WR_HOME not found", status);
+        return wr_init_err_proc(wr_env, CM_FALSE, CM_FALSE, "Environment variant GR_HOME not found", status);
     }
 
     status = wr_load_config(&wr_env->inst_cfg);
@@ -704,7 +704,7 @@ status_t wr_init_client(uint32_t max_open_files, char *home)
 
     status_t status = cm_create_thread(wr_heartbeat_entry, SIZE_K(512), NULL, &wr_env->thread_heartbeat);
     if (status != CM_SUCCESS) {
-        return wr_init_err_proc(wr_env, CM_TRUE, CM_TRUE, "WR failed to create heartbeat thread", status);
+        return wr_init_err_proc(wr_env, CM_TRUE, CM_TRUE, "GR failed to create heartbeat thread", status);
     }
 
 #ifdef ENABLE_WRTEST

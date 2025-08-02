@@ -34,20 +34,20 @@ set(COMMON_ALL_SRC
         ${CMD_SRC}
         )
 
-ADD_EXECUTABLE(wrcmd ${COMMON_ALL_SRC})
+ADD_EXECUTABLE(grcmd ${COMMON_ALL_SRC})
 
 if (ENABLE_FUZZASAN)
-    target_link_libraries(wrcmd wrapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} ${fuzz_lib} -Wl,--no-whole-archive)
+    target_link_libraries(grcmd grapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} ${fuzz_lib} -Wl,--no-whole-archive)
 else()
-    target_link_libraries(wrcmd wrapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} -Wl,--no-whole-archive)
+    target_link_libraries(grcmd grapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} -Wl,--no-whole-archive)
 endif(ENABLE_FUZZASAN)
 
 if (ENABLE_WRTEST)
     add_library(wrcmd_test SHARED ${COMMON_ALL_SRC})
     if (ENABLE_FUZZASAN)
-        target_link_libraries(wrcmd_test wrapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} ${fuzz_lib} -Wl,--no-whole-archive)
+        target_link_libraries(grcmd_test grapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} ${fuzz_lib} -Wl,--no-whole-archive)
     else()
-        target_link_libraries(wrcmd_test wrapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} -Wl,--no-whole-archive)
+        target_link_libraries(grcmd_test grapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} -Wl,--no-whole-archive)
     endif(ENABLE_FUZZASAN)
 endif(ENABLE_WRTEST)
 

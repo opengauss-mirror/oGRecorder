@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -133,7 +133,7 @@ static inline void wr_print_detail_error()
 
 /*
  * warning id is composed of source + module + object + code
- * source -- DN(10)/CM(11)/OM(12)/DM(20)/WR(30)
+ * source -- DN(10)/CM(11)/OM(12)/DM(20)/GR(30)
  * module -- File(01)/Transaction(02)/HA(03)/Log(04)/Buffer(05)/Space(06)/Server(07)
  * object -- Host Resource(01)/Run Environment(02)/Cluster Status(03)/
  *           Instance Status(04)/Database Status(05)/Database Object(06)

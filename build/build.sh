@@ -190,26 +190,44 @@ fi
 mkdir -p $binarylib_dir/kernel/component/${OUT_PACKAGE}/bin
 mkdir -p $binarylib_dir/kernel/component/${OUT_PACKAGE}/lib
 mkdir -p $binarylib_dir/kernel/component/${OUT_PACKAGE}/include
-cp -r output/lib/libwr* $binarylib_dir/kernel/component/${OUT_PACKAGE}/lib
-cp -r output/bin/wr* $binarylib_dir/kernel/component/${OUT_PACKAGE}/bin
+cp -r output/lib/libgr* $binarylib_dir/kernel/component/${OUT_PACKAGE}/lib
+cp -r output/bin/gr* $binarylib_dir/kernel/component/${OUT_PACKAGE}/bin
 cp -r src/interface/*.h $binarylib_dir/kernel/component/${OUT_PACKAGE}/include
-echo "build WR SUCCESS"
+echo "build GR SUCCESS"
+
+os_name=$(source /etc/os-release && echo ${NAME} | tr ' ' '_')
+os_version=$(source /etc/os-release && echo ${VERSION_ID})
+arch=$(uname -m)
+wr_version="7.0.0-RC2"
+pkg_name="openGauss-oGRecorder-${wr_version}-${os_name}${os_version}-${arch}.tar.gz"
 
 if [ "$pkg_flag"x == "ON"x ]; then
-    pkg_name="wr_package.tar.gz"
     tmp_dir="wr_package_tmp"
     rm -rf $tmp_dir
-    mkdir -p $tmp_dir/bin
-    mkdir -p $tmp_dir/lib
-    mkdir -p $tmp_dir/include
-    mkdir -p $tmp_dir/install
 
-    cp -r output/bin/wr* $tmp_dir/bin/
-    cp -r output/lib/libwr* $tmp_dir/lib/
-    cp -r src/interface/*.h $tmp_dir/include/
-    cp -r install/* $tmp_dir/install/
+    # server 目录
+    mkdir -p $tmp_dir/oGRecorder-Server/bin
+    mkdir -p $tmp_dir/oGRecorder-Server/lib
+    mkdir -p $tmp_dir/oGRecorder-Server/install
 
-    tar -czvf $pkg_name -C $tmp_dir .
+    cp -r output/bin/gr* $tmp_dir/oGRecorder-Server/bin/
+    cp -r output/lib/libgr* $tmp_dir/oGRecorder-Server/lib/
+    cp -r install/* $tmp_dir/oGRecorder-Server/install/
+
+    # sdk 目录
+    mkdir -p $tmp_dir/oGRecorder-SDK/include
+    mkdir -p $tmp_dir/oGRecorder-SDK/lib
+
+    cp -r src/interface/*.h $tmp_dir/oGRecorder-SDK/include/
+    cp -r output/lib/libgr* $tmp_dir/oGRecorder-SDK/lib/
+
+    # 分别压缩 server 和 sdk（只打包内容，不带顶层目录）
+    tar -czvf $tmp_dir/oGRecorder-Server.tar.gz -C $tmp_dir/oGRecorder-Server . 
+    tar -czvf $tmp_dir/oGRecorder-SDK.tar.gz -C $tmp_dir/oGRecorder-SDK .
+
+    # 再打成总包
+    tar -czvf $pkg_name -C $tmp_dir oGRecorder-Server.tar.gz oGRecorder-SDK.tar.gz
+
     rm -rf $tmp_dir
     echo "Package created: $pkg_name"
 fi

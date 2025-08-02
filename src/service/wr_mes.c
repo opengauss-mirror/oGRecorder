@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -406,7 +406,7 @@ static status_t wr_broadcast_msg_with_try(wr_message_head_t *wr_head, wr_recv_ms
     } while (i < WR_BROADCAST_MSG_TRY_MAX);
     cm_reset_error();
     WR_THROW_ERROR(ERR_WR_MES_ILL, "Failed to broadcast msg with try.");
-    LOG_RUN_ERR("[WR] THROW UP ERROR WHEN BROADCAST FAILED, errcode:%d", cm_get_error_code());
+    LOG_RUN_ERR("[GR] THROW UP ERROR WHEN BROADCAST FAILED, errcode:%d", cm_get_error_code());
     return CM_ERROR;
 }
 
@@ -419,7 +419,7 @@ static bool32 wr_check_srv_status(mes_msg_t *msg)
 {
     wr_message_head_t *wr_head = (wr_message_head_t *)(msg->buffer);
     if (g_wr_instance.status != WR_STATUS_OPEN && wr_head->wr_cmd != WR_CMD_ACK_JOIN_CLUSTER) {
-        LOG_DEBUG_INF("[MES] Could not exec remote req for the wrserver is not open or msg not join cluster, src "
+        LOG_DEBUG_INF("[MES] Could not exec remote req for the grserver is not open or msg not join cluster, src "
                       "node:%u, wait try again.",
             (uint32_t)(wr_head->src_inst));
         return CM_FALSE;
@@ -595,7 +595,7 @@ static status_t wr_set_mes_message_pool(unsigned long long recv_msg_buf_size, me
     mes_msg_pool_minimum_info_t minimum_info ={0};
     ret = mes_get_message_pool_minimum_info(profile, CM_FALSE, &minimum_info);
     if (ret != CM_SUCCESS) {
-        LOG_RUN_ERR("[WR] set mes message pool, get message pool minimum info failed");
+        LOG_RUN_ERR("[GR] set mes message pool, get message pool minimum info failed");
         return ret;
     }
     // want fourth buf_pool smallest
@@ -796,7 +796,7 @@ status_t wr_notify_expect_bool_ack(wr_vg_info_item_t *vg_item, wr_bcast_req_cmd_
         }
     } while (CM_TRUE);
     if (ret != CM_SUCCESS) {
-        LOG_RUN_ERR("[WR]: Failed to notify other wr instance, cmd: %u, file: %llu, vg: %s, errcode:%d, "
+        LOG_RUN_ERR("[GR]: Failed to notify other wr instance, cmd: %u, file: %llu, vg: %s, errcode:%d, "
                     "OS errno:%d, OS errmsg:%s.",
             cmd, ftid, vg_item->vg_name, cm_get_error_code(), errno, strerror(errno));
         return CM_ERROR;
@@ -848,7 +848,7 @@ status_t wr_notify_data_expect_bool_ack(
         }
     } while (CM_TRUE);
     if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("[WR] Failed to notify other wr instance, cmd: %u, vg%s, errcode:%d, "
+        LOG_RUN_ERR("[GR] Failed to notify other wr instance, cmd: %u, vg%s, errcode:%d, "
                     "OS errno:%d, OS errmsg:%s.",
             cmd, vg_item->vg_name, cm_get_error_code(), errno, strerror(errno));
         return CM_ERROR;

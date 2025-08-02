@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -64,7 +64,7 @@
 
 #pragma pack(8)
 
-// GFT mean WR File Table
+// GFT mean GR File Table
 typedef enum en_zft_item_type {
     GFT_PATH,  // path
     GFT_FILE,

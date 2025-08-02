@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -147,9 +147,9 @@ static config_item_t g_wr_params[] = {
         NULL, 40, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 };
 
-static const char *g_wr_config_file = (const char *)"wr_inst.ini";
-static const char *g_wr_ser_config_file = (const char *)"wr_ser_inst.ini";
-static const char *g_wr_cli_config_file = (const char *)"wr_cli_inst.ini";
+static const char *g_wr_config_file = (const char *)"gr_inst.ini";
+static const char *g_wr_ser_config_file = (const char *)"gr_ser_inst.ini";
+static const char *g_wr_cli_config_file = (const char *)"gr_cli_inst.ini";
 #define WR_PARAM_COUNT (sizeof(g_wr_params) / sizeof(config_item_t))
 #define WR_CERT_PARAM_COUNT (sizeof(g_wr_ssl_params) / sizeof(config_item_t))
 
@@ -323,33 +323,33 @@ int32_t wr_decrypt_pwd_cb(const char *cipher_text, uint32_t cipher_len, char *pl
 {
     if (cipher_text == NULL) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: cipher is NULL"));
+            LOG_RUN_ERR("[GR] failed to decrypt SSL cipher: cipher is NULL"));
     }
     if (cipher_len == 0 || cipher_len >= WR_PARAM_BUFFER_SIZE) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: cipher size [%u] is invalid.", cipher_len));
+            LOG_RUN_ERR("[GR] failed to decrypt SSL cipher: cipher size [%u] is invalid.", cipher_len));
     }
     if (plain_text == NULL) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: plain is NULL"));
+            LOG_RUN_ERR("[GR] failed to decrypt SSL cipher: plain is NULL"));
     }
     if (plain_len < CM_PASSWD_MAX_LEN) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_RUN_ERR("[WR] failed to decrypt SSL cipher: plain len [%u] is invalid.", plain_len));
+            LOG_RUN_ERR("[GR] failed to decrypt SSL cipher: plain len [%u] is invalid.", plain_len));
     }
     cipher_t cipher;
     if (cm_base64_decode(cipher_text, cipher_len, (uchar *)&cipher, (uint32_t)(sizeof(cipher_t) + 1)) == 0) {
         WR_RETURN_IFERR3(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT"),
-            LOG_RUN_ERR("[WR] failed to decode SSL cipher."));
+            LOG_RUN_ERR("[GR] failed to decode SSL cipher."));
     }
     if (cipher.cipher_len > 0) {
         status_t status = wr_load_random_file(cipher.rand, (int32_t)sizeof(cipher.rand));
-        WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_VALUE_ERROR, "[WR] load random component failed."));
+        WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_VALUE_ERROR, "[GR] load random component failed."));
         status = cm_decrypt_pwd(&cipher, (uchar *)plain_text, &plain_len);
-        WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_VALUE_ERROR, "[WR] failed to decrypt ssl pwd."));
+        WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_VALUE_ERROR, "[GR] failed to decrypt ssl pwd."));
     } else {
         CM_THROW_ERROR(ERR_INVALID_PARAM, "SSL_PWD_CIPHERTEXT");
-        LOG_RUN_ERR("[WR] failed to decrypt ssl pwd for the cipher len is invalid.");
+        LOG_RUN_ERR("[GR] failed to decrypt ssl pwd for the cipher len is invalid.");
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -675,7 +675,7 @@ status_t wr_load_config(wr_config_t *inst_cfg)
     status_t status = cm_load_config(g_wr_params, WR_PARAM_COUNT, file_name, &inst_cfg->config, CM_FALSE);
     WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_INVALID_PARAM, "failed to load config"));
     if (wr_is_server()) {
-        status = wr_init_loggers(inst_cfg, wr_get_instance_log_def(), wr_get_instance_log_def_count(), "wrserver");
+        status = wr_init_loggers(inst_cfg, wr_get_instance_log_def(), wr_get_instance_log_def_count(), "grserver");
         WR_RETURN_IFERR2(status, (void)printf("%s\nWR init loggers failed!\n", cm_get_errormsg(cm_get_error_code())));
         log_param_t *log_param = cm_log_param_instance();
         log_param->log_instance_starting = CM_TRUE;

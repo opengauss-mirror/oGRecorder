@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -54,8 +54,8 @@ const char *g_wr_error_desc[WR_ERROR_COUNT] = {
     [ERR_WR_VOLUME_REMOVE_SUPER_BLOCK] = "Remove super block %s failed",
     [ERR_WR_VOLUME_REPLACE] = "Failed to replace volume %s, reason %s.",
     [ERR_WR_FILE_SEEK] = "Failed to seek file, vgid:%u, fid:%llu, offset:%lld, file size:%llu",
-    [ERR_WR_FILE_REMOVE_OPENING] = "WR file is open",
-    [ERR_WR_FILE_REMOVE_SYSTEM] = "WR file %s is system file",
+    [ERR_WR_FILE_REMOVE_OPENING] = "GR file is open",
+    [ERR_WR_FILE_REMOVE_SYSTEM] = "GR file %s is system file",
     [ERR_WR_FILE_RENAME] = "Rename failed, reason %s",
     [ERR_WR_FILE_RENAME_DIFF_VG] = "Failed to rename from vg %s to another vg %s, function not supported",
     [ERR_WR_FILE_RENAME_EXIST] = "Rename failed, reason %s",
@@ -76,33 +76,33 @@ const char *g_wr_error_desc[WR_ERROR_COUNT] = {
     [ERR_WR_CONFIG_FILE_OVERSIZED] = "The size of config file %s is too large",
     [ERR_WR_CONFIG_LOAD] = "Please check wr_vg_conf.ini, reason %s",
     [ERR_WR_CONFIG_LINE_OVERLONG] = "The length of row %d is too long",
-    [ERR_WR_REDO_ILL] = "WR redo log error, reason %s",
+    [ERR_WR_REDO_ILL] = "GR redo log error, reason %s",
     [ERR_WR_OAMAP_INSERT] = "Failed to insert hash map ",
     [ERR_WR_OAMAP_INSERT_DUP_KEY] = "Hash map duplicated key",
     [ERR_WR_OAMAP_FETCH] = "Failed to fetch hash map",
-    [ERR_WR_SKLIST_ERR] = "Error WR skip list.",
-    [ERR_WR_SKLIST_NOT_INIT] = "Error WR skip list not init.",
-    [ERR_WR_SKLIST_NOT_EXIST] = "Error WR skip list not exist.",
-    [ERR_WR_SKLIST_EXIST] = "Error WR skip list key value exist.",
+    [ERR_WR_SKLIST_ERR] = "Error GR skip list.",
+    [ERR_WR_SKLIST_NOT_INIT] = "Error GR skip list not init.",
+    [ERR_WR_SKLIST_NOT_EXIST] = "Error GR skip list not exist.",
+    [ERR_WR_SKLIST_EXIST] = "Error GR skip list key value exist.",
     [ERR_WR_SHM_CREATE] = "Failed to create shared memory, key=0x%08x, size=%llu",
     [ERR_WR_SHM_CHECK] = "Failed to check shared memory ctrl, key=0x%08x, reason=%s",
     [ERR_WR_SHM_LOCK] = "Failed to lock vg shared memory, reason=%s",
     [ERR_WR_SHM_LOCK_TIMEOUT] = "Try to get shm lock timeout",
-    [ERR_WR_GA_INIT] = "WR ga init error, reason %s",
-    [ERR_WR_GA_GET_ADDR] = "WR ga get addr error, pool id %d, object id%u.",
-    [ERR_WR_GA_ALLOC_OBJECT] = "WR ga alloc object error, pool id %d.",
+    [ERR_WR_GA_INIT] = "GR ga init error, reason %s",
+    [ERR_WR_GA_GET_ADDR] = "GR ga get addr error, pool id %d, object id%u.",
+    [ERR_WR_GA_ALLOC_OBJECT] = "GR ga alloc object error, pool id %d.",
     [ERR_WR_SESSION_INVALID_ID] = "Invalid session %d",
-    [ERR_WR_SESSION_CREATE] = "Create new WR session failed, no free sessions, %d sessions used.",
-    [ERR_WR_SESSION_EXTEND] = "Extend WR session failed, reason : %s.",
-    [ERR_WR_INVALID_PARAM] = "Invalid WR parameter: %s",
-    [ERR_WR_NO_SPACE] = "WR no space in the vg",
-    [ERR_WR_ENV_NOT_INITIALIZED] = "The WR env has not been initialized.",
-    [ERR_WR_CLI_EXEC_FAIL] = "WR client exec cmd '%s' failed, reason %s.",
-    [ERR_WR_FNODE_CHECK] = "WR fnode error, reason %s",
-    [ERR_WR_LOCK_TIMEOUT] = "WR lock timeout",
-    [ERR_WR_SERVER_IS_DOWN] = "WR server is down",
-    [ERR_WR_CHECK_SIZE] = "Failed to specify size %d which is not  aligned with WR allocate-unit size %d",
-    [ERR_WR_MES_ILL] = "WR message contact error, reason %s",
+    [ERR_WR_SESSION_CREATE] = "Create new GR session failed, no free sessions, %d sessions used.",
+    [ERR_WR_SESSION_EXTEND] = "Extend GR session failed, reason : %s.",
+    [ERR_WR_INVALID_PARAM] = "Invalid GR parameter: %s",
+    [ERR_WR_NO_SPACE] = "GR no space in the vg",
+    [ERR_WR_ENV_NOT_INITIALIZED] = "The GR env has not been initialized.",
+    [ERR_WR_CLI_EXEC_FAIL] = "GR client exec cmd '%s' failed, reason %s.",
+    [ERR_WR_FNODE_CHECK] = "GR fnode error, reason %s",
+    [ERR_WR_LOCK_TIMEOUT] = "GR lock timeout",
+    [ERR_WR_SERVER_IS_DOWN] = "GR server is down",
+    [ERR_WR_CHECK_SIZE] = "Failed to specify size %d which is not  aligned with GR allocate-unit size %d",
+    [ERR_WR_MES_ILL] = "GR message contact error, reason %s",
     [ERR_WR_STRING_TOO_LONG] = "The length(%u) of text can't be larger than %u, text = %s",
     [ERR_WR_TCP_TIMEOUT_REMAIN] = "Waiting for request head(size) timeout, %d bytes remained",
     [ERR_WR_UDS_INVALID_URL] = "Invalid unix domain socket url:%s, length %d. \
@@ -116,32 +116,32 @@ const char *g_wr_error_desc[WR_ERROR_COUNT] = {
     [ERR_WR_VERSION_NOT_MATCH] =
         "[CHECK_PROTO]Protocol version need be changed, old protocol version is %u, new protocol version is %u.",
     [ERR_WR_INVALID_BLOCK_TYPE] = "Get Invalid block type, expect type is %u, but the type in share memory is %u.",
-    [ERR_WR_SERVER_REBOOT] = "WR server has reboot or close, wr client need reboot or close.",
+    [ERR_WR_SERVER_REBOOT] = "GR server has reboot or close, wr client need reboot or close.",
     [ERR_WR_UNSUPPORTED_CMD] =
-        "Command \"%s\" is not supported in current version(%u) of wrserver, least supporting version is %u.",
+        "Command \"%s\" is not supported in current version(%u) of grserver, least supporting version is %u.",
     [ERR_WR_VOLUME_FENCE_CHECK_COND] = "Fail to check fence cond:%s.",
     [ERR_WR_MASTER_CHANGE] = "Master id has changed.",
     [ERR_WR_RECOVER_CAUSE_BREAK] = "Req break by recovery.",
     [ERR_WR_FILE_SYSTEM_ERROR] = "File system error, reason %m.",
-    [ERR_WR_CONNECTION_CLOSED] = "WR connection is closed",
+    [ERR_WR_CONNECTION_CLOSED] = "GR connection is closed",
     [ERR_WR_MEM_CMP_FAILED] = "failed to memcpy compare",
-    [ERR_WR_READONLY] = "WR is in read-only mode, operation not allowed, cannot %s."
+    [ERR_WR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s."
 };
 
 wr_log_def_t g_wr_cmd_log[] = {
-    {CM_LOG_DEBUG, "debug/wrcmd.dlog"},
-    {CM_LOG_OPER, "oper/wrcmd.olog"},
-    {CM_LOG_RUN, "run/wrcmd.rlog"},
+    {CM_LOG_DEBUG, "debug/grcmd.dlog"},
+    {CM_LOG_OPER, "oper/grcmd.olog"},
+    {CM_LOG_RUN, "run/grcmd.rlog"},
     {CM_LOG_ALARM, "wrcmd_alarm.log"},
 };
 
 wr_log_def_t g_wr_instance_log[] = {
-    {CM_LOG_DEBUG, "debug/wrinstance.dlog"},
-    {CM_LOG_OPER, "oper/wrinstance.olog"},
-    {CM_LOG_RUN, "run/wrinstance.rlog"},
-    {CM_LOG_ALARM, "wrinstance_alarm.log"},
-    {CM_LOG_AUDIT, "audit/wrinstance.aud"},
-    {CM_LOG_BLACKBOX, "blackbox/wrinstance.blog"},
+    {CM_LOG_DEBUG, "debug/grinstance.dlog"},
+    {CM_LOG_OPER, "oper/grinstance.olog"},
+    {CM_LOG_RUN, "run/grinstance.rlog"},
+    {CM_LOG_ALARM, "grinstance_alarm.log"},
+    {CM_LOG_AUDIT, "audit/grinstance.aud"},
+    {CM_LOG_BLACKBOX, "blackbox/grinstance.blog"},
 };
 
 uint32_t g_wr_warn_id[] = {
@@ -424,7 +424,7 @@ static void sql_audit_init_assist(
         cm_get_error(&assist->code, &err_msg);
     }
     PRTS_RETVOID_IFERR(
-        snprintf_s(assist->return_code_buf, CM_MAX_NUMBER_LEN, CM_MAX_NUMBER_LEN - 1, "WR-%05d", assist->code));
+        snprintf_s(assist->return_code_buf, CM_MAX_NUMBER_LEN, CM_MAX_NUMBER_LEN - 1, "GR-%05d", assist->code));
     assist->return_code.len = (uint32_t)strlen(assist->return_code_buf);
     assist->return_code.str[assist->return_code.len] = '\0';
 }

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -605,23 +605,23 @@ static int32_t init_single_logger_core(log_param_t *log_param, log_type_t log_id
     switch (log_id) {
         case CM_LOG_RUN:
             ret = snprintf_s(
-                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/WR/run/%s", log_param->log_home, "wr.rlog");
+                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/GR/run/%s", log_param->log_home, "wr.rlog");
             break;
         case CM_LOG_DEBUG:
             ret = snprintf_s(
-                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/WR/debug/%s", log_param->log_home, "wr.dlog");
+                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/GR/debug/%s", log_param->log_home, "wr.dlog");
             break;
         case CM_LOG_ALARM:
             ret = snprintf_s(
-                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/WR/alarm/%s", log_param->log_home, "wr.alog");
+                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/GR/alarm/%s", log_param->log_home, "wr.alog");
             break;
         case CM_LOG_AUDIT:
             ret = snprintf_s(
-                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/WR/audit/%s", log_param->log_home, "wr.aud");
+                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/GR/audit/%s", log_param->log_home, "wr.aud");
             break;
         case CM_LOG_BLACKBOX:
             ret = snprintf_s(
-                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/WR/blackbox/%s", log_param->log_home, "wr.blog");
+                file_name, file_name_len, CM_MAX_FILE_NAME_LEN, "%s/GR/blackbox/%s", log_param->log_home, "wr.blog");
             break;
         default:
             ret = 0;
@@ -784,8 +784,8 @@ int wr_init(const wr_param_t param)
     }
     cm_log_set_file_permissions(600);
     cm_log_set_path_permissions(700);
-    (void)cm_set_log_module_name("WR", sizeof("WR"));
-    ret = strcpy_sp(log_param->instance_name, CM_MAX_NAME_LEN, "WR");
+    (void)cm_set_log_module_name("GR", sizeof("GR"));
+    ret = strcpy_sp(log_param->instance_name, CM_MAX_NAME_LEN, "GR");
     if (ret != EOK) {
         return ERR_WR_INIT_LOGGER_FAILED;
     }

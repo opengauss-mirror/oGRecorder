@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -32,7 +32,7 @@ extern "C" {
 #define WR_SUCCESS 0
 #define WR_ERROR (-1)
 
-/** 1.WR range [2000, 2500] *
+/** 1.GR range [2000, 2500] *
  *  2.ERR_WR_SUBMODEL_ACTION_DETAIL, _DETAIL is optional which indicates the error cause.
  */
 #define ERR_WR_FLOOR 2000

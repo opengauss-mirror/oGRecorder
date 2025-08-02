@@ -13,27 +13,27 @@ if [ ${file_user} != ${os_user} ]; then
     exit 1
 fi
 
-WR_BIN=wrserver
-WR_BIN_FULL=${WR_HOME}/bin/wrserver
-WR_BIN_CMD=${WR_HOME}/bin/wrcmd
+GR_BIN=grserver
+GR_BIN_FULL=${GR_HOME}/bin/grserver
+GR_BIN_CMD=${GR_HOME}/bin/grcmd
 BIN_PATH=${GAUSSHOME}/bin
 SCRIPT_NAME=$0
 
 usage()
 {
-    echo "Usage: $0 [cmd] [wrserver_id] [WR_HOME] [GSDB_HOME]"
+    echo "Usage: $0 [cmd] [grserver_id] [GR_HOME] [GSDB_HOME]"
     echo "cmd:"
-    echo "    -start: start wrserver"
-    echo "    -stop: stop wrserver"
-    echo "    -check: check wrserver"
-    echo "    -clean: clean wrserver&${GSDB_BIN}"
-    echo "    -reg: register wrserver"
-    echo "    -unreg: unregister wrserver"
-    echo "    -isreg: check whether wrserver is registered"
-    echo "wrserver_id:"
-    echo "    wrserver id"
-    echo "WR_HOME:"
-    echo "    wrserver data path"
+    echo "    -start: start grserver"
+    echo "    -stop: stop grserver"
+    echo "    -check: check grserver"
+    echo "    -clean: clean grserver&${GSDB_BIN}"
+    echo "    -reg: register grserver"
+    echo "    -unreg: unregister grserver"
+    echo "    -isreg: check whether grserver is registered"
+    echo "grserver_id:"
+    echo "    grserver id"
+    echo "GR_HOME:"
+    echo "    grserver data path"
     echo "GSDB_HOME:"
 }
 
@@ -47,7 +47,7 @@ fi
 log()
 {
    time=`date "+%Y-%m-%d %H:%M:%S"`
-   echo "[$time][WR]$1" >> ${startwr_log} 2>&1
+   echo "[$time][GR]$1" >> ${startgr_log} 2>&1
    return
 }
 
@@ -139,84 +139,84 @@ kill_program()
     exit 1
 }
 
-function check_wr_config()
+function check_gr_config()
 {
-    log "[START]Checking wr_inst.ini before start wr..."
-    if [[ ! -e ${WR_HOME}/cfg/wr_inst.ini ]]
+    log "[START]Checking gr_inst.ini before start gr..."
+    if [[ ! -e ${GR_HOME}/cfg/gr_inst.ini ]]
     then
-        log "[START]${WR_HOME}/cfg/wr_inst.ini must exist"
+        log "[START]${GR_HOME}/cfg/gr_inst.ini must exist"
         exit 1
     fi
 }
 
 function Check()
 {
-    wr_status=$(program_status wrserver ${WR_HOME})
-    if [[ -z ${wr_status} ]]
+    gr_status=$(program_status grserver ${GR_HOME})
+    if [[ -z ${gr_status} ]]
     then
-        log "[CHECK]wrserver is offline."
+        log "[CHECK]grserver is offline."
         exit 1
     fi
-    if [[ "${wr_status}" == "D" || "${wr_status}" == "T" || "${wr_status}" == "Z" ]]
+    if [[ "${gr_status}" == "D" || "${gr_status}" == "T" || "${gr_status}" == "Z" ]]
     then
-        log "[CHECK]wrserver is dead."
+        log "[CHECK]grserver is dead."
         exit 3
     fi
-    ${WR_BIN_CMD} getstatus
-    wr_status=$?
-    if [ ${wr_status} != 0 ]
+    ${GR_BIN_CMD} getstatus
+    gr_status=$?
+    if [ ${gr_status} != 0 ]
     then
-        log "[CHECK]wrcmd status return code: $wr_status"
+        log "[CHECK]grcmd status return code: $gr_status"
         exit 2
     fi
 }
 
 CMD=${1}
 INSTANCE_ID=${2}
-export WR_HOME=${3}
-CONN_PATH=UDS:${WR_HOME}/.wr_unix_d_socket
-startwr_log=${WR_HOME}/startwr.log
+export GR_HOME=${3}
+CONN_PATH=UDS:${GR_HOME}/.gr_unix_d_socket
+startgr_log=${GR_HOME}/startgr.log
 
-get_startwr_log()
+get_startgr_log()
 {
-    LOG_HOME=`cat ${WR_HOME}/cfg/wr_inst.ini | sed s/[[:space:]]//g |grep -Eo "^LOG_HOME=.*" | awk -F '=' '{print $2}'`
+    LOG_HOME=`cat ${GR_HOME}/cfg/gr_inst.ini | sed s/[[:space:]]//g |grep -Eo "^LOG_HOME=.*" | awk -F '=' '{print $2}'`
     if [[ ! -z ${LOG_HOME} ]]
     then
-        startwr_log=${LOG_HOME}/startwr.log
+        startgr_log=${LOG_HOME}/startgr.log
     fi
 
-    if [[ -z ${WR_HOME} ]]
+    if [[ -z ${GR_HOME} ]]
     then
-        startwr_log=/dev/null
+        startgr_log=/dev/null
     else
-        touch_logfile $startwr_log
+        touch_logfile $startgr_log
     fi
 }
 
-kill_wr()
+kill_gr()
 {
-    pid=$(program_pid wrserver ${WR_HOME})
+    pid=$(program_pid grserver ${GR_HOME})
     if [[ -z ${pid} ]]
     then
-        log "[${1}]wrserver not exist."
-        echo "wrserver not exist"
+        log "[${1}]grserver not exist."
+        echo "grserver not exist"
     fi
-    kill_program wrserver ${WR_HOME}
-    log "[${1}]Success to kill wrserver."
+    kill_program grserver ${GR_HOME}
+    log "[${1}]Success to kill grserver."
 }
 
 function Start()
 {
-    pid=`program_pid ${WR_BIN_FULL} ${WR_HOME}`
+    pid=`program_pid ${GR_BIN_FULL} ${GR_HOME}`
     if [[ ! -z ${pid} ]]
     then
-        log "[START]wrserver already started in dir ${WR_HOME}..."
+        log "[START]grserver already started in dir ${GR_HOME}..."
     else
         log "[START]Starting weserver..."
-        log "[START]wrserver"
-        #nohup ${WR_BIN_FULL} -D ${WR_HOME} >> ${startwr_log} 2>&1  &
-        ${WR_BIN_FULL} -D ${WR_HOME} &
-        log "[START]start wrserver in ${WR_HOME} is starting."
+        log "[START]grserver"
+        #nohup ${GR_BIN_FULL} -D ${GR_HOME} >> ${startgr_log} 2>&1  &
+        ${GR_BIN_FULL} -D ${GR_HOME} &
+        log "[START]start grserver in ${GR_HOME} is starting."
     fi
 }
 
@@ -243,13 +243,13 @@ kill_program()
 
 function Clean()
 {
-    kill_program wrserver ${WR_HOME}
+    kill_program grserver ${GR_HOME}
 }
 
 
 function Stop()
 {
-    kill_program wrserver ${WR_HOME}
+    kill_program grserver ${GR_HOME}
 }
 
 function Main()

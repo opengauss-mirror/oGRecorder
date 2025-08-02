@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -209,7 +209,7 @@ typedef struct {
 } wr_disk_usage_ack_t;
 
 #define WRAPI_BLOCK_SIZE 512
-#define WR_HOME "WR_HOME"
+#define GR_HOME "GR_HOME"
 #define SYS_HOME "HOME"
 #define WR_DEFAULT_UDS_PATH "UDS:/tmp/.wr_unix_d_socket"
 #define SESSION_LOCK_TIMEOUT 500 // tickets
@@ -217,7 +217,7 @@ typedef struct {
 status_t wr_connect(const char *server_locator, wr_conn_opt_t *options, wr_conn_t *conn);
 void wr_disconnect(wr_conn_t *conn);
 
-// NOTE:just for wrcmd because not support many threads in one process.
+// NOTE:just for grcmd because not support many threads in one process.
 void wr_disconnect_ex(wr_conn_t *conn);
 status_t wr_vfs_create_impl(wr_conn_t *conn, const char *dir_name, unsigned long long attrFlag);
 status_t wr_vfs_delete_impl(wr_conn_t *conn, const char *dir, unsigned long long attrFlag);

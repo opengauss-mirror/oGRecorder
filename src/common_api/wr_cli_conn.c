@@ -1,7 +1,7 @@
 /*
  * Copyright (c) Huawei Technologies Co.,Ltd. 2024-2024 all rigths reserved.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -164,7 +164,7 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
     cm_reset_error();
     wr_clt_env_init();
     if (cm_get_thv(GLOBAL_THV_OBJ0, CM_TRUE, (pointer_t *)conn, addr) != CM_SUCCESS) {
-        LOG_RUN_ERR("[WR API] connection failed, reason: %s", strerror(cm_get_os_error()));
+        LOG_RUN_ERR("[GR API] connection failed, reason: %s", strerror(cm_get_os_error()));
         WR_THROW_ERROR(ERR_WR_CONNECT_FAILED, cm_get_os_error(), strerror(cm_get_os_error()));
         return CM_ERROR;
     }
@@ -174,7 +174,7 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
         LOG_RUN_INF("wr client need re-connect, last conn pid:%llu.", (uint64)(*conn)->conn_pid);
         wr_disconnect(*conn);
         if (wr_conn_sync(NULL, *conn, addr) != CM_SUCCESS) {
-            LOG_RUN_ERR("[WR API] ABORT INFO: wr server stoped, application need restart.");
+            LOG_RUN_ERR("[GR API] ABORT INFO: wr server stoped, application need restart.");
             cm_fync_logfile();
             wr_exit_error();
         }
@@ -183,7 +183,7 @@ static status_t wr_get_conn(wr_conn_t **conn, const char *addr)
 #endif
 
     if ((*conn)->pipe.link.uds.closed) {
-        LOG_RUN_ERR("[WR API] connection is closed");
+        LOG_RUN_ERR("[GR API] connection is closed");
         WR_THROW_ERROR(ERR_WR_CONNECTION_CLOSED);
         return CM_ERROR;
     }
@@ -202,51 +202,51 @@ status_t wr_enter_api(wr_conn_t **conn, const char *addr)
 status_t check_server_addr_format(const char *server_addr)
 {
     if (server_addr == NULL) {
-        LOG_RUN_ERR("[WR API] ERROR INFO : server address is NULL.");
+        LOG_RUN_ERR("[GR API] ERROR INFO : server address is NULL.");
         return WR_ERROR;
     }
 
     size_t addr_len = strlen(server_addr);
     if (addr_len == 0 || addr_len >= CM_MAX_IP_LEN) {
-        LOG_RUN_ERR("[WR API] ERROR INFO : invalid server address length: %zu.", addr_len);
+        LOG_RUN_ERR("[GR API] ERROR INFO : invalid server address length: %zu.", addr_len);
         return WR_ERROR;
     }
 
     const char *port_sep = strrchr(server_addr, ':');
     if (port_sep == NULL) {
-        LOG_RUN_ERR("[WR API] ERROR INFO : server address(%s) format error: missing port", server_addr);
+        LOG_RUN_ERR("[GR API] ERROR INFO : server address(%s) format error: missing port", server_addr);
         return WR_ERROR;
     }
 
     size_t ip_len = port_sep - server_addr;
     if (ip_len == 0 || ip_len >= CM_MAX_IP_LEN) {
-        LOG_RUN_ERR("[WR API] ERROR INFO : invalid IP length in server address(%s)", server_addr);
+        LOG_RUN_ERR("[GR API] ERROR INFO : invalid IP length in server address(%s)", server_addr);
         return WR_ERROR;
     }
 
     const char *port_str = port_sep + 1;
     if (*port_str == '\0') {
-        LOG_RUN_ERR("[WR API] ERROR INFO : server address(%s) format error: empty port", server_addr);
+        LOG_RUN_ERR("[GR API] ERROR INFO : server address(%s) format error: empty port", server_addr);
         return WR_ERROR;
     }
 
     char *end_ptr = NULL;
     long port = strtol(port_str, &end_ptr, 10);
     if (*end_ptr != '\0' || port <= 0 || port > 65535) {
-        LOG_RUN_ERR("[WR API] ERROR INFO : invalid port number in server address(%s)", server_addr);
+        LOG_RUN_ERR("[GR API] ERROR INFO : invalid port number in server address(%s)", server_addr);
         return WR_ERROR;
     }
 
     char ip_buf[CM_MAX_IP_LEN] = {0};
     errno_t rc = strncpy_s(ip_buf, CM_MAX_IP_LEN, server_addr, ip_len);
     if (rc != EOK) {
-        LOG_RUN_ERR("[WR API] ERROR INFO : failed to copy IP address");
+        LOG_RUN_ERR("[GR API] ERROR INFO : failed to copy IP address");
         return WR_ERROR;
     }
 
     struct in_addr addr;
     if (inet_pton(AF_INET, ip_buf, &addr) != 1) {
-        LOG_RUN_ERR("[WR API] ERROR INFO : invalid IP format in server address(%s)", server_addr);
+        LOG_RUN_ERR("[GR API] ERROR INFO : invalid IP format in server address(%s)", server_addr);
         return WR_ERROR;
     }
 
