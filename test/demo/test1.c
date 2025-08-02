@@ -1,4 +1,4 @@
-/* gcc test1.c -I WR/src/interface -lwrapi -L WR/output/lib */
+/* gcc test1.c -I GR/src/interface -lwrapi -L GR/output/lib */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

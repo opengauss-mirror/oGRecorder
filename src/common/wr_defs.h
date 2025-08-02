@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -82,7 +82,7 @@ extern "C" {
 #define WR_MIN_SESSIONID 0
 #define WR_MAX_SESSIONS 16320
 #define WR_SESSION_NUM_PER_GROUP 128
-#define WR_MIN_SESSIONID_CFG 16  // allow config min sessionid in wr_inst.ini
+#define WR_MIN_SESSIONID_CFG 16  // allow config min sessionid in gr_inst.ini
 #define WR_MIN_INST_ID 0
 #define WR_MAX_INST_ID WR_MAX_INSTANCES
 #define WR_LOCK_VG_TIMEOUT 1000000  // usecs
@@ -139,7 +139,7 @@ extern "C" {
 
 #define WR_INIT_HASH_MAP_SIZE SIZE_K(16)
 
-#define WR_CFG_NAME "wr_inst.ini"
+#define WR_CFG_NAME "gr_inst.ini"
 
 #define WR_MAX_MEM_BLOCK_SIZE SIZE_M(8)
 
@@ -165,7 +165,7 @@ extern "C" {
 #define WR_VERSION_MAX_LEN 256
 #define WR_WAIT_TIMEOUT 5
 
-#define WR_ENV_HOME (char *)"WR_HOME"
+#define WR_ENV_HOME (char *)"GR_HOME"
 
 /* file */
 #define WR_MAX_CONFIG_FILE_SIZE SIZE_K(64) /* 64K */

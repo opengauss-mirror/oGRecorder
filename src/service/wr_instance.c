@@ -1,7 +1,7 @@
 ﻿/*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -122,7 +122,7 @@ static status_t wr_init_thread(wr_instance_t *inst)
 static status_t wr_init_inst_handle_session(wr_instance_t *inst)
 {
     status_t status = wr_create_session(NULL, &inst->handle_session);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance init create handle session fail!"));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance init create handle session fail!"));
     return CM_SUCCESS;
 }
 
@@ -134,19 +134,19 @@ status_t wr_init_certification(wr_instance_t *inst)
 static status_t instance_init_core(wr_instance_t *inst)
 {
     status_t status = wr_init_session_pool(wr_get_max_total_session_cnt());
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "WR instance failed to initialize sessions."));
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "GR instance failed to initialize sessions."));
     status = wr_init_thread(inst);
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "WR instance failed to initialize thread."));
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "GR instance failed to initialize thread."));
     status = wr_startup_mes();
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "WR instance failed to startup mes"));
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "GR instance failed to startup mes"));
     status = wr_create_reactors();
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance failed to start reactors!"));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to start reactors!"));
     status = wr_start_lsnr(inst);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance failed to start lsnr!"));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to start lsnr!"));
     status = wr_init_certification(inst);
-    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "WR instance failed to startup certification"));
+    WR_RETURN_IFERR2(status, WR_THROW_ERROR(ERR_WR_GA_INIT, "GR instance failed to startup certification"));
     status = wr_init_inst_handle_session(inst);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance int handle session!"));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance int handle session!"));
     return CM_SUCCESS;
 }
 
@@ -169,14 +169,14 @@ static void wr_init_maintain(wr_instance_t *inst, wr_srv_args_t wr_args)
 static status_t instance_init(wr_instance_t *inst)
 {
     status_t status = wr_lock_instance();
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Another wrinstance is running"));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("Another grinstance is running"));
     uint32_t shm_key =
         (uint32_t)(inst->inst_cfg.params.shm_key << (uint8)WR_MAX_SHM_KEY_BITS) + (uint32_t)inst->inst_cfg.params.inst_id;
     status = cm_init_shm(shm_key);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance failed to initialize shared memory!"));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to initialize shared memory!"));
     status = instance_init_ga(inst);
     WR_RETURN_IFERR4(status, (void)del_shm_by_key(CM_SHM_CTRL_KEY), cm_destroy_shm(),
-        LOG_RUN_ERR("WR instance failed to initialize ga!"));
+        LOG_RUN_ERR("GR instance failed to initialize ga!"));
     status = instance_init_core(inst);
     if (status != CM_SUCCESS) {
         (void)del_shm_by_key(CM_SHM_CTRL_KEY);
@@ -185,7 +185,7 @@ static status_t instance_init(wr_instance_t *inst)
         CM_FREE_PTR(g_wr_session_ctrl.sessions);
         return CM_ERROR;
     }
-    LOG_RUN_INF("WR instance begin to run.");
+    LOG_RUN_INF("GR instance begin to run.");
     return CM_SUCCESS;
 }
 
@@ -215,7 +215,7 @@ static status_t wr_save_process_pid(wr_config_t *inst_cfg)
         file_name, CM_FILE_NAME_BUFFER_SIZE, CM_FILE_NAME_BUFFER_SIZE - 1, "%s/%s", dir_name, "wr.process"));
     pid_t pid = getpid();
     if (strlen(file_name) == 0) {
-        LOG_RUN_ERR("wrserver process path not existed");
+        LOG_RUN_ERR("grserver process path not existed");
         return CM_ERROR;
     }
     FILE *fp;
@@ -225,7 +225,7 @@ static status_t wr_save_process_pid(wr_config_t *inst_cfg)
     int32_t size = fprintf(fp, "%d", pid);
     (void)fflush(stdout);
     if (size < 0) {
-        LOG_RUN_ERR("write wrserver process failed, write size is %d.", size);
+        LOG_RUN_ERR("write grserver process failed, write size is %d.", size);
         (void)fclose(fp);
         return CM_ERROR;
     }
@@ -248,7 +248,7 @@ status_t wr_startup(wr_instance_t *inst, wr_srv_args_t wr_args)
     wr_set_server_flag();
     regist_get_instance_status_proc(wr_get_instance_status);
     status = wr_set_cfg_dir(wr_args.wr_home, &inst->inst_cfg);
-    WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Environment variant WR_HOME not found!\n"));
+    WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Environment variant GR_HOME not found!\n"));
     status = cm_start_timer(g_timer());
     WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Aborted due to starting timer thread.\n"));
     status = wr_load_config(&inst->inst_cfg);
@@ -256,12 +256,12 @@ status_t wr_startup(wr_instance_t *inst, wr_srv_args_t wr_args)
     status = wr_load_ser_ssl_config(&inst->inst_cfg);
     WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Failed to load server parameters!\n"));
     status = wr_save_process_pid(&inst->inst_cfg);
-    WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Save wrserver pid failed!\n"));
+    WR_RETURN_IFERR2(status, WR_PRINT_RUN_ERROR("Save grserver pid failed!\n"));
     wr_init_maintain(inst, wr_args);
-    LOG_RUN_INF("WR instance begin to initialize.");
+    LOG_RUN_INF("GR instance begin to initialize.");
 
     status = instance_init(inst);
-    WR_RETURN_IFERR2(status, LOG_RUN_ERR("WR instance failed to initialized!"));
+    WR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to initialized!"));
     cm_set_shm_ctrl_flag(CM_SHM_CTRL_FLAG_TRUE);
     inst->abort_status = CM_FALSE;
     return CM_SUCCESS;
@@ -544,7 +544,7 @@ status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try
     if (inst->is_maintain || inst->inst_cfg.params.nodes_list.inst_cnt <= 1) {
         *grab_lock = CM_TRUE;
         LOG_RUN_INF_INHIBIT(LOG_INHIBIT_LEVEL5,
-            "[RECOVERY]Set curr_id %u to be primary when wrserver is maintain or just one inst.",
+            "[RECOVERY]Set curr_id %u to be primary when grserver is maintain or just one inst.",
             (uint32_t)inst_cfg->params.inst_id);
         *master_id = (uint32_t)inst_cfg->params.inst_id;
         return CM_SUCCESS;
@@ -554,7 +554,7 @@ status_t wr_get_cm_lock_owner(wr_instance_t *inst, bool32 *grab_lock, bool32 try
         return CM_SUCCESS;
     }
     status_t ret = wr_get_cm_res_lock_owner(cm_res, master_id);
-    WR_RETURN_IFERR2(ret, LOG_RUN_WAR("Failed to get cm lock owner, if WR is normal open ignore the log."));
+    WR_RETURN_IFERR2(ret, LOG_RUN_WAR("Failed to get cm lock owner, if GR is normal open ignore the log."));
     if (*master_id == WR_INVALID_ID32) {
         if (!try_lock) {
             return CM_ERROR;
@@ -743,8 +743,8 @@ void wr_alarm_check_proc(thread_t *thread)
 static void wr_check_peer_inst_inner(wr_instance_t *inst)
 {
     /**
-     * During installation initialization, db_init depends on the WR server. However, the CMS is not started.
-     * Therefore, cm_init cannot be invoked during the WR server startup.
+     * During installation initialization, db_init depends on the GR server. However, the CMS is not started.
+     * Therefore, cm_init cannot be invoked during the GR server startup.
      * Here, cm_init is invoked before the CM interface is invoked at first time.
      */
     if (SECUREC_UNLIKELY(!inst->cm_res.is_init)) {

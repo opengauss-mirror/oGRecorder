@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -57,7 +57,7 @@ extern bool32 g_shm_inited;
 #define CM_GA_SHM_MAX_ID 20480U  // max total extended pool
 #define CM_SHM_MAX_BLOCK ((CM_FIXED_SHM_MAX_ID) + (CM_HASH_SHM_MAX_ID) + (CM_GA_SHM_MAX_ID))
 /* share memory manager control block magic string, must be 8Bytes aligned, now 48Bytes */
-#define CM_SHM_MAGIC "Huawei Tech. Co., Ltd. gauss100 DB WR Software"
+#define CM_SHM_MAGIC "Huawei Tech. Co., Ltd. gauss100 DB GR Software"
 
 /* share memory control block reserved for future use */
 #define CM_SHM_CTRL_RESERVED 1020

@@ -1,6 +1,6 @@
-# WR
+# GR
 
-WR: WAL Recorder, a basic component providing WAL log recording services.
+GR: WAL Recorder, a basic component providing WAL log recording services.
 
 ## 1. Project Description
 
@@ -11,7 +11,7 @@ WR: WAL Recorder, a basic component providing WAL log recording services.
 - cmake or make, cmake is recommended
 
 ### 3. Directory Structure
-- **WR**: Main directory, CMakeLists.txt is the main project entry;
+- **GR**: Main directory, CMakeLists.txt is the main project entry;
 - **src**: Source code directory, divided into subdirectories for common function modules;
 - **build/build.sh**: Project build script
 
@@ -26,11 +26,11 @@ Supported operating systems:
 
 For other systems, refer to the openGauss database compilation guide.
 
-### 2. Download WR
-WR can be downloaded from the open-source community.
+### 2. Download GR
+GR can be downloaded from the open-source community.
 
 ### 3. Code Compilation
-Use `WR/build/build.sh` to compile the code. The parameters are explained in the table below.
+Use `GR/build/build.sh` to compile the code. The parameters are explained in the table below.
 
 | Option | Parameter          | Description                                      |
 |--------|--------------------|--------------------------------------------------|
@@ -44,10 +44,10 @@ To compile, simply use the following command:
 [user@linux]$ sh build.sh -3rd [binarylibs path] -m Release -t cmake
 ```
 
-After compilation, the dynamic libraries are generated in the `WR/output/lib` directory, and the executables are generated in the `WR/output/bin` directory.
+After compilation, the dynamic libraries are generated in the `GR/output/lib` directory, and the executables are generated in the `GR/output/bin` directory.
 
 ### 4. UT Testing
-Modify `WR/test/test_home/test_env` to set `CODE_BASE` to the absolute path of the WR directory. Execute `WR/test/gtest/build.sh` to compile the UT code.
+Modify `GR/test/test_home/test_env` to set `CODE_BASE` to the absolute path of the GR directory. Execute `GR/test/gtest/build.sh` to compile the UT code.
 
 ```bash
 ./test_wr_api

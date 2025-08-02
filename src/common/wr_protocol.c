@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -274,7 +274,7 @@ status_t wr_call_ex(cs_pipe_t *pipe, wr_packet_t *req, wr_packet_t *ack)
 {
     status_t ret = wr_call_base(pipe, req, ack);
     if (ret != CM_SUCCESS) {
-        LOG_RUN_ERR("[WR] ABORT INFO: wr call server failed, ack command type:%d, application exit.", ack->head->cmd);
+        LOG_RUN_ERR("[GR] ABORT INFO: wr call server failed, ack command type:%d, application exit.", ack->head->cmd);
         cs_disconnect(pipe);
         cm_fync_logfile();
     }

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -260,7 +260,7 @@ status_t wr_check_open_file_remote(wr_session_t *session, const char *vg_name, u
 {
     *is_open = CM_FALSE;
 
-    WR_LOG_DEBUG_OP("[WR-MES-CB]Begin to check file-open %llu.", ftid);
+    WR_LOG_DEBUG_OP("[GR-MES-CB]Begin to check file-open %llu.", ftid);
     wr_vg_info_item_t *vg_item = wr_find_vg_item(vg_name);
     if (vg_item == NULL) {
         WR_RETURN_IFERR3(

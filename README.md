@@ -1,4 +1,4 @@
-# WR
+# GR
 
 WR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
 
@@ -12,7 +12,7 @@ WR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
 - Make
 
 ### 目录结构
-- **WR**：主目录，包含主工程入口`CMakeLists.txt`
+- **GR**：主目录，包含主工程入口`CMakeLists.txt`
 - **src**：源代码目录，按子目录划分通用功能函数
 - **build/build.sh**：工程构建脚本
 
@@ -41,7 +41,7 @@ WR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
 | openEuler 24.03 x86 | [下载链接](https://opengauss.obs.cn-south-1.myhuaweicloud.com/latest/binarylibs/gcc10.3/openGauss-third_party_binarylibs_openEuler_2403_x86_64.tar.gz) |
 
 ### 代码编译
-使用 `WR/build/build.sh` 编译代码，参数说明如下：
+使用 `GR/build/build.sh` 编译代码，参数说明如下：
 
 | 选项 | 参数 | 说明 |
 |------|------|------|
@@ -55,18 +55,18 @@ WR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
 sh build.sh -3rd [binarylibs path] -m Release -t cmake
 ```
 
-编译完成后，动态库生成在 `WR/output/lib` 目录中，可执行文件生成在 `WR/output/bin` 目录中。
+编译完成后，动态库生成在 `GR/output/lib` 目录中，可执行文件生成在 `GR/output/bin` 目录中。
 
 ### 使用
 
-1. 修改 `WR/test/test_home/test_env` 中的 `CODE_BASE` 为WR目录的绝对路径。
-2. 执行 `source WR/test/test_home/test_env` 设置环境变量。
-3. 启动WAL日志记录服务：`wrserver &`
-4. 停止WAL日志记录服务：`wrcmd stopwr`
+1. 修改 `GR/test/test_home/test_env` 中的 `CODE_BASE` 为WR目录的绝对路径。
+2. 执行 `source GR/test/test_home/test_env` 设置环境变量。
+3. 启动WAL日志记录服务：`grserver &`
+4. 停止WAL日志记录服务：`grcmd stopwr`
 
 ### 单元测试
 
-执行 `WR/test/gtest/build.sh` 编译单元测试代码：
+执行 `GR/test/gtest/build.sh` 编译单元测试代码：
 
 ```bash
 ./test_wr_api

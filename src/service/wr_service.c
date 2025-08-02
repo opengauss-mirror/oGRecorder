@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -203,7 +203,7 @@ static void wr_return_error(wr_session_t *session)
     cm_get_error(&code, &message);
     // volume open/seek/read write fail for I/O, just abort
     if (code == ERR_WR_VOLUME_SYSTEM_IO) {
-        LOG_RUN_ERR("[WR] ABORT INFO: volume operate failed for I/O ERROR, errcode:%d.", code);
+        LOG_RUN_ERR("[GR] ABORT INFO: volume operate failed for I/O ERROR, errcode:%d.", code);
         cm_fync_logfile();
         wr_exit_error();
     }
@@ -676,7 +676,7 @@ char *wr_get_wr_instance_status(int32_t instance_status)
     return g_wr_instance_status_desc[WR_INSTANCE_STATUS_OFFSET(instance_status)];
 }
 
-// get wrserver status:open, recovery or switch
+// get grserver status:open, recovery or switch
 static status_t wr_process_get_inst_status(wr_session_t *session)
 {
     wr_server_status_t *wr_status = NULL;
@@ -761,7 +761,7 @@ void wr_set_session_running(wr_instance_t *inst, uint32_t sid)
     LOG_DEBUG_INF("Begin to set session running.");
     cm_latch_x(&inst->tcp_lsnr_latch, sid, NULL);
     if (inst->abort_status) {
-        LOG_RUN_INF("wrserver is aborting, no need to set sessions running.");
+        LOG_RUN_INF("grserver is aborting, no need to set sessions running.");
         cm_unlatch(&inst->tcp_lsnr_latch, NULL);
         return;
     }

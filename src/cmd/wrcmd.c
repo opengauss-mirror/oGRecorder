@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
- * WR is licensed under Mulan PSL v2.
+ * GR is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *
@@ -13,11 +13,11 @@
  * See the Mulan PSL v2 for more details.
  * -------------------------------------------------------------------------
  *
- * wrcmd.c
+ * grcmd.c
  *
  *
  * IDENTIFICATION
- *    src/cmd/wrcmd.c
+ *    src/cmd/grcmd.c
  *
  * -------------------------------------------------------------------------
  */
@@ -353,23 +353,23 @@ static status_t getstatus_proc(void)
     return status;
 }
 
-static wr_args_t cmd_stopwr_args[] = {};
-static wr_args_set_t cmd_stopwr_args_set = {
-    cmd_stopwr_args,
-    sizeof(cmd_stopwr_args) / sizeof(wr_args_t),
+static wr_args_t cmd_stop_args[] = {};
+static wr_args_set_t cmd_stop_args_set = {
+    cmd_stop_args,
+    sizeof(cmd_stop_args) / sizeof(wr_args_t),
     NULL,
 };
 
-static void stopwr_help(const char *prog_name, int print_flag)
+static void stop_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s stopwr\n", prog_name);
+    (void)printf("\nUsage:%s stop\n", prog_name);
     (void)printf("[client command] stop wr server\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
     }
 }
 
-static status_t stopwr_proc(void)
+static status_t stop_proc(void)
 {
     wr_conn_t *conn = wr_get_connection_for_cmd();
     if (conn == NULL) {
@@ -395,7 +395,7 @@ static wr_args_set_t cmd_switchover_args_set = {
 
 static void switchover_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s stopwr\n", prog_name);
+    (void)printf("\nUsage:%s stop\n", prog_name);
     (void)printf("[client command] stop wr server\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
@@ -590,9 +590,9 @@ static int file_exists(const char *filename) {
 
 static status_t gencert_proc(void)
 {
-    const char *wr_home = getenv("WR_HOME");
+    const char *wr_home = getenv("GR_HOME");
     if (!wr_home) {
-        printf("Please set WR_HOME environment variable.\n");
+        printf("Please set GR_HOME environment variable.\n");
         return CM_ERROR;
     }
     char *type = cmd_gencert_args[0].input_args;
@@ -617,7 +617,7 @@ static status_t gencert_proc(void)
     }
 
     if (strcmp(type, "client") == 0) {
-        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/wr_cli_inst.ini", wr_home) >= sizeof(conf_file)) {
+        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/gr_cli_inst.ini", wr_home) >= sizeof(conf_file)) {
             printf("conf_file path too long!\n");
             return CM_ERROR;
         }
@@ -641,7 +641,7 @@ static status_t gencert_proc(void)
         check_certs_expired(cli_ca, cli_cert);
         printf("Client certs generated and checked successfully.\n");
     } else if (strcmp(type, "server") == 0) {
-        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/wr_ser_inst.ini", wr_home) >= sizeof(conf_file)) {
+        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/gr_ser_inst.ini", wr_home) >= sizeof(conf_file)) {
             printf("conf_file path too long!\n");
             return CM_ERROR;
         }
@@ -673,23 +673,23 @@ static status_t gencert_proc(void)
     return CM_SUCCESS;
 }
 
-static wr_args_t cmd_usage_args[] = {};
-static wr_args_set_t cmd_usage_args_set = {
-    cmd_usage_args,
-    sizeof(cmd_usage_args) / sizeof(wr_args_t),
+static wr_args_t cmd_datausage_args[] = {};
+static wr_args_set_t cmd_datausage_args_set = {
+    cmd_datausage_args,
+    sizeof(cmd_datausage_args) / sizeof(wr_args_t),
     NULL,
 };
 
-static void usage_help(const char *prog_name, int print_flag)
+static void datausage_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s usage\n", prog_name);
+    (void)printf("\nUsage:%s datausage\n", prog_name);
     (void)printf("[client command] reload wr server certs\n");
     if (print_flag == WR_HELP_SIMPLE) {
         return;
     }
 }
 
-static status_t usage_proc(void)
+static status_t datausage_proc(void)
 {
     const double GB = 1073741824.0; // 1 GB in bytes
     wr_conn_t *conn = wr_get_connection_for_cmd();
@@ -722,11 +722,11 @@ wr_admin_cmd_t g_wr_admin_cmd[] = {
     {"setcfg", setcfg_help, setcfg_proc, &cmd_setcfg_args_set, true},
     {"getcfg", getcfg_help, getcfg_proc, &cmd_getcfg_args_set, false},
     {"getstatus", getstatus_help, getstatus_proc, &cmd_getstatus_args_set, false},
-    {"stopwr", stopwr_help, stopwr_proc, &cmd_stopwr_args_set, true},
+    {"stop", stop_help, stop_proc, &cmd_stop_args_set, true},
     {"switchover", switchover_help, switchover_proc, &cmd_switchover_args_set, true},
     {"reload_certs", reload_certs_help, reload_certs_proc, &cmd_reload_certs_args_set, false},
     {"gencert", gencert_help, gencert_proc, &cmd_gencert_args_set, true},
-    {"usage", usage_help, usage_proc, &cmd_usage_args_set, true},
+    {"datausage", datausage_help, datausage_proc, &cmd_datausage_args_set, true},
 };
 
 void clean_cmd()
@@ -739,9 +739,9 @@ void clean_cmd()
 static void help(char *prog_name, wr_help_type help_type)
 {
     (void)printf("Usage:%s [command] [OPTIONS]\n\n", prog_name);
-    (void)printf("Usage:%s %s/%s show help information of wrcmd\n", prog_name, HELP_SHORT, HELP_LONG);
-    (void)printf("Usage:%s %s/%s show all help information of wrcmd\n", prog_name, ALL_SHORT, ALL_LONG);
-    (void)printf("Usage:%s %s/%s show version information of wrcmd\n", prog_name, VERSION_SHORT, VERSION_LONG);
+    (void)printf("Usage:%s %s/%s show help information of grcmd\n", prog_name, HELP_SHORT, HELP_LONG);
+    (void)printf("Usage:%s %s/%s show all help information of grcmd\n", prog_name, ALL_SHORT, ALL_LONG);
+    (void)printf("Usage:%s %s/%s show version information of grcmd\n", prog_name, VERSION_SHORT, VERSION_LONG);
     (void)printf("commands:\n");
     for (uint32_t i = 0; i < sizeof(g_wr_admin_cmd) / sizeof(g_wr_admin_cmd[0]); ++i) {
         g_wr_admin_cmd[i].help(prog_name, help_type);
@@ -787,7 +787,7 @@ static void wr_cmd_oper_log(int argc, char **argv, status_t status)
         return;
     }
 
-    WR_RETURN_DRIECT_IFERR(wr_cmd_append_oper_log(log_buf, "wrcmd", &offset));
+    WR_RETURN_DRIECT_IFERR(wr_cmd_append_oper_log(log_buf, "grcmd", &offset));
 
     for (int i = 1; i < argc; i++) {
         WR_RETURN_DRIECT_IFERR(wr_cmd_append_oper_log(log_buf, " ", &offset));
@@ -832,7 +832,7 @@ bool8 cmd_check_run_interactive(int argc, char **argv)
 bool8 cmd_version_and_help(int argc, char **argv)
 {
     if (cm_str_equal(argv[1], VERSION_SHORT) || cm_str_equal(argv[1], VERSION_LONG)) {
-        (void)printf("wrcmd %s\n", (char *)DEF_WR_VERSION);
+        (void)printf("grcmd %s\n", (char *)DEF_WR_VERSION);
         return CM_TRUE;
     }
     if (cm_str_equal(argv[1], ALL_SHORT) || cm_str_equal(argv[1], ALL_LONG)) {
@@ -848,14 +848,14 @@ bool8 cmd_version_and_help(int argc, char **argv)
 
 void print_help_hint()
 {
-    (void)printf("wrcmd: Try \"wrcmd -h/--help\" for help information.\n");
-    (void)printf("wrcmd: Try \"wrcmd -a/--all\" for detailed help information.\n");
+    (void)printf("grcmd: Try \"grcmd -h/--help\" for help information.\n");
+    (void)printf("grcmd: Try \"grcmd -a/--all\" for detailed help information.\n");
 }
 
 int32_t execute_help_cmd(int argc, char **argv, uint32_t *idx, bool8 *go_ahead)
 {
     if (argc < CMD_ARGS_AT_LEAST) {
-        (void)printf("wrcmd: no operation specified.\n");
+        (void)printf("grcmd: no operation specified.\n");
         print_help_hint();
         *go_ahead = CM_FALSE;
         return EXIT_FAILURE;
@@ -865,7 +865,7 @@ int32_t execute_help_cmd(int argc, char **argv, uint32_t *idx, bool8 *go_ahead)
         return EXIT_SUCCESS;
     }
     if (!get_cmd_idx(argc, argv, idx)) {
-        (void)printf("wrcmd: command(%s) not found!\n", argv[WR_ARG_IDX_1]);
+        (void)printf("grcmd: command(%s) not found!\n", argv[WR_ARG_IDX_1]);
         print_help_hint();
         *go_ahead = CM_FALSE;
         return EXIT_FAILURE;
@@ -902,7 +902,7 @@ static status_t wr_check_user_permit()
 #ifndef WIN32
     // check root
     if (geteuid() == 0 || getuid() != geteuid()) {
-        (void)printf("The root user is not permitted to execute the wrcmd "
+        (void)printf("The root user is not permitted to execute the grcmd "
                      "and the real uids must be the same as the effective uids.\n");
         (void)fflush(stdout);
         return CM_ERROR;
@@ -929,13 +929,13 @@ int main(int argc, char **argv)
     }
     wr_config_t *inst_cfg = wr_get_g_inst_cfg();
     status_t ret = wr_set_cfg_dir(NULL, inst_cfg);
-    WR_RETURN_IFERR2(ret, WR_PRINT_ERROR("Environment variant WR_HOME not found!\n"));
+    WR_RETURN_IFERR2(ret, WR_PRINT_ERROR("Environment variant GR_HOME not found!\n"));
     ret = wr_load_local_server_config(inst_cfg);
     WR_RETURN_IFERR2(ret, WR_PRINT_ERROR("Failed to load local server config, status(%d).\n", ret));
     ret = cm_start_timer(g_timer());
 
     WR_RETURN_IFERR2(ret, WR_PRINT_ERROR("Aborted due to starting timer thread.\n"));
-    ret = wr_init_loggers(inst_cfg, wr_get_cmd_log_def(), wr_get_cmd_log_def_count(), "wrcmd");
+    ret = wr_init_loggers(inst_cfg, wr_get_cmd_log_def(), wr_get_cmd_log_def_count(), "grcmd");
     if (ret != CM_SUCCESS && is_log_necessary(argc, argv)) {
         WR_PRINT_ERROR("%s\nWR init loggers failed!\n", cm_get_errormsg(cm_get_error_code()));
         return ret;

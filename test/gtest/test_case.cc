@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include "wr_api.h"
 
-/* gcc -o test test.c -I /usr1/hmm_wr/WR/src/interface -lwrapi -L /usr1/hmm_wr/WR/output/lib  */
+/* gcc -o test test.c -I /usr1/hmm_wr/GR/src/interface -lwrapi -L /usr1/hmm_wr/GR/output/lib  */
 
 /*
  * 功能描述：
