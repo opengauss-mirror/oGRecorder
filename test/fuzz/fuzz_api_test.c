@@ -3,31 +3,31 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "wr_api.h"
+#include "gr_api.h"
 
 #define MAX_STR_LEN 128
 #define MAX_FILE_NAME_LEN 64
 #define MAX_BUF_LEN 1024
 
-static wr_instance_handle g_inst = NULL;
-static wr_vfs_handle g_vfs = {0};
+static gr_instance_handle g_inst = NULL;
+static gr_vfs_handle g_vfs = {0};
 static int g_inited = 0;
 
 // 初始化和清理
 __attribute__((constructor))
 static void fuzz_init() {
     if (!g_inited) {
-        wr_create_inst("127.0.0.1:19225", &g_inst);
-        wr_vfs_create(g_inst, "fuzzdir", 0);
-        wr_vfs_mount(g_inst, "fuzzdir", &g_vfs);
+        gr_create_inst("127.0.0.1:19225", &g_inst);
+        gr_vfs_create(g_inst, "fuzzdir", 0);
+        gr_vfs_mount(g_inst, "fuzzdir", &g_vfs);
         g_inited = 1;
     }
 }
 __attribute__((destructor))
 static void fuzz_cleanup() {
     if (g_inited) {
-        wr_vfs_unmount(&g_vfs);
-        wr_delete_inst(g_inst);
+        gr_vfs_unmount(&g_vfs);
+        gr_delete_inst(g_inst);
         g_inst = NULL;
         g_inited = 0;
     }
@@ -67,46 +67,46 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     // 选择API进行fuzz
     switch (api_id) {
         case 0:
-            wr_set_conf(g_inst, str1, str2);
+            gr_set_conf(g_inst, str1, str2);
             break;
         case 1:
-            wr_get_conf(g_inst, str1, buf);
+            gr_get_conf(g_inst, str1, buf);
             break;
         case 2:
-            wr_vfs_create(g_inst, str1, 0);
+            gr_vfs_create(g_inst, str1, 0);
             break;
         case 3:
-            wr_vfs_mount(g_inst, str1, &g_vfs);
+            gr_vfs_mount(g_inst, str1, &g_vfs);
             break;
         case 4:
-            wr_file_create(g_vfs, file_name, NULL);
+            gr_file_create(g_vfs, file_name, NULL);
             break;
         case 5: {
-            wr_file_handle fh;
-            wr_file_open(g_vfs, file_name, 0, &fh);
-            wr_file_close(g_vfs, &fh, 0);
+            gr_file_handle fh;
+            gr_file_open(g_vfs, file_name, 0, &fh);
+            gr_file_close(g_vfs, &fh, 0);
             break;
         }
         case 6: {
-            wr_file_handle fh;
-            wr_file_open(g_vfs, file_name, 0, &fh);
-            wr_file_pwrite(g_vfs, &fh, buf, (offset < size ? data[offset] : 10), 0);
-            wr_file_close(g_vfs, &fh, 0);
+            gr_file_handle fh;
+            gr_file_open(g_vfs, file_name, 0, &fh);
+            gr_file_pwrite(g_vfs, &fh, buf, (offset < size ? data[offset] : 10), 0);
+            gr_file_close(g_vfs, &fh, 0);
             break;
         }
         case 7: {
-            wr_file_handle fh;
-            wr_file_open(g_vfs, file_name, 0, &fh);
-            wr_file_pread(g_vfs, fh, buf, (offset < size ? data[offset] : 10), 0);
-            wr_file_close(g_vfs, &fh, 0);
+            gr_file_handle fh;
+            gr_file_open(g_vfs, file_name, 0, &fh);
+            gr_file_pread(g_vfs, fh, buf, (offset < size ? data[offset] : 10), 0);
+            gr_file_close(g_vfs, &fh, 0);
             break;
         }
         case 8:
-            wr_file_delete(g_vfs, file_name);
+            gr_file_delete(g_vfs, file_name);
             break;
         case 9: {
             int file_num = 0;
-            wr_vfs_query_file_num(g_vfs, &file_num);
+            gr_vfs_query_file_num(g_vfs, &file_num);
             break;
         }
         default:

@@ -1,6 +1,6 @@
 # GR
 
-WR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
+GR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
 
 ## 工程说明
 
@@ -27,8 +27,8 @@ WR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
 
 适配其他系统，可参照openGauss数据库编译指导。
 
-### 下载WR及第三方库
-可以从开源社区下载WR。第三方库下载地址：
+### 下载GR及第三方库
+可以从开源社区下载GR。第三方库下载地址：
 
 | 系统版本 | 下载链接 |
 |----------|----------|
@@ -59,15 +59,15 @@ sh build.sh -3rd [binarylibs path] -m Release -t cmake
 
 ### 使用
 
-1. 修改 `GR/test/test_home/test_env` 中的 `CODE_BASE` 为WR目录的绝对路径。
+1. 修改 `GR/test/test_home/test_env` 中的 `CODE_BASE` 为GR目录的绝对路径。
 2. 执行 `source GR/test/test_home/test_env` 设置环境变量。
 3. 启动WAL日志记录服务：`grserver &`
-4. 停止WAL日志记录服务：`grcmd stopwr`
+4. 停止WAL日志记录服务：`grcmd stop`
 
 ### 单元测试
 
 执行 `GR/test/gtest/build.sh` 编译单元测试代码：
 
 ```bash
-./test_wr_api
+./test_api
 ```

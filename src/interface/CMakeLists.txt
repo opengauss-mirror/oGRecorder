@@ -1,13 +1,13 @@
 ## include
 include_directories($ENV{JAVA_HOME}/include)
 include_directories($ENV{JAVA_HOME}/include/linux)
-include_directories(${WR_COMMON_PATH})
-include_directories(${WR_COMMON_PATH}/persist)
-include_directories(${WR_LOG_PATH})
-include_directories(${WR_PARAMS_PATH})
-include_directories(${WR_COMMON_API_PATH})
-include_directories(${WR_INTERFACE_PATH})
-include_directories(${WR_HOTPATCH_PATH})
+include_directories(${GR_COMMON_PATH})
+include_directories(${GR_COMMON_PATH}/persist)
+include_directories(${GR_LOG_PATH})
+include_directories(${GR_PARAMS_PATH})
+include_directories(${GR_COMMON_API_PATH})
+include_directories(${GR_INTERFACE_PATH})
+include_directories(${GR_HOTPATCH_PATH})
 
 option(ENABLE_FUZZASAN OFF)
 if (ENABLE_FUZZASAN)
@@ -15,28 +15,28 @@ if (ENABLE_FUZZASAN)
 endif(ENABLE_FUZZASAN)
 
 ## other dependency include
-include_directories(${WR_SECUREC_INC_PATH})
-include_directories(${WR_OPENSSL_PATH})
+include_directories(${GR_SECUREC_INC_PATH})
+include_directories(${GR_OPENSSL_PATH})
 include_directories(${LIBAIO_INC_PATH})
-include_directories(${WR_CBB_PATH})
+include_directories(${GR_CBB_PATH})
 include_directories(${LZ4_INC_PATH})
 ## source
 
-aux_source_directory(${WR_COMMON_PATH} WR_COMMON_SRC)
-aux_source_directory(${WR_COMMON_PATH}/persist WR_COMMON_SRC)
-aux_source_directory(${WR_LOG_PATH} WR_LOG_SRC)
-aux_source_directory(${WR_PARAMS_PATH} WR_PARAMS_SRC)
-aux_source_directory(${WR_COMMON_API_PATH} WR_COMMON_API_SRC)
-aux_source_directory(${WR_INTERFACE_PATH} WR_INTERFACE_SRC)
-aux_source_directory(${WR_SER_PATH} WR_SER_SRC)
+aux_source_directory(${GR_COMMON_PATH} GR_COMMON_SRC)
+aux_source_directory(${GR_COMMON_PATH}/persist GR_COMMON_SRC)
+aux_source_directory(${GR_LOG_PATH} GR_LOG_SRC)
+aux_source_directory(${GR_PARAMS_PATH} GR_PARAMS_SRC)
+aux_source_directory(${GR_COMMON_API_PATH} GR_COMMON_API_SRC)
+aux_source_directory(${GR_INTERFACE_PATH} GR_INTERFACE_SRC)
+aux_source_directory(${GR_SER_PATH} GR_SER_SRC)
 
 set(COMMON_ALL_SRC
-        ${WR_COMMON_SRC}
-        ${WR_LOG_SRC}
-        ${WR_PARAMS_SRC}
-        ${WR_COMMON_API_SRC}
-        ${WR_INTERFACE_SRC}
-        ${WR_SER_SRC}
+        ${GR_COMMON_SRC}
+        ${GR_LOG_SRC}
+        ${GR_PARAMS_SRC}
+        ${GR_COMMON_API_SRC}
+        ${GR_INTERFACE_SRC}
+        ${GR_SER_SRC}
         )
 
 add_library(grapi SHARED ${COMMON_ALL_SRC})

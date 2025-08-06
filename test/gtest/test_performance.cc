@@ -3,8 +3,8 @@
 #include <chrono>
 #include <iostream>
 extern "C" {
-#include "wr_api.h"
-#include "wr_errno.h"
+#include "gr_api.h"
+#include "gr_errno.h"
 }
 
 #define SIZE_GB 1024 * 1024 * 1024
@@ -14,55 +14,55 @@ extern "C" {
 #define TEST_DIR "performancedir"
 #define TEST_FILE "performance_test_file1"
 
-wr_param_t g_wr_param;
-wr_file_handle file_handle;
+gr_param_t g_gr_param;
+gr_file_handle file_handle;
 
-class WrApiPerformanceTest : public ::testing::Test {
+class GRApiPerformanceTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        strcpy(g_wr_param.log_home, "./testlog");
-        g_wr_param.log_level = 255;
-        g_wr_param.log_backup_file_count = 100;
-        g_wr_param.log_max_file_size = SIZE_GB;
-        wr_init(g_wr_param); 
-        int result = wr_create_inst(SERVER_ADDR, &g_inst_handle);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to create instance";
+        strcpy(g_gr_param.log_home, "./testlog");
+        g_gr_param.log_level = 255;
+        g_gr_param.log_backup_file_count = 100;
+        g_gr_param.log_max_file_size = SIZE_GB;
+        gr_init(g_gr_param); 
+        int result = gr_create_inst(SERVER_ADDR, &g_inst_handle);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to create instance";
 
-        result = wr_vfs_create(g_inst_handle, TEST_DIR, 0);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to create VFS";
+        result = gr_vfs_create(g_inst_handle, TEST_DIR, 0);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to create VFS";
 
-        result = wr_vfs_mount(g_inst_handle, TEST_DIR, &g_vfs_handle);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to mount VFS";
+        result = gr_vfs_mount(g_inst_handle, TEST_DIR, &g_vfs_handle);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to mount VFS";
 
-        result = wr_file_create(g_vfs_handle, TEST_FILE, NULL);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to create test file";
+        result = gr_file_create(g_vfs_handle, TEST_FILE, NULL);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to create test file";
 
-        result = wr_file_open(g_vfs_handle, TEST_FILE, O_RDWR | O_SYNC, &file_handle);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to open test file";
+        result = gr_file_open(g_vfs_handle, TEST_FILE, O_RDWR | O_SYNC, &file_handle);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to open test file";
 
-        result = wr_file_truncate(g_vfs_handle, file_handle, 0, 100 * SIZE_MB);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to truncate test file";
+        result = gr_file_truncate(g_vfs_handle, file_handle, 0, 100 * SIZE_MB);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to truncate test file";
     }
 
     void TearDown() override {
-        wr_file_close(g_vfs_handle, &file_handle, true);
-        wr_file_delete(g_vfs_handle, TEST_FILE);
-        wr_vfs_delete(g_inst_handle, TEST_DIR, 0);
+        gr_file_close(g_vfs_handle, &file_handle, true);
+        gr_file_delete(g_vfs_handle, TEST_FILE);
+        gr_vfs_delete(g_inst_handle, TEST_DIR, 0);
     }
 
-    wr_instance_handle g_inst_handle = NULL;
-    wr_vfs_handle g_vfs_handle;
-    wr_file_handle file_handle;
+    gr_instance_handle g_inst_handle = NULL;
+    gr_vfs_handle g_vfs_handle;
+    gr_file_handle file_handle;
     int handle = 0;
 };
 
-TEST_F(WrApiPerformanceTest, TestWritePerformance) {
+TEST_F(GRApiPerformanceTest, TestWritePerformance) {
     const int data_size = 100 * SIZE_MB;
     char *data = new char[data_size];
     memset(data, 'A', data_size);
 
     auto start = std::chrono::high_resolution_clock::now();
-    int result = wr_file_pwrite(g_vfs_handle, &file_handle, data, data_size, 0);
+    int result = gr_file_pwrite(g_vfs_handle, &file_handle, data, data_size, 0);
     auto end = std::chrono::high_resolution_clock::now();
 
     ASSERT_EQ(result, data_size) << "Failed to write data";
@@ -77,20 +77,20 @@ TEST_F(WrApiPerformanceTest, TestWritePerformance) {
     delete[] data;
 }
 
-TEST_F(WrApiPerformanceTest, TestWritePerformanceWith8KSteps) {
+TEST_F(GRApiPerformanceTest, TestWritePerformanceWith8KSteps) {
     const int step_size = 8 * 1024; // 8KB
     const int total_size = 100 * SIZE_MB; // 100MB
     char *data = new char[step_size];
     memset(data, 'B', step_size); // 用'B'填充数据
 
     auto total_start = std::chrono::high_resolution_clock::now();
-    int result = WR_SUCCESS;
+    int result = GR_SUCCESS;
     double total_latency = 0.0;
     int write_count = total_size / step_size;
 
     for (int offset = 0; offset < total_size; offset += step_size) {
         auto start = std::chrono::high_resolution_clock::now();
-        result = wr_file_pwrite(g_vfs_handle, &file_handle, data, step_size, offset);
+        result = gr_file_pwrite(g_vfs_handle, &file_handle, data, step_size, offset);
         auto end = std::chrono::high_resolution_clock::now();
 
         ASSERT_EQ(result, step_size) << "Failed to write data at offset " << offset;

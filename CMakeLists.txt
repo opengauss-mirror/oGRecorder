@@ -1,5 +1,5 @@
 ﻿CMAKE_MINIMUM_REQUIRED(VERSION 3.12.1)
-PROJECT(wr)
+PROJECT(gr)
 
 message(${CMAKE_BUILD_TYPE})
 if (${CMAKE_BUILD_TYPE} STREQUAL "Debug"
@@ -7,7 +7,7 @@ if (${CMAKE_BUILD_TYPE} STREQUAL "Debug"
     message(STATUS "CMAKE_BUILD_TYPE is Debug")
     set(CMAKE_BUILD_TYPE Debug)
     add_compile_definitions(_DEBUG DB_DEBUG_VERSION)
-elseif (${CMAKE_BUILD_TYPE} STREQUAL "Memcheck" OR ${CMAKE_BUILD_TYPE} STREQUAL "MemcheckWRtest")
+elseif (${CMAKE_BUILD_TYPE} STREQUAL "Memcheck" OR ${CMAKE_BUILD_TYPE} STREQUAL "MemcheckGRtest")
     message(STATUS "CMAKE_BUILD_TYPE is Memcheck")
     set(CMAKE_BUILD_TYPE Memcheck)
     add_compile_definitions(_DEBUG DB_DEBUG_VERSION)
@@ -54,19 +54,19 @@ EXECUTE_PROCESS(
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-# WR_VERSION_STR can be used for api/cmd/server
-# WR_VERSION_STR like: (openGauss build ab4a14da) compiled at 2000-01-01 00:00:00 debug)
-if (ENABLE_WRTEST)
-    SET(WR_VERSION_STR
-        "(${COMPONENT} build ${COMMIT_ID}) compiled at ${COMPILE_TIME} ${CMAKE_BUILD_TYPE} (WRTEST ON)"
+# GR_VERSION_STR can be used for api/cmd/server
+# GR_VERSION_STR like: (openGauss build ab4a14da) compiled at 2000-01-01 00:00:00 debug)
+if (ENABLE_GRTEST)
+    SET(GR_VERSION_STR
+        "(${COMPONENT} build ${COMMIT_ID}) compiled at ${COMPILE_TIME} ${CMAKE_BUILD_TYPE} (GRTEST ON)"
     )
 else()
-    SET(WR_VERSION_STR
-        "(${COMPONENT} build ${COMMIT_ID}) compiled at ${COMPILE_TIME} ${CMAKE_BUILD_TYPE} (WRTEST OFF)"
+    SET(GR_VERSION_STR
+        "(${COMPONENT} build ${COMMIT_ID}) compiled at ${COMPILE_TIME} ${CMAKE_BUILD_TYPE} (GRTEST OFF)"
     )
 endif()
 
-message(STATUS "Version info: ${WR_VERSION_STR}")
+message(STATUS "Version info: ${GR_VERSION_STR}")
 
 set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS} -D__FILE_NAME__='\"$(notdir $(subst .o,,$(abspath $@)))\"'" )
 add_compile_options(-fPIC -Wall -MMD -fno-strict-aliasing -fsigned-char -fms-extensions -lpthread)
@@ -138,8 +138,8 @@ IF (ENABLE_FUZZASAN)
     SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage")
     SET(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage")
     SET(CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} -fprofile-arcs -ftest-coverage -lgcov")
-    set(WR_FUZZ_LIB_PATH ${PROJECT_SOURCE_DIR}/test/fuzz_test/lib)
-    message(STATUS "WR_FUZZ_LIB_PATH = ${WR_FUZZ_LIB_PATH}")
+    set(GR_FUZZ_LIB_PATH ${PROJECT_SOURCE_DIR}/test/fuzz_test/lib)
+    message(STATUS "GR_FUZZ_LIB_PATH = ${GR_FUZZ_LIB_PATH}")
 ENDIF()
 
 OPTION(ENABLE_EXPORT_API "Enable hidden internal api" OFF)
@@ -151,13 +151,13 @@ ENDIF()
 OPTION(ENABLE_DEFAULT_FILE_FLAG_INNER_INITED "Enable default file flag inited" OFF)
 message(STATUS "ENABLE_DEFAULT_FILE_FLAG_INNER_INITED = ${ENABLE_DEFAULT_FILE_FLAG_INNER_INITED}")
 IF (ENABLE_DEFAULT_FILE_FLAG_INNER_INITED)
-    add_definitions(-DWR_DEFAULT_FILE_FLAG_INNER_INITED)
+    add_definitions(-DGR_DEFAULT_FILE_FLAG_INNER_INITED)
 ENDIF()
 
-OPTION(ENABLE_WRTEST "Enable wr test" OFF)
-message(STATUS "ENABLE_WRTEST = ${ENABLE_WRTEST}")
-IF (ENABLE_WRTEST)
-    add_definitions(-DENABLE_WRTEST)
+OPTION(ENABLE_GRTEST "Enable gr test" OFF)
+message(STATUS "ENABLE_GRTEST = ${ENABLE_GRTEST}")
+IF (ENABLE_GRTEST)
+    add_definitions(-DENABLE_GRTEST)
 ENDIF()
 
 execute_process(
@@ -181,19 +181,19 @@ else ()
 endif ()
 Add_Definitions(-DWSEC_COMPILE_CAC_OPENSSL -DWSEC_AES_GCM_SUPPORT -DWSEC_USE_OPENSSL_110)
 
-## wr include_directories
-set(WR_COMMON_PATH ${PROJECT_SOURCE_DIR}/src/common)
-set(WR_LOG_PATH ${PROJECT_SOURCE_DIR}/src/log)
-set(WR_PARAMS_PATH ${PROJECT_SOURCE_DIR}/src/params)
-set(WR_COMMON_API_PATH ${PROJECT_SOURCE_DIR}/src/common_api)
-set(WR_CMD_PATH ${PROJECT_SOURCE_DIR}/src/cmd)
-set(WR_SER_PATH ${PROJECT_SOURCE_DIR}/src/service)
-set(WR_INTERFACE_PATH ${PROJECT_SOURCE_DIR}/src/interface)
+## GR include_directories
+set(GR_COMMON_PATH ${PROJECT_SOURCE_DIR}/src/common)
+set(GR_LOG_PATH ${PROJECT_SOURCE_DIR}/src/log)
+set(GR_PARAMS_PATH ${PROJECT_SOURCE_DIR}/src/params)
+set(GR_COMMON_API_PATH ${PROJECT_SOURCE_DIR}/src/common_api)
+set(GR_CMD_PATH ${PROJECT_SOURCE_DIR}/src/cmd)
+set(GR_SER_PATH ${PROJECT_SOURCE_DIR}/src/service)
+set(GR_INTERFACE_PATH ${PROJECT_SOURCE_DIR}/src/interface)
 
 ## other dependency include
-set(WR_SECUREC_INC_PATH        "${CMAKE_CURRENT_SOURCE_DIR}/library/huawei_security/include")
-set(WR_OPENSSL_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/openssl/include")
-set(WR_CBB_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/cbb/include")
+set(GR_SECUREC_INC_PATH        "${CMAKE_CURRENT_SOURCE_DIR}/library/huawei_security/include")
+set(GR_OPENSSL_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/openssl/include")
+set(GR_CBB_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/cbb/include")
 set(LIBAIO_INC_PATH             "${CMAKE_CURRENT_SOURCE_DIR}/library/libaio/include")
 set(ZLIB_INC_PATH               "${CMAKE_CURRENT_SOURCE_DIR}/library/zlib/include")
 set(LZ4_INC_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/lz4/include")
@@ -211,12 +211,12 @@ set(LZ4_PATH                   "${CMAKE_CURRENT_SOURCE_DIR}/library/lz4/lib")
 set (LIBRARY_OUTPUT_PATH        ${CMAKE_CURRENT_SOURCE_DIR}/output/lib)
 set (EXECUTABLE_OUTPUT_PATH     ${CMAKE_CURRENT_SOURCE_DIR}/output/bin)
 
-CONFIGURE_FILE(config.h.in ${WR_COMMON_API_PATH}/config.h)
-CONFIGURE_FILE(config.h.in ${WR_SER_PATH}/config.h)
+CONFIGURE_FILE(config.h.in ${GR_COMMON_API_PATH}/config.h)
+CONFIGURE_FILE(config.h.in ${GR_SER_PATH}/config.h)
 ## add source
 link_directories(${LIBRARY_OUTPUT_PATH} ${SECUREC_LIB_PATH} ${LIBZ_PATH} ${LZ4_PATH} ${CBB_LIB_PATH})
 IF (ENABLE_FUZZASAN)
-    link_directories(${WR_FUZZ_LIB_PATH})
+    link_directories(${GR_FUZZ_LIB_PATH})
     set(fuzz_lib "libSecodefuzz.a")
 ENDIF()
 

@@ -1,10 +1,10 @@
 ## include
-include_directories(${WR_COMMON_PATH})
-include_directories(${WR_COMMON_PATH}/persist)
-include_directories(${WR_LOG_PATH})
-include_directories(${WR_PARAMS_PATH})
-include_directories(${WR_INTERFACE_PATH})
-include_directories(${WR_HOTPATCH_PATH})
+include_directories(${GR_COMMON_PATH})
+include_directories(${GR_COMMON_PATH}/persist)
+include_directories(${GR_LOG_PATH})
+include_directories(${GR_PARAMS_PATH})
+include_directories(${GR_INTERFACE_PATH})
+include_directories(${GR_HOTPATCH_PATH})
 
 option(ENABLE_FUZZASAN OFF)
 if (ENABLE_FUZZASAN)
@@ -12,15 +12,15 @@ if (ENABLE_FUZZASAN)
 endif(ENABLE_FUZZASAN)
 
 ## other dependency include 
-include_directories(${WR_SECUREC_INC_PATH})
-include_directories(${WR_OPENSSL_PATH})
-include_directories(${WR_CBB_PATH})
+include_directories(${GR_SECUREC_INC_PATH})
+include_directories(${GR_OPENSSL_PATH})
+include_directories(${GR_CBB_PATH})
 include_directories(${LZ4_INC_PATH})
-aux_source_directory(${WR_COMMON_PATH} COMMON_SRC)
-aux_source_directory(${WR_COMMON_PATH}/persist COMMON_SRC)
-aux_source_directory(${WR_LOG_PATH} LOG_SRC)
-aux_source_directory(${WR_PARAMS_PATH} PARAMS_SRC)
-aux_source_directory(${WR_SER_PATH} SER_SRC)
+aux_source_directory(${GR_COMMON_PATH} COMMON_SRC)
+aux_source_directory(${GR_COMMON_PATH}/persist COMMON_SRC)
+aux_source_directory(${GR_LOG_PATH} LOG_SRC)
+aux_source_directory(${GR_PARAMS_PATH} PARAMS_SRC)
+aux_source_directory(${GR_SER_PATH} SER_SRC)
 
 set(COMMON_ALL_SRC
         ${COMMON_SRC}

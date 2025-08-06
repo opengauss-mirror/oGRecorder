@@ -14,7 +14,7 @@
 # MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 # See the Mulan PSL v2 for more details.
 # ----------------------------------------------------------------------------
-# Description  : wr build for opengauss
+# Description  : gr build for opengauss
 #############################################################################
 
 set -e
@@ -24,7 +24,7 @@ function print_help()
     echo "Usage: $0 [OPTION]
     -h|--help              show help information.
     -3rd|--binarylib_dir   the directory of third party binarylibs.
-    -m|--version_mode      this values of paramenter is Debug, Release, Memcheck, DebugWRtest, ReleaseWRtest, MemcheckWRtest the default value is Release.
+    -m|--version_mode      this values of paramenter is Debug, Release, Memcheck, DebugGRtest, ReleaseGRtest, MemcheckGRtest the default value is Release.
     -t|--build_tool          this values of parameter is cmake, make, the default value is cmake.
     -s|--storage_mode      storage device type. values is disk, ceph. default is disk. 
 "
@@ -78,7 +78,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-enable_wrtest=OFF
+enable_grtest=OFF
 if [ -z "${version_mode}" ] || [ "$version_mode"x == ""x ]; then
     version_mode=Release
 fi
@@ -89,21 +89,21 @@ fi
 if [ -z "${build_tool}" ] || [ "$build_tool"x == ""x ]; then
     build_tool=cmake
 fi
-if [ ! "$version_mode"x == "Debug"x ] && [ ! "$version_mode"x == "Release"x ] && [ ! "$version_mode"x == "DebugWRtest"x ] && [ ! "$version_mode"x == "ReleaseWRtest"x ] && [ ! "$version_mode"x == "Memcheck"x ] && [ ! "$version_mode"x == "MemcheckWRtest"x ]; then
+if [ ! "$version_mode"x == "Debug"x ] && [ ! "$version_mode"x == "Release"x ] && [ ! "$version_mode"x == "DebugGRtest"x ] && [ ! "$version_mode"x == "ReleaseGRtest"x ] && [ ! "$version_mode"x == "Memcheck"x ] && [ ! "$version_mode"x == "MemcheckGRtest"x ]; then
     echo "ERROR: version_mode param is error"
     exit 1
 fi
-if [ "$version_mode"x == "DebugWRtest"x ]; then
+if [ "$version_mode"x == "DebugGRtest"x ]; then
     version_mode=Debug
-    enable_wrtest=ON
+    enable_grtest=ON
 fi
-if [ "$version_mode"x == "ReleaseWRtest"x ]; then
+if [ "$version_mode"x == "ReleaseGRtest"x ]; then
     version_mode=Release
-    enable_wrtest=ON
+    enable_grtest=ON
 fi
-if [ "$version_mode"x == "MemcheckWRtest"x ]; then
+if [ "$version_mode"x == "MemcheckGRtest"x ]; then
     version_mode=Memcheck
-    enable_wrtest=ON
+    enable_grtest=ON
 fi
 if [ ! "$build_tool"x == "make"x ] && [ ! "$build_tool"x == "cmake"x ]; then
     echo "ERROR: build_tool param is error"
@@ -119,46 +119,46 @@ LOCAL_PATH=${0}
 CUR_PATH=$(pwd)
 LOCAL_DIR=$(dirname "${LOCAL_PATH}")
 export PACKAGE=$CUR_PATH/../
-export OUT_PACKAGE=wr
+export OUT_PACKAGE=gr
 
-export WR_OPEN_SRC_PATH=$(pwd)/../open_source
-export WR_LIBRARYS=$(pwd)/../library
+export GR_OPEN_SRC_PATH=$(pwd)/../open_source
+export GR_LIBRARYS=$(pwd)/../library
 
-[ -d "${WR_LIBRARYS}" ] && rm -rf ${WR_LIBRARYS}
-mkdir -p $WR_LIBRARYS/huawei_security
-mkdir -p $WR_LIBRARYS/openssl
-mkdir -p $WR_LIBRARYS/zlib
-mkdir -p $WR_LIBRARYS/lz4
-mkdir -p $WR_LIBRARYS/libaio/include
-mkdir -p $WR_LIBRARYS/cbb
+[ -d "${GR_LIBRARYS}" ] && rm -rf ${GR_LIBRARYS}
+mkdir -p $GR_LIBRARYS/huawei_security
+mkdir -p $GR_LIBRARYS/openssl
+mkdir -p $GR_LIBRARYS/zlib
+mkdir -p $GR_LIBRARYS/lz4
+mkdir -p $GR_LIBRARYS/libaio/include
+mkdir -p $GR_LIBRARYS/cbb
 
 export LIB_PATH=$binarylib_dir/kernel/dependency
 export P_LIB_PATH=$binarylib_dir/kernel/platform
 COPT_LIB_PATH=${binarylib_dir}/kernel/component
 
-cp -r $P_LIB_PATH/Huawei_Secure_C/comm/lib     $WR_LIBRARYS/huawei_security/lib
-cp -r $LIB_PATH/openssl/comm/lib               $WR_LIBRARYS/openssl/lib
-cp -r $LIB_PATH/zlib1.2.11/comm/lib            $WR_LIBRARYS/zlib/lib
-cp -r $LIB_PATH/lz4/comm/lib                   $WR_LIBRARYS/lz4/lib
+cp -r $P_LIB_PATH/Huawei_Secure_C/comm/lib     $GR_LIBRARYS/huawei_security/lib
+cp -r $LIB_PATH/openssl/comm/lib               $GR_LIBRARYS/openssl/lib
+cp -r $LIB_PATH/zlib1.2.11/comm/lib            $GR_LIBRARYS/zlib/lib
+cp -r $LIB_PATH/lz4/comm/lib                   $GR_LIBRARYS/lz4/lib
 
-cp -r $P_LIB_PATH/Huawei_Secure_C/comm/include    $WR_LIBRARYS/huawei_security/include
-cp -r $LIB_PATH/openssl/comm/include              $WR_LIBRARYS/openssl/include
-cp -r $LIB_PATH/zlib1.2.11/comm/include           $WR_LIBRARYS/zlib/include
-cp -r $LIB_PATH/lz4/comm/include                  $WR_LIBRARYS/lz4/include
+cp -r $P_LIB_PATH/Huawei_Secure_C/comm/include    $GR_LIBRARYS/huawei_security/include
+cp -r $LIB_PATH/openssl/comm/include              $GR_LIBRARYS/openssl/include
+cp -r $LIB_PATH/zlib1.2.11/comm/include           $GR_LIBRARYS/zlib/include
+cp -r $LIB_PATH/lz4/comm/include                  $GR_LIBRARYS/lz4/include
 
 status=0
 if [ -f "/usr/include/libaio.h" ];then
     echo "begin cp libaio.h from /usr/include/"
-    cp -r /usr/include/libaio.h                   $WR_LIBRARYS/libaio/include
+    cp -r /usr/include/libaio.h                   $GR_LIBRARYS/libaio/include
     status=1
 fi
 
 if [ ${status} -eq 0 ];then
-    for file in "${WR_OPEN_SRC_PATH}"/libaio/libaio-*/src/libaio.h
+    for file in "${GR_OPEN_SRC_PATH}"/libaio/libaio-*/src/libaio.h
     do
         if [ -f "${file}" ];then
             echo "begin cp libaio.h from open_source/libaio/"
-            cp -r ${WR_OPEN_SRC_PATH}/libaio/libaio-*/src/libaio.h $WR_LIBRARYS/libaio/include
+            cp -r ${GR_OPEN_SRC_PATH}/libaio/libaio-*/src/libaio.h $GR_LIBRARYS/libaio/include
             status=1
         fi
     done
@@ -169,16 +169,16 @@ if [ ${status} -eq 0 ];then
     fi
 fi
 
-cp -r $COPT_LIB_PATH/cbb/include                  $WR_LIBRARYS/cbb/include
-cp -r $COPT_LIB_PATH/cbb/lib                      $WR_LIBRARYS/cbb/lib
+cp -r $COPT_LIB_PATH/cbb/include                  $GR_LIBRARYS/cbb/include
+cp -r $COPT_LIB_PATH/cbb/lib                      $GR_LIBRARYS/cbb/lib
 
-cd $WR_LIBRARYS/openssl/lib
+cd $GR_LIBRARYS/openssl/lib
 cp -r libssl_static.a libssl.a
 cp -r libcrypto_static.a libcrypto.a
 
 cd $PACKAGE
 if [ "$build_tool"x == "cmake"x ];then
-    cmake_opts="-DCMAKE_BUILD_TYPE=${version_mode} -DENABLE_WRTEST=${enable_wrtest} -DOPENGAUSS_FLAG=ON -DIOFENCE_FLAG=OFF -DVG_FILE_LOCK=OFF \
+    cmake_opts="-DCMAKE_BUILD_TYPE=${version_mode} -DENABLE_GRTEST=${enable_grtest} -DOPENGAUSS_FLAG=ON -DIOFENCE_FLAG=OFF -DVG_FILE_LOCK=OFF \
     -DENABLE_EXPORT_API=${export_api}"
     cmake ${cmake_opts} CMakeLists.txt
     make all -sj 8
@@ -198,11 +198,11 @@ echo "build GR SUCCESS"
 os_name=$(source /etc/os-release && echo ${NAME} | tr ' ' '_')
 os_version=$(source /etc/os-release && echo ${VERSION_ID})
 arch=$(uname -m)
-wr_version="7.0.0-RC2"
-pkg_name="openGauss-oGRecorder-${wr_version}-${os_name}${os_version}-${arch}.tar.gz"
+gr_version="7.0.0-RC2"
+pkg_name="openGauss-oGRecorder-${gr_version}-${os_name}${os_version}-${arch}.tar.gz"
 
 if [ "$pkg_flag"x == "ON"x ]; then
-    tmp_dir="wr_package_tmp"
+    tmp_dir="gr_package_tmp"
     rm -rf $tmp_dir
 
     # server 目录

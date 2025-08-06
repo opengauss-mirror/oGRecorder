@@ -5,9 +5,9 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include "wr_api.h"
+#include "gr_api.h"
 
-/* gcc 1.c -I /home/czk/bianyi/WalRecord/src/interface -lwrapi -L /home/czk/bianyi/WalRecord/output/lib */
+/* gcc 1.c -I /home/czk/bianyi/WalRecord/src/interface -lgrapi -L /home/czk/bianyi/WalRecord/output/lib */
 
 int errorcode = 0;
 const char *errormsg = NULL;    
@@ -30,7 +30,7 @@ typedef int socket_t;
 #define uint64 unsigned long long
 #define int64 long long 
 
-typedef struct st_wr_packet_head {
+typedef struct st_gr_packet_head {
     uint32_t version;
     uint32_t client_version;
     uint32_t size;
@@ -39,17 +39,17 @@ typedef struct st_wr_packet_head {
     uint16 flags;
     uint32_t serial_number;
     uint8 reserve[60];
-} wr_packet_head_t;
+} gr_packet_head_t;
 
-typedef struct st_wr_packet {
+typedef struct st_gr_packet {
     uint32_t offset;   // for reading
     uint32_t options;  // options
-    wr_packet_head_t *head;
+    gr_packet_head_t *head;
     uint32_t max_buf_size;  // MAX_ALLOWED_PACKET
     uint32_t buf_size;
     char *buf;
     char init_buf[10240];
-} wr_packet_t;
+} gr_packet_t;
 
 typedef enum en_cs_pipe_type {
     CS_TYPE_TCP = 1,
@@ -99,32 +99,32 @@ typedef struct st_cs_pipe {
     int32_t l_linger;
 } cs_pipe_t;
 
-typedef struct wr_cli_info {
+typedef struct gr_cli_info {
     uint64 cli_pid;
     int64 start_time;
     char process_name[256];
     uint32_t thread_id;
     uint64 connect_time;
-} wr_cli_info_t;
+} gr_cli_info_t;
 
-typedef struct st_wr_conn {
-    wr_packet_t pack;  // for sending
+typedef struct st_gr_conn {
+    gr_packet_t pack;  // for sending
     cs_pipe_t pipe;
     void *cli_vg_handles;
     bool32 flag;
     void *session;
     uint32_t server_version;
     uint32_t proto_version;
-#ifdef ENABLE_WRTEST
+#ifdef ENABLE_GRTEST
     pid_t conn_pid;
 #endif
-    wr_cli_info_t cli_info;
-} wr_conn_t;
+    gr_cli_info_t cli_info;
+} gr_conn_t;
 
-typedef struct st_wr_instance_handle {
-    wr_conn_t *conn;
+typedef struct st_gr_instance_handle {
+    gr_conn_t *conn;
     char addr[64];
-} st_wr_instance_handle;
+} st_gr_instance_handle;
 
 
 // server_address
@@ -140,14 +140,14 @@ const char* errorAddr = "111";
 void test_case_1()
 {
     printf(" test case1: ***************\n");
-    wr_instance_handle wr_init_handle = NULL;
+    gr_instance_handle gr_init_handle = NULL;
 
-    int result = wr_create_inst(serverAddr, &wr_init_handle);
+    int result = gr_create_inst(serverAddr, &gr_init_handle);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case1: success  ***************\n");
-        wr_delete_inst(wr_init_handle);
+        gr_delete_inst(gr_init_handle);
         return;
     }
     printf(" test case1: failed  ***************\n");
@@ -161,18 +161,18 @@ void test_case_1()
 void test_case_2()
 {
     printf(" test case2: ***************\n");
-    wr_instance_handle wr_init_handle = NULL;
+    gr_instance_handle gr_init_handle = NULL;
 
-    int result = wr_create_inst(serverAddr, &wr_init_handle);
+    int result = gr_create_inst(serverAddr, &gr_init_handle);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case2: failed  ***************\n");
-        wr_delete_inst(wr_init_handle);
+        gr_delete_inst(gr_init_handle);
         return;
     }
     printf(" test case2: success  ***************\n");
-    wr_delete_inst(wr_init_handle);
+    gr_delete_inst(gr_init_handle);
 }
 
 /* 
@@ -183,14 +183,14 @@ void test_case_2()
 void test_case_3()
 {
     printf(" test case3: ***************\n");
-    wr_instance_handle wr_init_handle = NULL;
+    gr_instance_handle gr_init_handle = NULL;
 
-    int result = wr_create_inst(serverAddr, &wr_init_handle);
+    int result = gr_create_inst(serverAddr, &gr_init_handle);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case3: success  ***************\n");
-        wr_delete_inst(wr_init_handle);
+        gr_delete_inst(gr_init_handle);
         return;
     }
     printf(" test case3: failed  ***************\n");
@@ -204,18 +204,18 @@ void test_case_3()
 void test_case_4()
 {
     printf(" test case4: ***************\n");
-    wr_instance_handle wr_init_handle = NULL;
+    gr_instance_handle gr_init_handle = NULL;
 
-    int result = wr_create_inst(remoteServerAddr, &wr_init_handle);
+    int result = gr_create_inst(remoteServerAddr, &gr_init_handle);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case4: failed  ***************\n");
-        wr_delete_inst(wr_init_handle);
+        gr_delete_inst(gr_init_handle);
         return;
     }
     printf(" test case4: success  ***************\n");
-    wr_delete_inst(wr_init_handle);
+    gr_delete_inst(gr_init_handle);
 }
 
 /* 
@@ -226,14 +226,14 @@ void test_case_4()
 void test_case_5()
 {
     printf(" test case5: ***************\n");
-    wr_instance_handle wr_init_handle = NULL;
+    gr_instance_handle gr_init_handle = NULL;
 
-    int result = wr_create_inst(errorAddr, &wr_init_handle);
+    int result = gr_create_inst(errorAddr, &gr_init_handle);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case5: success  ***************\n");
-        wr_delete_inst(wr_init_handle);
+        gr_delete_inst(gr_init_handle);
         return;
     }
     printf(" test case5: failed  ***************\n");
@@ -247,41 +247,41 @@ void test_case_5()
 void test_case_6()
 {
     printf(" test case6: ***************\n");
-    wr_instance_handle wr_init_handle1 = NULL;
-    wr_instance_handle wr_init_handle2 = NULL;
-    wr_instance_handle wr_init_handle3 = NULL;
+    gr_instance_handle gr_init_handle1 = NULL;
+    gr_instance_handle gr_init_handle2 = NULL;
+    gr_instance_handle gr_init_handle3 = NULL;
 
-    int result = wr_create_inst(serverAddr, &wr_init_handle1);
+    int result = gr_create_inst(serverAddr, &gr_init_handle1);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case6: failed  ***************\n");
-        wr_delete_inst(wr_init_handle1);
+        gr_delete_inst(gr_init_handle1);
         return;
     }
 
-    wr_create_inst(serverAddr, &wr_init_handle2);
+    gr_create_inst(serverAddr, &gr_init_handle2);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case6: failed  ***************\n");
-        wr_delete_inst(wr_init_handle2);
+        gr_delete_inst(gr_init_handle2);
         return;
     }
 
-    wr_create_inst(serverAddr, &wr_init_handle3);
+    gr_create_inst(serverAddr, &gr_init_handle3);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case6: failed  ***************\n");
-        wr_delete_inst(wr_init_handle3);
+        gr_delete_inst(gr_init_handle3);
         return;
     }
 
     printf(" test case6: success  ***************\n");
-    wr_delete_inst(wr_init_handle1);
-    wr_delete_inst(wr_init_handle2);
-    wr_delete_inst(wr_init_handle3);
+    gr_delete_inst(gr_init_handle1);
+    gr_delete_inst(gr_init_handle2);
+    gr_delete_inst(gr_init_handle3);
 }
 
 /* 
@@ -292,41 +292,41 @@ void test_case_6()
 void test_case_7()
 {
     printf(" test case7: ***************\n");
-    wr_instance_handle wr_init_handle1 = NULL;
-    wr_instance_handle wr_init_handle2 = NULL;
-    wr_instance_handle wr_init_handle3 = NULL;
+    gr_instance_handle gr_init_handle1 = NULL;
+    gr_instance_handle gr_init_handle2 = NULL;
+    gr_instance_handle gr_init_handle3 = NULL;
 
-    int result = wr_create_inst(remoteServerAddr, &wr_init_handle1);
+    int result = gr_create_inst(remoteServerAddr, &gr_init_handle1);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case7: failed  ***************\n");
-        wr_delete_inst(wr_init_handle1);
+        gr_delete_inst(gr_init_handle1);
         return;
     }
 
-    wr_create_inst(remoteServerAddr, &wr_init_handle2);
+    gr_create_inst(remoteServerAddr, &gr_init_handle2);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case7: failed  ***************\n");
-        wr_delete_inst(wr_init_handle2);
+        gr_delete_inst(gr_init_handle2);
         return;
     }
 
-    wr_create_inst(remoteServerAddr, &wr_init_handle3);
+    gr_create_inst(remoteServerAddr, &gr_init_handle3);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case7: failed  ***************\n");
-        wr_delete_inst(wr_init_handle3);
+        gr_delete_inst(gr_init_handle3);
         return;
     }
 
     printf(" test case7: success  ***************\n");
-    wr_delete_inst(wr_init_handle1);
-    wr_delete_inst(wr_init_handle2);
-    wr_delete_inst(wr_init_handle3);
+    gr_delete_inst(gr_init_handle1);
+    gr_delete_inst(gr_init_handle2);
+    gr_delete_inst(gr_init_handle3);
 }
 
 /* 
@@ -337,52 +337,52 @@ void test_case_7()
 void test_case_8()
 {
     printf(" test case8: ***************\n");
-    wr_instance_handle wr_init_handle1 = NULL;
-    wr_instance_handle wr_init_handle2 = NULL;
-    wr_instance_handle wr_init_handle3 = NULL;
-    wr_instance_handle wr_init_handle4 = NULL;
+    gr_instance_handle gr_init_handle1 = NULL;
+    gr_instance_handle gr_init_handle2 = NULL;
+    gr_instance_handle gr_init_handle3 = NULL;
+    gr_instance_handle gr_init_handle4 = NULL;
 
-    int result = wr_create_inst(serverAddr, &wr_init_handle1);
+    int result = gr_create_inst(serverAddr, &gr_init_handle1);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case8: failed  ***************\n");
-        wr_delete_inst(wr_init_handle1);
+        gr_delete_inst(gr_init_handle1);
         return;
     }
 
-    wr_create_inst(serverAddr, &wr_init_handle2);
+    gr_create_inst(serverAddr, &gr_init_handle2);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case8: failed  ***************\n");
-        wr_delete_inst(wr_init_handle2);
+        gr_delete_inst(gr_init_handle2);
         return;
     }
 
-    wr_create_inst(remoteServerAddr, &wr_init_handle3);
+    gr_create_inst(remoteServerAddr, &gr_init_handle3);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case8: failed  ***************\n");
-        wr_delete_inst(wr_init_handle3);
+        gr_delete_inst(gr_init_handle3);
         return;
     }
 
-    wr_create_inst(remoteServerAddr, &wr_init_handle4);
+    gr_create_inst(remoteServerAddr, &gr_init_handle4);
     if (result != 0) {
-        wr_get_error(&errorcode, &errormsg);
+        gr_get_error(&errorcode, &errormsg);
         printf("%d : %s\n", errorcode, errormsg);
         printf(" test case8: failed  ***************\n");
-        wr_delete_inst(wr_init_handle4);
+        gr_delete_inst(gr_init_handle4);
         return;
     }
 
     printf(" test case8: success  ***************\n");
-    wr_delete_inst(wr_init_handle1);
-    wr_delete_inst(wr_init_handle2);
-    wr_delete_inst(wr_init_handle3);
-    wr_delete_inst(wr_init_handle4);
+    gr_delete_inst(gr_init_handle1);
+    gr_delete_inst(gr_init_handle2);
+    gr_delete_inst(gr_init_handle3);
+    gr_delete_inst(gr_init_handle4);
 }
 
 

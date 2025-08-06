@@ -1,6 +1,6 @@
 source ../test_home/test_env
 
-function check_wrstatus()
+function check_grstatus()
 {
     res=`grcmd getstatus | awk 'NR==1'`
     if [[ $res =~ 'Server status' ]]; then
@@ -70,7 +70,7 @@ function recover_env()
         echo "Failed to start grserver."
         exit 1
     fi
-    check_wrstatus
+    check_grstatus
 
     res=`grcmd setcfg -n _LOG_LEVEL -v 255`
     if [[ $res =~ $"Succeed" ]]; then
@@ -83,7 +83,7 @@ function recover_env()
 
 main()
 {
-    check_wrstatus
+    check_grstatus
     test_getcfg
     test_setcfg
     test_lscli

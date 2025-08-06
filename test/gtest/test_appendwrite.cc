@@ -3,8 +3,8 @@
 #include <vector>
 #include <fcntl.h>
 extern "C" {
-#include "wr_api.h"
-#include "wr_errno.h"
+#include "gr_api.h"
+#include "gr_errno.h"
 }
 
 #define TEST_LOG_DIR "./test_log"
@@ -16,50 +16,50 @@ extern "C" {
 
 int errorcode = 0;
 const char *errormsg = NULL;
-wr_instance_handle g_inst_handle1 = NULL;
-wr_instance_handle g_inst_handle2 = NULL;
-wr_vfs_handle g_vfs_handle1;
-wr_vfs_handle g_vfs_handle2;
+gr_instance_handle g_inst_handle1 = NULL;
+gr_instance_handle g_inst_handle2 = NULL;
+gr_vfs_handle g_vfs_handle1;
+gr_vfs_handle g_vfs_handle2;
 int handle1 = 0, handle2 = 0;
 
-wr_file_handle file_handle1;
-wr_file_handle file_handle2;
+gr_file_handle file_handle1;
+gr_file_handle file_handle2;
 
-wr_param_t g_wr_param;
+gr_param_t g_gr_param;
 
-class AppendWrApiTest : public ::testing::Test {
+class AppendGRApiTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        strcpy(g_wr_param.log_home, "./testlog");
-        g_wr_param.log_level = 255;
-        g_wr_param.log_backup_file_count = 100;
-        g_wr_param.log_max_file_size = ONE_GB;
-        int result = wr_init(g_wr_param);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to initialize logger";
+        strcpy(g_gr_param.log_home, "./testlog");
+        g_gr_param.log_level = 255;
+        g_gr_param.log_backup_file_count = 100;
+        g_gr_param.log_max_file_size = ONE_GB;
+        int result = gr_init(g_gr_param);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to initialize logger";
 
-        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle2), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_create(g_inst_handle1, TEST_DIR, 0), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), WR_SUCCESS);
-        EXPECT_EQ(wr_file_create(g_vfs_handle1, TEST_FILE1, NULL), WR_SUCCESS);
-        EXPECT_EQ(wr_file_create(g_vfs_handle2, TEST_FILE2, NULL), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle2, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS);
+        EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle2), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_create(g_inst_handle1, TEST_DIR, 0), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), GR_SUCCESS);
+        EXPECT_EQ(gr_file_create(g_vfs_handle1, TEST_FILE1, NULL), GR_SUCCESS);
+        EXPECT_EQ(gr_file_create(g_vfs_handle2, TEST_FILE2, NULL), GR_SUCCESS);
+        EXPECT_EQ(gr_file_open(g_vfs_handle1, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_file_open(g_vfs_handle2, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), GR_SUCCESS);
     }
 
     void TearDown() override {
-        EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle1, false), WR_SUCCESS); 
-        EXPECT_EQ(wr_file_close(g_vfs_handle2, &file_handle2, false), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle2), WR_SUCCESS);
+        EXPECT_EQ(gr_file_close(g_vfs_handle1, &file_handle1, false), GR_SUCCESS); 
+        EXPECT_EQ(gr_file_close(g_vfs_handle2, &file_handle2, false), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_unmount(&g_vfs_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_unmount(&g_vfs_handle2), GR_SUCCESS);
 #ifndef ENABLE_WORM
-        EXPECT_EQ(wr_vfs_delete(g_inst_handle1, TEST_DIR, 1), WR_SUCCESS);
+        EXPECT_EQ(gr_vfs_delete(g_inst_handle1, TEST_DIR, 1), GR_SUCCESS);
 #endif
     }
 };
 
-TEST_F(AppendWrApiTest, TestWrite) {
+TEST_F(AppendGRApiTest, TestWrite) {
     const int data_size1 = 512 * 1024; // 512KB
     const int data_size2 = 256 * 1024; // 256KB
     char *data1 = new char[data_size1];
@@ -73,11 +73,11 @@ TEST_F(AppendWrApiTest, TestWrite) {
     std::vector<std::thread> threads;
 
     // 写数据
-    EXPECT_EQ(wr_file_pwrite(g_vfs_handle1, &file_handle1, data1, data_size1, 0), data_size1);
-    EXPECT_EQ(wr_file_pwrite(g_vfs_handle2, &file_handle2, data2, data_size2, 0), data_size2);
+    EXPECT_EQ(gr_file_pwrite(g_vfs_handle1, &file_handle1, data1, data_size1, 0), data_size1);
+    EXPECT_EQ(gr_file_pwrite(g_vfs_handle2, &file_handle2, data2, data_size2, 0), data_size2);
     // 读数据
-    EXPECT_EQ(wr_file_pread(g_vfs_handle1, file_handle1, read_buffer1, data_size1, 0), data_size1);
-    EXPECT_EQ(wr_file_pread(g_vfs_handle2, file_handle2, read_buffer2, data_size2, 0), data_size2);
+    EXPECT_EQ(gr_file_pread(g_vfs_handle1, file_handle1, read_buffer1, data_size1, 0), data_size1);
+    EXPECT_EQ(gr_file_pread(g_vfs_handle2, file_handle2, read_buffer2, data_size2, 0), data_size2);
 
 
     // 验证读取的数据是否与写入的数据一致
@@ -85,15 +85,15 @@ TEST_F(AppendWrApiTest, TestWrite) {
     EXPECT_EQ(memcmp(data2, read_buffer2, data_size2), 0);
 
     // close file and change into lock mode
-    EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle1, true), WR_SUCCESS);
-    EXPECT_EQ(wr_file_close(g_vfs_handle2, &file_handle2, true), WR_SUCCESS);
+    EXPECT_EQ(gr_file_close(g_vfs_handle1, &file_handle1, true), GR_SUCCESS);
+    EXPECT_EQ(gr_file_close(g_vfs_handle2, &file_handle2, true), GR_SUCCESS);
 
-    EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE1, O_RDONLY, &file_handle1), WR_SUCCESS);
-    EXPECT_EQ(wr_file_open(g_vfs_handle2, TEST_FILE2, O_RDONLY, &file_handle2), WR_SUCCESS);
+    EXPECT_EQ(gr_file_open(g_vfs_handle1, TEST_FILE1, O_RDONLY, &file_handle1), GR_SUCCESS);
+    EXPECT_EQ(gr_file_open(g_vfs_handle2, TEST_FILE2, O_RDONLY, &file_handle2), GR_SUCCESS);
 
     // 读数据
-    EXPECT_EQ(wr_file_pread(g_vfs_handle1, file_handle1, read_buffer1, data_size1, 0), data_size1);
-    EXPECT_EQ(wr_file_pread(g_vfs_handle2, file_handle2, read_buffer2, data_size2, 0), data_size2);
+    EXPECT_EQ(gr_file_pread(g_vfs_handle1, file_handle1, read_buffer1, data_size1, 0), data_size1);
+    EXPECT_EQ(gr_file_pread(g_vfs_handle2, file_handle2, read_buffer2, data_size2, 0), data_size2);
 
     delete[] data1;
     delete[] data2;
