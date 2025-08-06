@@ -3,8 +3,8 @@
 #include <vector>
 #include <fcntl.h>
 extern "C" {
-#include "wr_api.h"
-#include "wr_errno.h"
+#include "gr_api.h"
+#include "gr_errno.h"
 }
 
 #define TEST_LOG_DIR "./test_log"
@@ -16,76 +16,76 @@ extern "C" {
 
 int errorcode = 0;
 const char *errormsg = NULL;
-wr_instance_handle g_inst_handle1 = NULL;
-wr_instance_handle g_inst_handle2 = NULL;
-wr_instance_handle g_inst_handle3 = NULL;
-wr_instance_handle g_inst_handle4 = NULL;
+gr_instance_handle g_inst_handle1 = NULL;
+gr_instance_handle g_inst_handle2 = NULL;
+gr_instance_handle g_inst_handle3 = NULL;
+gr_instance_handle g_inst_handle4 = NULL;
 
-wr_vfs_handle g_vfs_handle1;
-wr_vfs_handle g_vfs_handle2;
-wr_vfs_handle g_vfs_handle3;
-wr_vfs_handle g_vfs_handle4;
+gr_vfs_handle g_vfs_handle1;
+gr_vfs_handle g_vfs_handle2;
+gr_vfs_handle g_vfs_handle3;
+gr_vfs_handle g_vfs_handle4;
 
-wr_file_handle file_handle1;
-wr_file_handle file_handle2;
-wr_file_handle file_handle3;
-wr_file_handle file_handle4;
+gr_file_handle file_handle1;
+gr_file_handle file_handle2;
+gr_file_handle file_handle3;
+gr_file_handle file_handle4;
 
-wr_param_t g_wr_param;
+gr_param_t g_gr_param;
 
-class ComplexWrApiTest : public ::testing::Test {
+class ComplexGRApiTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        strcpy(g_wr_param.log_home, "./testlog");
-        g_wr_param.log_level = 255;
-        g_wr_param.log_backup_file_count = 100;
-        g_wr_param.log_max_file_size = ONE_GB;
-        int result = wr_init(g_wr_param);
-        ASSERT_EQ(result, WR_SUCCESS) << "Failed to initialize logger";
+        strcpy(g_gr_param.log_home, "./testlog");
+        g_gr_param.log_level = 255;
+        g_gr_param.log_backup_file_count = 100;
+        g_gr_param.log_max_file_size = ONE_GB;
+        int result = gr_init(g_gr_param);
+        ASSERT_EQ(result, GR_SUCCESS) << "Failed to initialize logger";
 
-        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle2), WR_SUCCESS);
-        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle3), WR_SUCCESS);
-        EXPECT_EQ(wr_create_inst(SERVER_ADDR, &g_inst_handle4), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_create(g_inst_handle1, TEST_DIR, 0), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle3), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle4), WR_SUCCESS);
+        EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle2), GR_SUCCESS);
+        EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle3), GR_SUCCESS);
+        EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle4), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_create(g_inst_handle1, TEST_DIR, 0), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle3), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle4), GR_SUCCESS);
         
 
-        EXPECT_EQ(wr_file_create(g_vfs_handle1, TEST_FILE1, NULL), WR_SUCCESS);
-        EXPECT_EQ(wr_file_create(g_vfs_handle2, TEST_FILE2, NULL), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle1, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle2, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle3, TEST_FILE1, O_RDWR | O_SYNC, &file_handle3), WR_SUCCESS);
-        EXPECT_EQ(wr_file_open(g_vfs_handle4, TEST_FILE2, O_RDWR | O_SYNC, &file_handle4), WR_SUCCESS);
+        EXPECT_EQ(gr_file_create(g_vfs_handle1, TEST_FILE1, NULL), GR_SUCCESS);
+        EXPECT_EQ(gr_file_create(g_vfs_handle2, TEST_FILE2, NULL), GR_SUCCESS);
+        EXPECT_EQ(gr_file_open(g_vfs_handle1, TEST_FILE1, O_RDWR | O_SYNC, &file_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_file_open(g_vfs_handle2, TEST_FILE2, O_RDWR | O_SYNC, &file_handle2), GR_SUCCESS);
+        EXPECT_EQ(gr_file_open(g_vfs_handle3, TEST_FILE1, O_RDWR | O_SYNC, &file_handle3), GR_SUCCESS);
+        EXPECT_EQ(gr_file_open(g_vfs_handle4, TEST_FILE2, O_RDWR | O_SYNC, &file_handle4), GR_SUCCESS);
     }
     
     void TearDown() override {
-        EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle1, true), WR_SUCCESS);
-        EXPECT_EQ(wr_file_close(g_vfs_handle1, &file_handle2, true), WR_SUCCESS);
+        EXPECT_EQ(gr_file_close(g_vfs_handle1, &file_handle1, true), GR_SUCCESS);
+        EXPECT_EQ(gr_file_close(g_vfs_handle1, &file_handle2, true), GR_SUCCESS);
 #ifndef ENABLE_WORM
-        EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE1), WR_SUCCESS);
-        EXPECT_EQ(wr_file_delete(g_vfs_handle1, TEST_FILE2), WR_SUCCESS);
+        EXPECT_EQ(gr_file_delete(g_vfs_handle1, TEST_FILE1), GR_SUCCESS);
+        EXPECT_EQ(gr_file_delete(g_vfs_handle1, TEST_FILE2), GR_SUCCESS);
 #endif
-        EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle1), WR_SUCCESS);
-        EXPECT_EQ(wr_vfs_unmount(&g_vfs_handle2), WR_SUCCESS);
+        EXPECT_EQ(gr_vfs_unmount(&g_vfs_handle1), GR_SUCCESS);
+        EXPECT_EQ(gr_vfs_unmount(&g_vfs_handle2), GR_SUCCESS);
 #ifndef ENABLE_WORM
-        EXPECT_EQ(wr_vfs_delete(g_inst_handle1, TEST_DIR, 1), WR_SUCCESS);
+        EXPECT_EQ(gr_vfs_delete(g_inst_handle1, TEST_DIR, 1), GR_SUCCESS);
 #endif
     }
 };
 
-void writeData(wr_file_handle *file_handle, wr_vfs_handle vfs_handle, const char* data, size_t size, int64_t offset) {
-    EXPECT_EQ(wr_file_pwrite(vfs_handle, file_handle, data, size, offset), size);
+void writeData(gr_file_handle *file_handle, gr_vfs_handle vfs_handle, const char* data, size_t size, int64_t offset) {
+    EXPECT_EQ(gr_file_pwrite(vfs_handle, file_handle, data, size, offset), size);
 }
 
-void readData(wr_file_handle file_handle, wr_vfs_handle vfs_handle, char* buffer, size_t size, int64_t offset) {
-    EXPECT_EQ(wr_file_pread(vfs_handle, file_handle, buffer, size, offset), size);
+void readData(gr_file_handle file_handle, gr_vfs_handle vfs_handle, char* buffer, size_t size, int64_t offset) {
+    EXPECT_EQ(gr_file_pread(vfs_handle, file_handle, buffer, size, offset), size);
 }
 
-TEST_F(ComplexWrApiTest, TestConcurrentReadWrite) {
+TEST_F(ComplexGRApiTest, TestConcurrentReadWrite) {
     const int data_size1 = 512 * 1024; // 512KB
     const int data_size2 = 256 * 1024; // 256KB
     char *data1 = new char[data_size1];

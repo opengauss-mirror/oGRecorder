@@ -1,9 +1,9 @@
-/* gcc test1.c -I GR/src/interface -lwrapi -L GR/output/lib */
+/* gcc test1.c -I GR/src/interface -lgrapi -L GR/output/lib */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "wr_api.h"
-#include "wr_errno.h"
+#include "gr_api.h"
+#include "gr_errno.h"
 
 #define TEST_LOG_DIR "./test_log"
 #define TEST_DIR "testdir1"
@@ -14,39 +14,39 @@
 int main() {
     int errorcode = 0;
     const char *errormsg = NULL;
-    wr_instance_handle g_inst_handle = NULL;
+    gr_instance_handle g_inst_handle = NULL;
     int handle1 = 0;
 
     // 初始化日志
-    if (wr_init_logger(TEST_LOG_DIR, 255, 100, ONE_GB) != WR_SUCCESS) {
+    if (gr_init_logger(TEST_LOG_DIR, 255, 100, ONE_GB) != GR_SUCCESS) {
         fprintf(stderr, "Failed to initialize logger\n");
         return EXIT_FAILURE;
     }
 
     // 创建实例
-    if (wr_create_inst(SERVER_ADDR, &g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_create_inst(SERVER_ADDR, &g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error creating instance: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
     }
 
     // 创建VFS
-    if (wr_vfs_create(TEST_DIR, g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_vfs_create(TEST_DIR, g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error creating VFS: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
     }
 
     // 创建文件
-    if (wr_file_create(TEST_FILE1, 0, g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_file_create(TEST_FILE1, 0, g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error creating file: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
     }
 
     // 打开文件
-    if (wr_file_open(TEST_FILE1, 0, &handle1, g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_file_open(TEST_FILE1, 0, &handle1, g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error opening file: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
     }
@@ -61,8 +61,8 @@ int main() {
     memset(large_data, 'A', large_data_size);
 
     // 写入大数据块到文件
-    if (wr_file_pwrite(handle1, large_data, large_data_size, 0, g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_file_pwrite(handle1, large_data, large_data_size, 0, g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error writing to file: %d : %s\n", errorcode, errormsg);
         free(large_data);
         return EXIT_FAILURE;
@@ -75,8 +75,8 @@ int main() {
         free(large_data);
         return EXIT_FAILURE;
     }
-    if (wr_file_pread(handle1, read_buffer, large_data_size, 0, g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_file_pread(handle1, read_buffer, large_data_size, 0, g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error reading from file: %d : %s\n", errorcode, errormsg);
         free(large_data);
         free(read_buffer);
@@ -98,22 +98,22 @@ int main() {
     free(read_buffer);
 
     // 关闭文件
-    if (wr_file_close(handle1, g_inst_handle, true) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_file_close(handle1, g_inst_handle, true) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error closing file: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
     }
 
     // 删除文件
-    if (wr_file_delete(TEST_FILE1, g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_file_delete(TEST_FILE1, g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error deleting file: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
     }
 
     // 删除VFS
-    if (wr_vfs_delete(TEST_DIR, g_inst_handle) != WR_SUCCESS) {
-        wr_get_error(&errorcode, &errormsg);
+    if (gr_vfs_delete(TEST_DIR, g_inst_handle) != GR_SUCCESS) {
+        gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error deleting VFS: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;
     }

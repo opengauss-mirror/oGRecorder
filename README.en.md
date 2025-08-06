@@ -50,5 +50,5 @@ After compilation, the dynamic libraries are generated in the `GR/output/lib` di
 Modify `GR/test/test_home/test_env` to set `CODE_BASE` to the absolute path of the GR directory. Execute `GR/test/gtest/build.sh` to compile the UT code.
 
 ```bash
-./test_wr_api
+./test_api
 ```

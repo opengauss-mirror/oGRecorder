@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # 项目名称
-project(WrApiTest)
+project(GRApiTest)
 
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 11)
@@ -23,7 +23,7 @@ include_directories(../../src/interface)
 link_directories(../../output/lib)
 
 # 添加测试源文件
-add_executable(test_wr_api test_wr_api.cc)
+add_executable(test_api test_api.cc)
 add_executable(test_performance test_performance.cc)
 add_executable(test_rw test_rw.cc)
 add_executable(test_mutliwrite test_mutliwrite.cc)
@@ -31,7 +31,7 @@ add_executable(test_appendwrite test_appendwrite.cc)
 add_executable(test_insthandle test_insthandle.cc)
 
 # 链接 Google Test 库和项目库
-target_link_libraries(test_wr_api ${GTEST_LIBRARIES} pthread grapi)
+target_link_libraries(test_api ${GTEST_LIBRARIES} pthread grapi)
 target_link_libraries(test_performance ${GTEST_LIBRARIES} pthread grapi)
 target_link_libraries(test_rw ${GTEST_LIBRARIES} pthread grapi)
 target_link_libraries(test_mutliwrite ${GTEST_LIBRARIES} pthread grapi)
@@ -42,17 +42,17 @@ target_link_libraries(test_insthandle ${GTEST_LIBRARIES} pthread grapi)
 enable_testing()
 
 # 添加测试
-add_test(NAME WrApiTest COMMAND test_wr_api)
-add_test(NAME WrApiPerformanceTest COMMAND test_performance)
-add_test(NAME WrApiRwTest COMMAND test_rw)
-add_test(NAME WrApiMultiWriteTest COMMAND test_mutliwrite)
-add_test(NAME WrApiAppendWriteTest COMMAND test_appendwrite)
-add_test(NAME WrCreateInstHandle COMMAND test_insthandle)
+add_test(NAME GRApiTest COMMAND test_api)
+add_test(NAME GRApiPerformanceTest COMMAND test_performance)
+add_test(NAME GRApiRwTest COMMAND test_rw)
+add_test(NAME GRApiMultiWriteTest COMMAND test_mutliwrite)
+add_test(NAME GRApiAppendWriteTest COMMAND test_appendwrite)
+add_test(NAME GRCreateInstHandle COMMAND test_insthandle)
 
 
 if(DEFINED AUTO_TEST AND AUTO_TEST)
     add_custom_target(run_all_tests ALL
-        DEPENDS test_wr_api test_performance test_rw test_mutliwrite test_appendwrite test_insthandle
+        DEPENDS test_api test_performance test_rw test_mutliwrite test_appendwrite test_insthandle
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )

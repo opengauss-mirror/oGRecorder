@@ -22,11 +22,11 @@
  * -------------------------------------------------------------------------
  */
 
-#ifndef __WRCMD_H__
-#define __WRCMD_H__
+#ifndef __GRCMD_H__
+#define __GRCMD_H__
 
-#include "wr_defs.h"
-#include "wr_interaction.h"
+#include "gr_defs.h"
+#include "gr_interaction.h"
 
 int32_t execute_help_cmd(int argc, char **argv, uint32_t *idx, bool8 *go_ahead);
 

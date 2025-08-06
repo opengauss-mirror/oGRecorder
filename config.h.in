@@ -1,3 +1,3 @@
-#ifndef DEF_WR_VERSION
-#define DEF_WR_VERSION "@WR_VERSION_STR@"
+#ifndef DEF_GR_VERSION
+#define DEF_GR_VERSION "@GR_VERSION_STR@"
 #endif

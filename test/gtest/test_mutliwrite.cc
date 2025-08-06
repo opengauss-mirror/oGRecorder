@@ -6,8 +6,8 @@
 #include <fcntl.h>
 #include <chrono>
 extern "C" {
-#include "wr_api.h"
-#include "wr_errno.h"
+#include "gr_api.h"
+#include "gr_errno.h"
 }
 
 #define SERVER_ADDR "127.0.0.1:19225"
@@ -19,35 +19,35 @@ extern "C" {
 int errorcode = 0;
 const char *errormsg = NULL;
 
-wr_param_t g_wr_param;
-wr_instance_handle g_inst_handle[NUM_THREADS];
-wr_vfs_handle g_vfs_handle[NUM_THREADS];
+gr_param_t g_gr_param;
+gr_instance_handle g_inst_handle[NUM_THREADS];
+gr_vfs_handle g_vfs_handle[NUM_THREADS];
 
-class WrApiConcurrentPerformanceTest : public ::testing::Test {
+class GRApiConcurrentPerformanceTest : public ::testing::Test {
 protected:
     void SetUp() override {
         /*
-         *   strcpy(g_wr_param.log_home, "./testlog");
-         *   g_wr_param.log_level = 255;
-         *   g_wr_param.log_backup_file_count = 100;
-         *   g_wr_param.log_max_file_size = ONE_GB;
-         *   wr_init(g_wr_param); 
+         *   strcpy(g_gr_param.log_home, "./testlog");
+         *   g_gr_param.log_level = 255;
+         *   g_gr_param.log_backup_file_count = 100;
+         *   g_gr_param.log_max_file_size = ONE_GB;
+         *   gr_init(g_gr_param); 
         */
         for (int i = 0; i < NUM_THREADS; i++) {
-            int result = wr_create_inst(SERVER_ADDR, &g_inst_handle[i]);
-            ASSERT_EQ(result, WR_SUCCESS) << "Failed to create instance";
+            int result = gr_create_inst(SERVER_ADDR, &g_inst_handle[i]);
+            ASSERT_EQ(result, GR_SUCCESS) << "Failed to create instance";
 
             std::string dir_name = std::string("testdir") + std::to_string(i);
-            result = wr_vfs_create(g_inst_handle[i], dir_name.c_str(), 0);
-            // ASSERT_EQ(result, WR_SUCCESS) << "Failed to create VFS";
+            result = gr_vfs_create(g_inst_handle[i], dir_name.c_str(), 0);
+            // ASSERT_EQ(result, GR_SUCCESS) << "Failed to create VFS";
 
-            result = wr_vfs_mount(g_inst_handle[i], dir_name.c_str(), &g_vfs_handle[i]);
-            ASSERT_EQ(result, WR_SUCCESS) << "Failed to mount VFS";
+            result = gr_vfs_mount(g_inst_handle[i], dir_name.c_str(), &g_vfs_handle[i]);
+            ASSERT_EQ(result, GR_SUCCESS) << "Failed to mount VFS";
 
 
             std::string file_name = std::string("testfile");
-            result = wr_file_create(g_vfs_handle[i], file_name.c_str(), NULL);
-            // ASSERT_EQ(result, WR_SUCCESS) << "Failed to create file " << file_name;
+            result = gr_file_create(g_vfs_handle[i], file_name.c_str(), NULL);
+            // ASSERT_EQ(result, GR_SUCCESS) << "Failed to create file " << file_name;
         }
 
     }
@@ -55,17 +55,17 @@ protected:
     void TearDown() override {
         for (int i = 0; i < NUM_THREADS; i++) {
             std::string dir_name = std::string("testdir") + std::to_string(i);
-            wr_vfs_delete(g_inst_handle[i], dir_name.c_str(), 1);
+            gr_vfs_delete(g_inst_handle[i], dir_name.c_str(), 1);
         }
     }
 };
 
-void writeToFileWithPerformance(wr_vfs_handle vfs_handle, const std::string& file_name, const char* data, size_t step_size, size_t total_size) {
+void writeToFileWithPerformance(gr_vfs_handle vfs_handle, const std::string& file_name, const char* data, size_t step_size, size_t total_size) {
     int handle;
     int result;
-    wr_file_handle file_handle;
-    result = wr_file_open(vfs_handle, file_name.c_str(), O_RDWR | O_SYNC, &file_handle);
-    ASSERT_EQ(result, WR_SUCCESS) << "Failed to open file " << file_name;
+    gr_file_handle file_handle;
+    result = gr_file_open(vfs_handle, file_name.c_str(), O_RDWR | O_SYNC, &file_handle);
+    ASSERT_EQ(result, GR_SUCCESS) << "Failed to open file " << file_name;
 
     auto total_start = std::chrono::high_resolution_clock::now();
     double total_latency = 0.0;
@@ -73,12 +73,12 @@ void writeToFileWithPerformance(wr_vfs_handle vfs_handle, const std::string& fil
 
     for (int offset = 0; offset < total_size; offset += step_size) {
         auto start = std::chrono::high_resolution_clock::now();
-        result = wr_file_pwrite(vfs_handle, &file_handle, data, step_size, offset);
+        result = gr_file_pwrite(vfs_handle, &file_handle, data, step_size, offset);
         auto end = std::chrono::high_resolution_clock::now();
 
         if (result != step_size) {
-            wr_get_error(&errorcode, &errormsg);
-            printf("wr_file_pwrite interaction failure. code:%d msg:%s\n", errorcode, errormsg);
+            gr_get_error(&errorcode, &errormsg);
+            printf("gr_file_pwrite interaction failure. code:%d msg:%s\n", errorcode, errormsg);
             return;
         }
 
@@ -96,10 +96,10 @@ void writeToFileWithPerformance(wr_vfs_handle vfs_handle, const std::string& fil
     std::cout << "File: " << file_name << " - Write speed: " << speed << " MB/s" << std::endl;
     std::cout << "File: " << file_name << " - Average latency per write: " << average_latency << " milliseconds" << std::endl;
 
-    wr_file_close(vfs_handle, &file_handle, false);
+    gr_file_close(vfs_handle, &file_handle, false);
 }
 
-TEST_F(WrApiConcurrentPerformanceTest, TestConcurrentWritePerformance) {
+TEST_F(GRApiConcurrentPerformanceTest, TestConcurrentWritePerformance) {
     const int step_size = 8 * 1024; // 8KB
     const int total_size = 80 * 1024 * 1024; // 80MB
     char *data = new char[step_size];
