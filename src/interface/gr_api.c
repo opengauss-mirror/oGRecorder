@@ -705,9 +705,9 @@ int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *va
         return GR_ERROR;
     }
 
-    if (cm_strcmpi(name, "_LOG_LEVEL") != 0 && cm_strcmpi(name, "_LOG_MAX_FILE_SIZE") != 0 &&
-        cm_strcmpi(name, "_LOG_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "_AUDIT_MAX_FILE_SIZE") != 0 &&
-        cm_strcmpi(name, "_AUDIT_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "_AUDIT_LEVEL") != 0 && 
+    if (cm_strcmpi(name, "LOG_LEVEL") != 0 && cm_strcmpi(name, "LOG_MAX_FILE_SIZE") != 0 &&
+        cm_strcmpi(name, "LOG_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_MAX_FILE_SIZE") != 0 &&
+        cm_strcmpi(name, "AUDIT_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_LEVEL") != 0 && 
         cm_strcmpi(name, "DATA_FILE_PATH") != 0) {
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid name when set cfg");
         return GR_ERROR;

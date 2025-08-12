@@ -73,27 +73,27 @@ static config_item_t g_gr_params[] = {
         NULL, 1, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_LOG_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
+    {"LOG_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
         NULL, 3, EFFECT_REBOOT, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
-    {"_LOG_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
+    {"LOG_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
         NULL, 4, EFFECT_REBOOT, CFG_INS, gr_verify_log_file_size, gr_notify_log_file_size, NULL, NULL},
     {"INST_ID", CM_TRUE, ATTR_READONLY, "0", NULL, NULL, "-", "[0,64)", "GS_TYPE_INTEGER",
         NULL, 5, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER",
+    {"LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER",
         NULL, 6, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
     {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
         NULL, 7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_AUDIT_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
+    {"AUDIT_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
         NULL, 8, EFFECT_REBOOT, CFG_INS, gr_verify_audit_backup_file_count, gr_notify_audit_backup_file_count, NULL, NULL},
-    {"_AUDIT_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
+    {"AUDIT_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
         NULL, 9, EFFECT_REBOOT, CFG_INS, gr_verify_audit_file_size, gr_notify_audit_file_size, NULL, NULL},
-    {"_LOG_FILE_PERMISSIONS", CM_TRUE, ATTR_READONLY, "600", NULL, NULL, "-", "[600-777]", "GS_TYPE_INTEGER",
+    {"LOG_FILE_PERMISSIONS", CM_TRUE, ATTR_READONLY, "600", NULL, NULL, "-", "[600-777]", "GS_TYPE_INTEGER",
         NULL, 10, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_LOG_PATH_PERMISSIONS", CM_TRUE, ATTR_READONLY, "700", NULL, NULL, "-", "[700-777]", "GS_TYPE_INTEGER",
+    {"LOG_PATH_PERMISSIONS", CM_TRUE, ATTR_READONLY, "700", NULL, NULL, "-", "[700-777]", "GS_TYPE_INTEGER",
         NULL, 11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SSL_PWD_CIPHERTEXT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 12, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_SHM_KEY", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER",
+    {"SHM_KEY", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER",
         NULL, 13, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 14, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
@@ -101,7 +101,7 @@ static config_item_t g_gr_params[] = {
         NULL, 15, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"INTERCONNECT_CHANNEL_NUM", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,32]", "GS_TYPE_INTEGER",
         NULL, 16, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER",
+    {"MES_WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER",
         NULL, 17, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER",
         NULL, 18, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
@@ -117,34 +117,30 @@ static config_item_t g_gr_params[] = {
         NULL, 23, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SSL_CIPHER", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 24, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"POOL_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 25, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"IMAGE_NAMES", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 26, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"_AUDIT_LEVEL", CM_TRUE, ATTR_NONE, "1", NULL, NULL, "-", "[0,255]", "GS_TYPE_INTEGER",
-        NULL, 27, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_audit_level, gr_notify_audit_level, NULL, NULL},
+    {"AUDIT_LEVEL", CM_TRUE, ATTR_NONE, "1", NULL, NULL, "-", "[0,255]", "GS_TYPE_INTEGER",
+        NULL, 25, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_audit_level, gr_notify_audit_level, NULL, NULL},
     {"SSL_PERIOD_DETECTION", CM_TRUE, ATTR_READONLY, "7", NULL, NULL, "-", "[1,180]", "GS_TYPE_INTEGER",
-        NULL, 28, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 26, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"MES_WITH_IP", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
-        NULL, 29, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 27, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"IP_WHITE_LIST_ON", CM_TRUE, ATTR_READONLY, "TRUE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
-        NULL, 30, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 28, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"IO_THREADS", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,8]", "GS_TYPE_INTEGER",
-        NULL, 31, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 29, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER",
-        NULL, 32, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 30, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"MES_WAIT_TIMEOUT", CM_TRUE, ATTR_NONE, "10000", NULL, NULL, "-", "[500,30000]", "GS_TYPE_INTEGER",
-        NULL, 34, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_mes_wait_timeout, gr_notify_mes_wait_timeout, NULL, NULL},
+        NULL, 31, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_mes_wait_timeout, gr_notify_mes_wait_timeout, NULL, NULL},
     {"DELAY_CLEAN_INTERVAL", CM_TRUE, ATTR_NONE, "5", NULL, NULL, "-", "[5,1000000]", "GS_TYPE_INTEGER",
-        NULL, 36, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_delay_clean_interval, gr_notify_delay_clean_interval, NULL, NULL},
+        NULL, 32, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_delay_clean_interval, gr_notify_delay_clean_interval, NULL, NULL},
     {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
-        NULL, 37, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 33, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_ALARM_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 38, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 34, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 39, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 35, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 40, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 36, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 };
 
 static const char *g_gr_config_file = (const char *)"gr_inst.ini";
@@ -249,12 +245,12 @@ static status_t gr_load_mes_channel_num(gr_config_t *inst_cfg)
 static status_t gr_load_mes_work_thread_cnt(gr_config_t *inst_cfg)
 {
     uint32_t work_thread_cnt;
-    char *value = cm_get_config_value(&inst_cfg->config, "WORK_THREAD_COUNT");
+    char *value = cm_get_config_value(&inst_cfg->config, "MES_WORK_THREAD_COUNT");
     status_t status = cm_str2uint32(value, &work_thread_cnt);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid parameter value of 'WORK_THREAD_COUNT'"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid parameter value of 'MES_WORK_THREAD_COUNT'"));
 
-    if (work_thread_cnt < GR_MIN_WORK_THREAD_COUNT || work_thread_cnt > GR_MAX_WORK_THREAD_COUNT) {
-        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "WORK_THREAD_COUNT"));
+    if (work_thread_cnt < GR_MIN_MES_WORK_THREAD_COUNT || work_thread_cnt > GR_MAX_MES_WORK_THREAD_COUNT) {
+        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "MES_WORK_THREAD_COUNT"));
     }
 
     inst_cfg->params.work_thread_cnt = work_thread_cnt;
@@ -545,17 +541,17 @@ static status_t gr_load_mes_with_ip(gr_config_t *inst_cfg)
 
 static status_t gr_load_shm_key(gr_config_t *inst_cfg)
 {
-    char *value = cm_get_config_value(&inst_cfg->config, "_SHM_KEY");
+    char *value = cm_get_config_value(&inst_cfg->config, "SHM_KEY");
     // 单个机器上最多允许(1<<GR_MAX_SHM_KEY_BITS)这么多个用户并发使用wr的范围的ipc key，这样是为了防止重叠
     // key组成为: (((基础_SHM_KEY << GR_MAX_SHM_KEY_BITS)      + inst_id) << 16) | 实际的业务id，
     // 实际的业务id具体范围现在分为[1,2][3,18],[19,20496]
     status_t status = cm_str2uint32(value, &inst_cfg->params.shm_key);
-    GR_RETURN_IFERR2(status, LOG_RUN_ERR("invalid parameter value of '_SHM_KEY', value:%s.", value));
+    GR_RETURN_IFERR2(status, LOG_RUN_ERR("invalid parameter value of 'SHM_KEY', value:%s.", value));
 
     if (inst_cfg->params.shm_key < GR_MIN_SHM_KEY || inst_cfg->params.shm_key > GR_MAX_SHM_KEY) {
-        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "the value of '_SHM_KEY' is invalid"));
+        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "the value of 'SHM_KEY' is invalid"));
     }
-    LOG_RUN_INF("_SHM_KEY is %u.", inst_cfg->params.shm_key);
+    LOG_RUN_INF("SHM_KEY is %u.", inst_cfg->params.shm_key);
     return CM_SUCCESS;
 }
 

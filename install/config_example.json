@@ -1,0 +1,20 @@
+{
+  "cluster": {
+    "name": "cluster",
+    "install_path": "/home/omm/install/",
+    "env_file": "/home/omm/env/gr_env",
+    "user": "omm",
+    "nodes": [
+      {
+        "name": "oGRecorder1",
+        "ip": "20.20.20.1",
+        "gr_port": 33228
+      },
+      {
+        "name": "oGRecorder2",
+        "ip": "20.20.20.2",
+        "gr_port": 33228
+      }
+    ]
+  }
+}

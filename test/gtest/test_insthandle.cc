@@ -133,8 +133,8 @@ const char* remoteServerAddr = "20.20.20.11:18440";
 const char* errorAddr = "111";
 
 /* 
- * 测试：连接本节点wrserver
- * 前提：本节点wrserver未启动
+ * 测试：连接本节点grserver
+ * 前提：本节点grserver未启动
  * 期望结果：连接失败
  */
 void test_case_1()
@@ -154,8 +154,8 @@ void test_case_1()
 }
 
 /* 
- * 测试：连接本节点wrserver
- * 前提：本节点wrserver启动
+ * 测试：连接本节点grserver
+ * 前提：本节点grserver启动
  * 期望结果：连接成功
  */
 void test_case_2()
@@ -176,8 +176,8 @@ void test_case_2()
 }
 
 /* 
- * 测试：跨节点连接wrserver
- * 前提：其他节点wrserver未启动
+ * 测试：跨节点连接grserver
+ * 前提：其他节点grserver未启动
  * 期望结果：连接失败
  */
 void test_case_3()
@@ -197,8 +197,8 @@ void test_case_3()
 }
 
 /* 
- * 测试：跨节点连接wrserver
- * 前提：其他节点wrserver启动
+ * 测试：跨节点连接grserver
+ * 前提：其他节点grserver启动
  * 期望结果：连接成功
  */
 void test_case_4()
@@ -241,7 +241,7 @@ void test_case_5()
 
 /* 
  * 测试：本节点创建多个连接
- * 前提：本节点wrserver启动
+ * 前提：本节点grserver启动
  * 期望结果：连接成功
  */
 void test_case_6()
@@ -286,7 +286,7 @@ void test_case_6()
 
 /* 
  * 测试：跨节点创建多个连接
- * 前提：其他节点wrserver启动
+ * 前提：其他节点grserver启动
  * 期望结果：连接成功
  */
 void test_case_7()
@@ -331,7 +331,7 @@ void test_case_7()
 
 /* 
  * 测试：连接本节点和跨节点连接
- * 前提：其他节点wrserver启动
+ * 前提：其他节点grserver启动
  * 期望结果：连接成功
  */
 void test_case_8()

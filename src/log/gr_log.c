@@ -36,17 +36,6 @@
  */
 const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     // Zenith File System, range [2000, 2500]
-    [ERR_GR_VOLUME_SYSTEM_IO] = "Failed to operate volume %s for system I/O error.",
-    [ERR_GR_VOLUME_OPEN] = "Open volume '%s' failed, reason %d",
-    [ERR_GR_VOLUME_READ] = "Read volume '%s' failed, volume id %d, reason %d",
-    [ERR_GR_VOLUME_WRITE] = "Write volume '%s' failed, volume id %d, reason %d",
-    [ERR_GR_VOLUME_SEEK] = "Seek volume '%s' failed, volume id %d, reason %d",
-    [ERR_GR_VOLUME_ADD] = "Failed to add volume %s, reason %s.",
-    [ERR_GR_VOLUME_EXISTED] = "Add/Replace an existed volume %s of volume-group %s failed",
-    [ERR_GR_VOLUME_NOEXIST] = "Remove/Replace a non-existent volume %s of volume-group %s failed",
-    [ERR_GR_VOLUME_REMOVE_NONEMPTY] = "Remove a nonempty volume %s failed",
-    [ERR_GR_VOLUME_REMOVE_SUPER_BLOCK] = "Remove super block %s failed",
-    [ERR_GR_VOLUME_REPLACE] = "Failed to replace volume %s, reason %s.",
     [ERR_GR_FILE_SEEK] = "Failed to seek file, vgid:%u, fid:%llu, offset:%lld, file size:%llu",
     [ERR_GR_FILE_REMOVE_OPENING] = "GR file is open",
     [ERR_GR_FILE_REMOVE_SYSTEM] = "GR file %s is system file",
@@ -109,7 +98,6 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_SERVER_REBOOT] = "GR server has reboot or close, gr client need reboot or close.",
     [ERR_GR_UNSUPPORTED_CMD] =
         "Command \"%s\" is not supported in current version(%u) of grserver, least supporting version is %u.",
-    [ERR_GR_VOLUME_FENCE_CHECK_COND] = "Fail to check fence cond:%s.",
     [ERR_GR_MASTER_CHANGE] = "Master id has changed.",
     [ERR_GR_RECOVER_CAUSE_BREAK] = "Req break by recovery.",
     [ERR_GR_FILE_SYSTEM_ERROR] = "File system error, reason %m.",
@@ -166,38 +154,38 @@ static status_t gr_init_log_file(log_param_t *log_param, gr_config_t *inst_cfg)
     int64 val_int64;
     uint16 val_uint16;
 
-    char *value = cm_get_config_value(&inst_cfg->config, "_LOG_MAX_FILE_SIZE");
+    char *value = cm_get_config_value(&inst_cfg->config, "LOG_MAX_FILE_SIZE");
     status_t status = cm_str2size(value, &val_int64);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_MAX_FILE_SIZE"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_MAX_FILE_SIZE"));
     if (val_int64 < CM_MIN_LOG_FILE_SIZE || val_int64 > CM_MAX_LOG_FILE_SIZE) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_MAX_FILE_SIZE");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_MAX_FILE_SIZE");
         return CM_ERROR;
     }
     log_param->max_log_file_size = (uint64)val_int64;
 
-    value = cm_get_config_value(&inst_cfg->config, "_AUDIT_MAX_FILE_SIZE");
+    value = cm_get_config_value(&inst_cfg->config, "AUDIT_MAX_FILE_SIZE");
     status = cm_str2size(value, &val_int64);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_AUDIT_MAX_FILE_SIZE"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_MAX_FILE_SIZE"));
     if (val_int64 < CM_MIN_LOG_FILE_SIZE || val_int64 > CM_MAX_LOG_FILE_SIZE) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_AUDIT_MAX_FILE_SIZE");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_MAX_FILE_SIZE");
         return CM_ERROR;
     }
     log_param->max_audit_file_size = (uint64)val_int64;
 
-    value = cm_get_config_value(&inst_cfg->config, "_LOG_FILE_PERMISSIONS");
+    value = cm_get_config_value(&inst_cfg->config, "LOG_FILE_PERMISSIONS");
     status = cm_str2uint16(value, &val_uint16);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_FILE_PERMISSIONS"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_FILE_PERMISSIONS"));
     if (val_uint16 < CM_DEF_LOG_FILE_PERMISSIONS || val_uint16 > CM_MAX_LOG_PERMISSIONS) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_FILE_PERMISSIONS");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_FILE_PERMISSIONS");
         return CM_ERROR;
     }
     cm_log_set_file_permissions(val_uint16);
 
-    value = cm_get_config_value(&inst_cfg->config, "_LOG_PATH_PERMISSIONS");
+    value = cm_get_config_value(&inst_cfg->config, "LOG_PATH_PERMISSIONS");
     status = cm_str2uint16(value, &val_uint16);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_PATH_PERMISSIONS"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_PATH_PERMISSIONS"));
     if (val_uint16 < CM_DEF_LOG_PATH_PERMISSIONS || val_uint16 > CM_MAX_LOG_PERMISSIONS) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_PATH_PERMISSIONS");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_PATH_PERMISSIONS");
         return CM_ERROR;
     }
     cm_log_set_path_permissions(val_uint16);
@@ -275,31 +263,31 @@ static status_t gr_init_loggers_inner(gr_config_t *inst_cfg, log_param_t *log_pa
 {
     uint32_t val_uint32;
 
-    char *value = cm_get_config_value(&inst_cfg->config, "_LOG_BACKUP_FILE_COUNT");
+    char *value = cm_get_config_value(&inst_cfg->config, "LOG_BACKUP_FILE_COUNT");
     if (cm_str2uint32(value, &val_uint32) != CM_SUCCESS) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_BACKUP_FILE_COUNT");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT");
         return CM_ERROR;
 #ifdef OPENGAUSS
     } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT_LARGER) {
 #else
     } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT) {
 #endif
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_BACKUP_FILE_COUNT");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT");
         return CM_ERROR;
     } else {
         log_param->log_backup_file_count = val_uint32;
     }
 
-    value = cm_get_config_value(&inst_cfg->config, "_AUDIT_BACKUP_FILE_COUNT");
+    value = cm_get_config_value(&inst_cfg->config, "AUDIT_BACKUP_FILE_COUNT");
     if (cm_str2uint32(value, &val_uint32) != CM_SUCCESS) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_AUDIT_BACKUP_FILE_COUNT");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_BACKUP_FILE_COUNT");
         return CM_ERROR;
 #ifdef OPENGAUSS
     } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT_LARGER) {
 #else
     } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT) {
 #endif
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_AUDIT_BACKUP_FILE_COUNT");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_BACKUP_FILE_COUNT");
         return CM_ERROR;
     } else {
         log_param->audit_backup_file_count = val_uint32;
@@ -308,21 +296,21 @@ static status_t gr_init_loggers_inner(gr_config_t *inst_cfg, log_param_t *log_pa
     status_t status = gr_init_log_file(log_param, inst_cfg);
     GR_RETURN_IF_ERROR(status);
 
-    value = cm_get_config_value(&inst_cfg->config, "_LOG_LEVEL");
+    value = cm_get_config_value(&inst_cfg->config, "LOG_LEVEL");
     status = cm_str2uint32(value, (uint32_t *)&log_param->log_level);
-    GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_LEVEL"));
+    GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL"));
     if (log_param->log_level > MAX_LOG_LEVEL) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_LEVEL");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL");
         return CM_ERROR;
     }
 
-    value = cm_get_config_value(&inst_cfg->config, "_AUDIT_LEVEL");
+    value = cm_get_config_value(&inst_cfg->config, "AUDIT_LEVEL");
     if (cm_str2uint32(value, (uint32_t *)&log_param->audit_level) != CM_SUCCESS) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_AUDIT_LEVEL");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_LEVEL");
         return CM_ERROR;
     }
     if (log_param->audit_level > GR_AUDIT_ALL) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_AUDIT_LEVEL");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_LEVEL");
         return CM_ERROR;
     }
     return gr_load_log_compressed(inst_cfg, log_param);
@@ -370,8 +358,8 @@ status_t gr_init_loggers(gr_config_t *inst_cfg, gr_log_def_t *log_def, uint32_t 
         CM_THROW_ERROR(ERR_SYSTEM_CALL, rc);
         return CM_ERROR;
     }
-    LOG_RUN_INF("gr set log param _LOG_LEVEL, param_value = %u", log_param->log_level);
-    LOG_RUN_INF("gr set log param _AUDIT_LEVEL, param_value = %u", log_param->audit_level);
+    LOG_RUN_INF("gr set log param LOG_LEVEL, param_value = %u", log_param->log_level);
+    LOG_RUN_INF("gr set log param AUDIT_LEVEL, param_value = %u", log_param->audit_level);
     return CM_SUCCESS;
 }
 

@@ -13,24 +13,24 @@ function check_grstatus()
 
 function test_getcfg()
 {
-    cfg_val=`cat $GR_HOME/cfg/gr_inst.ini | grep _LOG_LEVEL | sed 's/[^0-9]//g'`
-    get_val=`grcmd getcfg -n _LOG_LEVEL | sed 's/[^0-9]//g'`
+    cfg_val=`cat $GR_HOME/cfg/gr_inst.ini | grep LOG_LEVEL | sed 's/[^0-9]//g'`
+    get_val=`grcmd getcfg -n LOG_LEVEL | sed 's/[^0-9]//g'`
     if [ $get_val -eq $cfg_val ]; then
-        echo "Get cfg param _LOG_LEVEL successfully."
+        echo "Get cfg param LOG_LEVEL successfully."
     else
-        echo "Failed to get _LOG_LEVEL by grcmd getcfg."
+        echo "Failed to get LOG_LEVEL by grcmd getcfg."
         exit 1
     fi
 }
 
 function test_setcfg()
 {
-    grcmd setcfg -n _LOG_LEVEL -v 7
-    cfg_val=`cat $GR_HOME/cfg/gr_inst.ini | grep _LOG_LEVEL | sed 's/[^0-9]//g'`
+    grcmd setcfg -n LOG_LEVEL -v 7
+    cfg_val=`cat $GR_HOME/cfg/gr_inst.ini | grep LOG_LEVEL | sed 's/[^0-9]//g'`
     if [ $cfg_val -eq 7 ]; then
-        echo "Set param _LOG_LEVEL successfully."
+        echo "Set param LOG_LEVEL successfully."
     else
-        echo "Failed to set _LOG_LEVEL by grcmd setcfg."
+        echo "Failed to set LOG_LEVEL by grcmd setcfg."
         exit 1
     fi
 }
@@ -72,11 +72,11 @@ function recover_env()
     fi
     check_grstatus
 
-    res=`grcmd setcfg -n _LOG_LEVEL -v 255`
+    res=`grcmd setcfg -n LOG_LEVEL -v 255`
     if [[ $res =~ $"Succeed" ]]; then
-        echo "Successfully set _LOG_LEVEL to 255."
+        echo "Successfully set LOG_LEVEL to 255."
     else
-        echo "Failed to set _LOG_LEVEL."
+        echo "Failed to set LOG_LEVEL."
         exit 1
     fi
 }
