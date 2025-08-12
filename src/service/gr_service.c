@@ -201,12 +201,6 @@ static void gr_return_error(gr_session_t *session)
     send_pack->head->result = (uint8)CM_ERROR;
     send_pack->head->flags = 0;
     cm_get_error(&code, &message);
-    // volume open/seek/read write fail for I/O, just abort
-    if (code == ERR_GR_VOLUME_SYSTEM_IO) {
-        LOG_RUN_ERR("[GR] ABORT INFO: volume operate failed for I/O ERROR, errcode:%d.", code);
-        cm_fync_logfile();
-        gr_exit_error();
-    }
     (void)gr_put_int32(send_pack, (uint32_t)code);
     (void)gr_put_str_with_cutoff(send_pack, message);
     status_t status = gr_write(&session->pipe, send_pack);

@@ -64,11 +64,11 @@ TEST_F(GRApiTest, TestGRCreateInstance) {
 
 TEST_F(GRApiTest, TestGRSetGetConf) {
     char buf[100];
-    EXPECT_EQ(gr_set_conf(g_inst_handle, "_LOG_LEVEL", "7"), GR_SUCCESS);
-    EXPECT_EQ(gr_get_conf(g_inst_handle, "_LOG_LEVEL", buf), GR_SUCCESS);
+    EXPECT_EQ(gr_set_conf(g_inst_handle, "LOG_LEVEL", "7"), GR_SUCCESS);
+    EXPECT_EQ(gr_get_conf(g_inst_handle, "LOG_LEVEL", buf), GR_SUCCESS);
     EXPECT_EQ(strcmp(buf, "7"), 0);
-    EXPECT_EQ(gr_set_conf(g_inst_handle, "_LOG_LEVEL", "255"), GR_SUCCESS);
-    EXPECT_EQ(gr_get_conf(g_inst_handle, "_LOG_LEVEL", buf), GR_SUCCESS);
+    EXPECT_EQ(gr_set_conf(g_inst_handle, "LOG_LEVEL", "255"), GR_SUCCESS);
+    EXPECT_EQ(gr_get_conf(g_inst_handle, "LOG_LEVEL", buf), GR_SUCCESS);
     EXPECT_EQ(strcmp(buf, "255"), 0);
 }
 

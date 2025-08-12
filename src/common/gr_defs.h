@@ -153,7 +153,7 @@ extern "C" {
 
 #define GR_MAX_STACK_BUF_SIZE SIZE_K(512)
 
-#define GR_CMS_RES_TYPE "wr"
+#define GR_CMS_RES_TYPE "gr"
 
 #define GR_FILE_HASH_SIZE (uint32_t)5000
 

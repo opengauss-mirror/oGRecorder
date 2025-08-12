@@ -42,10 +42,10 @@ status_t gr_verify_log_level(void *lex, void *def)
     text_t text = {.str = value, .len = (uint32_t)strlen(value)};
     cm_trim_text(&text);
     status_t status = cm_text2uint32(&text, &num);
-    GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_LEVEL"));
+    GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL"));
 
     if (num > MAX_LOG_LEVEL) {
-        GR_RETURN_IFERR2(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "_LOG_LEVEL"));
+        GR_RETURN_IFERR2(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL"));
     }
 
     int32_t iret_snprintf =
@@ -172,19 +172,19 @@ status_t gr_verify_log_file_size(void *lex, void *def)
     text_t text = {.str = value, .len = (uint32_t)strlen(value)};
     cm_trim_text(&text);
 
-    // The last char of _LOG_MAX_FILE_SIZE is size unit, which should not be checked for number.
+    // The last char of LOG_MAX_FILE_SIZE is size unit, which should not be checked for number.
     char unit = text.str[text.len - 1];
     text.str[text.len - 1] = '\0';
     if (cm_check_is_number(text.str) != CM_SUCCESS) {
-        CM_THROW_ERROR_EX(ERR_VALUE_ERROR, "The text for _LOG_MAX_FILE_SIZE is not integer, text = %s", text.str);
+        CM_THROW_ERROR_EX(ERR_VALUE_ERROR, "The text for LOG_MAX_FILE_SIZE is not integer, text = %s", text.str);
         return CM_ERROR;
     }
     text.str[text.len - 1] = unit;
 
     status_t status = cm_text2size(&text, (int64 *)&num);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_MAX_FILE_SIZE"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_MAX_FILE_SIZE"));
     if (num < CM_MIN_LOG_FILE_SIZE || num > CM_MAX_LOG_FILE_SIZE) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_MAX_FILE_SIZE");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_MAX_FILE_SIZE");
         return CM_ERROR;
     }
 
@@ -207,13 +207,13 @@ status_t gr_verify_log_backup_file_count(void *lex, void *def)
     text_t text = {.str = value, .len = (uint32_t)strlen(value)};
     cm_trim_text(&text);
     status_t status = cm_text2uint32(&text, &num);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_BACKUP_FILE_COUNT"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT"));
 #ifdef OPENGAUSS
     if (num > CM_MAX_LOG_FILE_COUNT_LARGER) {
 #else
     if (num > CM_MAX_LOG_FILE_COUNT) {
 #endif
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_LOG_BACKUP_FILE_COUNT");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT");
         return CM_ERROR;
     }
 
@@ -236,13 +236,13 @@ status_t gr_verify_audit_backup_file_count(void *lex, void *def)
     text_t text = {.str = value, .len = (uint32_t)strlen(value)};
     cm_trim_text(&text);
     status_t status = cm_text2uint32(&text, &num);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_AUDIT_BACKUP_FILE_COUNT"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_BACKUP_FILE_COUNT"));
 #ifdef OPENGAUSS
     if (num > CM_MAX_LOG_FILE_COUNT_LARGER) {
 #else
     if (num > CM_MAX_LOG_FILE_COUNT) {
 #endif
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_AUDIT_BACKUP_FILE_COUNT");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_BACKUP_FILE_COUNT");
         return CM_ERROR;
     }
 
@@ -269,15 +269,15 @@ status_t gr_verify_audit_file_size(void *lex, void *def)
     char unit = text.str[text.len - 1];
     text.str[text.len - 1] = '\0';
     if (cm_check_is_number(text.str) != CM_SUCCESS) {
-        CM_THROW_ERROR_EX(ERR_VALUE_ERROR, "The text for _AUDIT_MAX_FILE_SIZE is not integer, text = %s", text.str);
+        CM_THROW_ERROR_EX(ERR_VALUE_ERROR, "The text for AUDIT_MAX_FILE_SIZE is not integer, text = %s", text.str);
         return CM_ERROR;
     }
     text.str[text.len - 1] = unit;
 
     status_t status = cm_text2size(&text, (int64 *)&num);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_AUDIT_MAX_FILE_SIZE"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_MAX_FILE_SIZE"));
     if (num < CM_MIN_LOG_FILE_SIZE || num > CM_MAX_LOG_FILE_SIZE) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "_AUDIT_MAX_FILE_SIZE");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_MAX_FILE_SIZE");
         return CM_ERROR;
     }
 
@@ -300,10 +300,10 @@ status_t gr_verify_audit_level(void *lex, void *def)
     text_t text = {.str = value, .len = (uint32_t)strlen(value)};
     cm_trim_text(&text);
     status_t status = cm_text2uint32(&text, &num);
-    GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "_AUDIT_LEVEL"));
+    GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_LEVEL"));
 
     if (num > GR_AUDIT_ALL) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "_AUDIT_LEVEL");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_LEVEL");
         return CM_ERROR;
     }
 

@@ -39,8 +39,8 @@
 extern "C" {
 #endif
 
-#define GR_MIN_WORK_THREAD_COUNT (2)
-#define GR_MAX_WORK_THREAD_COUNT (64)
+#define GR_MIN_MES_WORK_THREAD_COUNT (2)
+#define GR_MAX_MES_WORK_THREAD_COUNT (64)
 // for most time, standby nodes rerad meta from primary
 #define GR_WORK_THREAD_LOAD_DATA_PERCENT 0.5
 

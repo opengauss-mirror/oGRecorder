@@ -4296,10 +4296,9 @@ class dbClusterInfo():
                     if status != 0:
                         print("ERROR")
                     cmd = \
-                        "pscp -H %s %s/cluster_static_config_%s %s" \
-                        "/bin/cluster_static_config" % (
-                            dbNode.name, tmpDirName,
-                            dbNode.name, clusterInfo.appPath)
+                        "scp %s/cluster_static_config_%s %s:%s/bin/cluster_static_config" % (
+                            tmpDirName,
+                            dbNode.name, dbNode.name, clusterInfo.appPath)
                 else:
                     cmd = \
                         "mkdir -p %s/bin; cp %s/cluster_static_config_%s %s" \
@@ -4360,7 +4359,7 @@ class dbClusterInfo():
         # 分发
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "pscp -H %s %s %s" % (dbNode.name, PkgPath, clusterInfo.toolPath)
+                cmd = "scp %s %s:%s" % (PkgPath, dbNode.name, clusterInfo.toolPath)
                 status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp %s %s' % (PkgPath, clusterInfo.toolPath)
@@ -4382,8 +4381,8 @@ class dbClusterInfo():
         for dbNode in clusterInfo.dbNodes:
             config_content = (
                 f"INST_ID={dbNode.id - 1}\n"
-                f"_SHM_KEY=6\n"
-                f"_LOG_LEVEL=255\n"
+                f"SHM_KEY=6\n"
+                f"LOG_LEVEL=255\n"
                 f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
                 f"LISTEN_ADDR={dbNode.listen_addr}\n"
                 f"DATA_FILE_PATH={clusterInfo.grPath}/data\n"
@@ -4417,7 +4416,7 @@ class dbClusterInfo():
 
         # 生成资源添加脚本
         add_cmd = (
-            'cm_ctl res --add --res_name="wr" '
+            'cm_ctl res --add --res_name="gr" '
             '--res_attr="resources_type=APP,'
             'script={app_path}/bin/gr_contrl.sh,'
             'check_interval=1,'
@@ -4463,7 +4462,6 @@ class dbClusterInfo():
         ca_path = clusterInfo.grPath
         if not ca_path.endswith("CA"):
             ca_path = os.path.join(ca_path, "CA")
-        self.logger.log(f"CA path is: {ca_path}")
         for dbNode in clusterInfo.dbNodes:
             if (dbNode.name != GetHostIpOrName()):
                 cmd = "scp -r {certPath}/ {host}:{certPath}".format(certPath=ca_path, host=dbNode.sshIps[0])
@@ -4485,7 +4483,7 @@ class dbClusterInfo():
         # gr_om
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "pscp -H %s gr_om %s/bin" % (dbNode.name, clusterInfo.appPath)
+                cmd = "scp gr_om %s:%s/bin" % (dbNode.name, clusterInfo.appPath)
                 status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp gr_om %s/bin' % (clusterInfo.appPath)
@@ -4497,7 +4495,7 @@ class dbClusterInfo():
         # gr_contrl.sh脚本
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "pscp -H %s gr_contrl.sh %s/bin" % (dbNode.name, clusterInfo.appPath)
+                cmd = "scp gr_contrl.sh %s:%s/bin" % (dbNode.name, clusterInfo.appPath)
                 status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp gr_contrl.sh %s/bin' % (clusterInfo.appPath)
@@ -4509,7 +4507,7 @@ class dbClusterInfo():
         # py_pstree.py脚本
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "pscp -H %s py_pstree.py %s/script/" % (dbNode.name, clusterInfo.toolPath)
+                cmd = "scp py_pstree.py %s:%s/script/" % (dbNode.name, clusterInfo.toolPath)
                 status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp py_pstree.py %s/script' % (clusterInfo.toolPath)
@@ -4519,110 +4517,136 @@ class dbClusterInfo():
         self.logger.log("Successfully distribute py_pstree.py.")
         self.logger.log("Successfully install oGRecorder.")
 
-    def preinstall(self, xmlFile, user, envfile):
+    def preinstall(self, config_file, user, envfile):
+        """
+        Preinstall oGRecorder cluster using JSON configuration file
+        """
+        # Read JSON configuration file
+        if not os.path.exists(config_file):
+            print(f"Configuration file {config_file} does not exist!")
+            sys.exit(1)
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception as e:
+            print(f"Failed to read JSON configuration file: {e}")
+            sys.exit(1)
+        
+        # Extract cluster information from JSON config
+        if 'cluster' not in config:
+            print("Missing cluster configuration in JSON file!")
+            sys.exit(1)
+        
+        cluster_config = config['cluster']
+        nodes = cluster_config.get('nodes', [])
+        
+        if not nodes:
+            print("No nodes found in cluster configuration!")
+            sys.exit(1)
+        
+        # Initialize logger
         clusterInfo = dbClusterInfo()
-        clusterInfo.initFromXml(xmlFile)
-
-        # 初始化日志模块
-        self.initLogger("preinstall")
-
-        self.logger.log("Start preinstall oGRecorder.")
-        # 创建目录
-        for dbNode in clusterInfo.dbNodes:
-            cmd = "mkdir -p %s %s %s %s %s %s %s -m 755" % (
-                clusterInfo.toolPath, clusterInfo.grPath, clusterInfo.appPath,
-                dbNode.cmDataDir, clusterInfo.logPath, dbNode.datanodes[0].datadir, clusterInfo.tmpPath)
+        clusterInfo.initLogger("preinstall")
+        logger = clusterInfo.logger
+        
+        # Set paths based on JSON configuration
+        install_path = cluster_config.get('install_path', '/home/czk/install/')
+        clusterInfo.installPath = install_path
+        clusterInfo.toolPath = os.path.join(install_path, "tool")
+        clusterInfo.grPath = os.path.join(install_path, "gr")
+        clusterInfo.appPath = os.path.join(install_path, "gr")
+        clusterInfo.logPath = os.path.join(install_path, "log")
+        clusterInfo.tmpPath = os.path.join(install_path, "tmp")
+        datadnPath = os.path.join(install_path, "data/dn") # cm need "dn" to check disk, maybe need to change
+        logger.log("Start preinstall oGRecorder.")
+        
+        # Create directories
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
+            # Create basic directories
+            cmd = f"mkdir -p {clusterInfo.toolPath} {clusterInfo.grPath} {clusterInfo.appPath} {clusterInfo.logPath} {clusterInfo.tmpPath} {datadnPath} -m 755"
             status, output = self.execute_on_node(
-                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
             if status != 0:
-                raise Exception(f"failed to create preinstall directory, Error output:\n{output}")
-        self.logger.log("Successfully create preinstall directory.")
+                raise Exception(f"failed to create preinstall directory on {node_name}, Error output:\n{output}")
+        logger.log("Successfully create preinstall directory.")
 
-        # 修改权限
-        for dbNode in clusterInfo.dbNodes:
-            cmd = 'chown -R %s:%s %s %s %s %s %s %s %s' % (
-                user, user, clusterInfo.toolPath, clusterInfo.grPath,
-                clusterInfo.appPath, dbNode.cmDataDir, clusterInfo.logPath,
-                dbNode.datanodes[0].datadir, clusterInfo.tmpPath)
+        # Change permissions
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
+            cmd = f'chown -R {user}:{user} {clusterInfo.toolPath} {clusterInfo.grPath} {clusterInfo.appPath} {clusterInfo.logPath} {clusterInfo.tmpPath} {datadnPath}'
             status, output = self.execute_on_node(
-                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
             if status != 0:
-                raise Exception(f"failed to change permissions, Error output:\n{output}")
-        self.logger.log("Successfully change permissions.")
+                raise Exception(f"failed to change permissions on {node_name}, Error output:\n{output}")
+        logger.log("Successfully change permissions.")
 
-        # 创建环境变量文件
+        # Create environment variable file
         parent_dir = os.path.dirname(envfile)
-        for dbNode in clusterInfo.dbNodes:
-            if (dbNode.name != GetHostIpOrName()):
-                cmd = "ssh -q -o ConnectTimeout=5 %s 'mkdir -p %s && touch %s'" % (
-                        dbNode.name, parent_dir, envfile)
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
+            if (node_name != GetHostIpOrName()):
+                cmd = f"ssh -q -o ConnectTimeout=5 {node_name} 'mkdir -p {parent_dir} && touch {envfile}'"
             else:
-                cmd = 'mkdir -p %s && touch %s' % (parent_dir, envfile)
+                cmd = f'mkdir -p {parent_dir} && touch {envfile}'
             (status, output) = subprocess.getstatusoutput(cmd)
             if (status != 0):
-                raise Exception(f"failed to create environment variable file, Error output:\n{output}")
+                raise Exception(f"failed to create environment variable file on {node_name}, Error output:\n{output}")
         
-        # 配置环境变量
-        for dbNode in clusterInfo.dbNodes:
-            if (dbNode.name != GetHostIpOrName()):
-                cmd = "ssh -q -o ConnectTimeout=5 %s 'mkdir -p %s && touch %s'" % (
-                        dbNode.name, parent_dir, envfile)
-            else:
-                cmd = 'mkdir -p %s && touch %s' % (parent_dir, envfile)
-            (status, output) = subprocess.getstatusoutput(cmd)
-            if (status != 0):
-                raise Exception(f"failed to create environment variable file, Error output:\n{output}")
-        
-        # 配置环境变量
-        for dbNode in clusterInfo.dbNodes:
-            if (dbNode.name != GetHostIpOrName()):
-                cmd = '''ssh -q -o ConnectTimeout=5 %s "cat > %s <<'EOF'
-export MPPDB_ENV_SEPARATE_PATH=%s
-export GPHOME=%s
-export GAUSSHOME=%s
-export GAUSSLOG=%s
-export GR_HOME=%s
-export PGHOST=%s
+        # Configure environment variables
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
+            if (node_name != GetHostIpOrName()):
+                cmd = f'''ssh -q -o ConnectTimeout=5 {node_name} "cat > {envfile} <<'EOF'
+export MPPDB_ENV_SEPARATE_PATH={envfile}
+export GPHOME={clusterInfo.toolPath}
+export GAUSSHOME={clusterInfo.appPath}
+export GAUSSLOG={clusterInfo.logPath}
+export GR_HOME={clusterInfo.grPath}
+export PGHOST={clusterInfo.tmpPath}
 export PATH=\$GAUSSHOME/bin/:\$GR_HOME/bin/:\$PATH
 export LD_LIBRARY_PATH=\$GAUSSHOME/lib:\$GR_HOME/lib:\$LD_LIBRARY_PATH
 EOF"
-''' % (dbNode.name, envfile, envfile, clusterInfo.toolPath, clusterInfo.appPath, clusterInfo.logPath, clusterInfo.grPath, clusterInfo.tmpPath)
+'''
             else:
-                cmd = '''cat > %s <<'EOF'
-export MPPDB_ENV_SEPARATE_PATH=%s
-export GPHOME=%s
-export GAUSSHOME=%s
-export GAUSSLOG=%s
-export GR_HOME=%s
-export PGHOST=%s
+                cmd = f'''cat > {envfile} <<'EOF'
+export MPPDB_ENV_SEPARATE_PATH={envfile}
+export GPHOME={clusterInfo.toolPath}
+export GAUSSHOME={clusterInfo.appPath}
+export GAUSSLOG={clusterInfo.logPath}
+export GR_HOME={clusterInfo.grPath}
+export PGHOST={clusterInfo.tmpPath}
 export PATH=$GAUSSHOME/bin/:$GR_HOME/bin/:$PATH
 export LD_LIBRARY_PATH=$GAUSSHOME/lib:$GR_HOME/lib:$LD_LIBRARY_PATH
 EOF
-''' % (envfile, envfile, clusterInfo.toolPath, clusterInfo.appPath, clusterInfo.logPath, clusterInfo.grPath, clusterInfo.tmpPath)
+'''
             (status, output) = subprocess.getstatusoutput(cmd)
             if (status != 0):
-                raise Exception(f"failed to add environment variable, Error output:\n{output}")
-        self.logger.log("Successfully add environment variable.")
+                raise Exception(f"failed to add environment variable on {node_name}, Error output:\n{output}")
+        logger.log("Successfully add environment variable.")
 
-        # 修改权限
-        for dbNode in clusterInfo.dbNodes:
-            cmd = 'chown -R %s:%s %s' % (user, user, parent_dir)
+        # Change permissions for environment file
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
+            cmd = f'chown -R {user}:{user} {parent_dir}'
             status, output = self.execute_on_node(
-                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
             if status != 0:
-                raise Exception(f"failed to change permissions, Error output:\n{output}")
-        self.logger.log("Successfully change permissions.")
+                raise Exception(f"failed to change permissions on {node_name}, Error output:\n{output}")
+        logger.log("Successfully change permissions.")
 
-        # 添加定时任务权限
-        for dbNode in clusterInfo.dbNodes:
+        # Add crontab permission
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
             cmd = f"grep -q '^{user}$' /etc/cron.allow || echo '{user}' >> /etc/cron.allow"
             status, output = self.execute_on_node(
-                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
             if status != 0:
-                raise Exception(f"Failed to add user {user} to /etc/cron.allow on node {dbNode.name}")
-        self.logger.log("Successfully add crontab permission.")
+                raise Exception(f"Failed to add user {user} to /etc/cron.allow on node {node_name}")
+        logger.log("Successfully add crontab permission.")
 
-        # 设置 /etc/security/limits.conf 资源限制
+        # Set /etc/security/limits.conf resource limits
         limits_conf_lines = [
             f"{user}       soft    as  unlimited",
             f"{user}       hard    as  unlimited",
@@ -4634,105 +4658,215 @@ EOF
         limits_conf_cmd = ""
         for line in limits_conf_lines:
             limits_conf_cmd += f"grep -q \"^{line}\" /etc/security/limits.conf || echo \"{line}\" >> /etc/security/limits.conf; "
-        for dbNode in clusterInfo.dbNodes:
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
             status, output = self.execute_on_node(
-                dbNode.name, limits_conf_cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                node_name, limits_conf_cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
             if status != 0:
-                raise Exception(f"Failed to set limits.conf for user {user} on node {dbNode.name}, Error output:\n{output}")
-        self.logger.log("Successfully set limits.conf.")
-        self.logger.log("Successfully preinstall oGRecorder.")
+                raise Exception(f"Failed to set limits.conf for user {user} on node {node_name}, Error output:\n{output}")
+        logger.log("Successfully set limits.conf.")
+        logger.log("Successfully preinstall oGRecorder.")
 
-    def uninstall(self, xmlFile):
-        clusterInfo = dbClusterInfo()
-        clusterInfo.initFromXml(xmlFile)
+    def uninstall(self, config_file):
+        """
+        Uninstall oGRecorder from JSON configuration file
+        """
+        import getpass
+        import json
+        import os
+        import subprocess
+        import socket
 
-        # 初始化日志模块
+        RED = '\033[0;31m'
+        GREEN = '\033[0;32m'
+        YELLOW = '\033[0;33m'
+        NC = '\033[0m'
+
+        # Read JSON configuration file
+        if not os.path.exists(config_file):
+            print(f"{RED}Configuration file {config_file} does not exist!{NC}")
+            sys.exit(1)
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception as e:
+            print(f"{RED}Failed to read JSON configuration file: {e}{NC}")
+            sys.exit(1)
+        
+        # Validate configuration file format
+        if 'cluster' not in config or 'nodes' not in config['cluster']:
+            print(f"{RED}Missing cluster.nodes configuration in JSON file!{NC}")
+            sys.exit(1)
+        
+        # Get cluster information
+        cluster_name = config['cluster'].get('name', 'cluster')
+        install_path = config['cluster'].get('install_path', '/home/czk/install/')
+        nodes = config['cluster']['nodes']
+        
+        if not nodes:
+            print(f"{RED}Node list is empty!{NC}")
+            sys.exit(1)
+        
+        print(f"{GREEN}Starting to uninstall oGRecorder cluster: {cluster_name}{NC}")
+        print(f"{GREEN}Installation path: {install_path}{NC}")
+        print(f"{GREEN}Number of nodes: {len(nodes)}{NC}")
+        
+        # Initialize logging module
         self.initLogger("uninstall")
         self.logger.log("Start uninstall oGrecorder.")
-        if not all([clusterInfo.toolPath, clusterInfo.grPath, clusterInfo.appPath]):
-            print("ERROR, path is null")
-            return
+        
+        # Get current user
         user = getpass.getuser()
         envfile = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
         if (envfile == ""):
             raise Exception(ErrorCode.GAUSS_502["GAUSS_50201"] % \
                             ("installation path of designated user [%s]" % user))
-        # 清理目录
-        for dbNode in clusterInfo.dbNodes:
-            cmd = 'rm -rf %s/* %s/* %s/* %s %s/* %s/*' % (
-                clusterInfo.toolPath, clusterInfo.grPath, clusterInfo.appPath, envfile, clusterInfo.logPath, dbNode.cmDataDir)
-            status, output = self.execute_on_node(
-                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+        
+        # Clean directories on each node
+        for node in nodes:
+            node_name = node['name']
+            node_ip = node['ip']
+            
+            print(f"{GREEN}[{node_name}] Starting to clean node...{NC}")
+            
+            # Build cleanup command
+            cmd = f'rm -rf {install_path}/* {install_path}/log/* {envfile}'
+            
+            # Execute cleanup command
+            if node_ip == socket.gethostbyname(socket.gethostname()):
+                # Local node
+                status, output = subprocess.getstatusoutput(cmd)
+            else:
+                # Remote node
+                ssh_cmd = f"ssh -q -o ConnectTimeout=5 {user}@{node_ip} '{cmd}'"
+                status, output = subprocess.getstatusoutput(ssh_cmd)
+            
             if status != 0:
-                raise Exception(f"failed to clean oGRecorder directory. Error output:\n{output}")
+                error_msg = f"failed to clean oGRecorder directory on {node_name}. Error output:\n{output}"
+                print(f"{RED}{error_msg}{NC}")
+                raise Exception(error_msg)
+            
+            print(f"{GREEN}[{node_name}] Node cleanup completed{NC}")
+        
         self.logger.log("Successfully uninstall oGRecorder.")
+        print(f"{GREEN}oGRecorder uninstallation completed!{NC}")
 
-    def distribute_gr_certs(self, xmlFile, envFile):
+    def distribute_gr_certs(self, config_file, envFile):
         """
-        生成GR证书并分发到所有节点，然后reload证书
+        Generate GR certificates and distribute to all nodes, then reload certificates
         """
+        # Read JSON configuration file
+        if not os.path.exists(config_file):
+            print(f"Configuration file {config_file} does not exist!")
+            sys.exit(1)
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception as e:
+            print(f"Failed to read JSON configuration file: {e}")
+            sys.exit(1)
+        
+        # Extract cluster information from JSON config
+        if 'cluster' not in config:
+            print("Missing cluster configuration in JSON file!")
+            sys.exit(1)
+        
+        cluster_config = config['cluster']
+        nodes = cluster_config.get('nodes', [])
+        
+        if not nodes:
+            print("No nodes found in cluster configuration!")
+            sys.exit(1)
+        
+        # Initialize logger
         clusterInfo = dbClusterInfo()
-        clusterInfo.initFromXml(xmlFile)
         clusterInfo.initLogger("gr_certs")
         logger = clusterInfo.logger
-
+        
+        # Get current user
         user = getpass.getuser()
-        # 证书目录，避免重复拼接CA
+        
+        # Set paths based on JSON configuration
+        install_path = cluster_config.get('install_path', '/home/czk/install/')
+        clusterInfo.installPath = install_path
+        clusterInfo.grPath = os.path.join(install_path, "gr")
+        
+        # Certificate directory, avoid duplicate CA concatenation
         ca_path = clusterInfo.grPath
         if not ca_path.endswith("CA"):
             ca_path = os.path.join(ca_path, "CA")
-        logger.log(f"CA path is: {ca_path}")
-
-        # 生成证书
+        
+        # Create certificate directory if it doesn't exist
+        if not os.path.exists(ca_path):
+            logger.log(f"Creating certificate directory: {ca_path}")
+            os.makedirs(ca_path, exist_ok=True)
+        
+        # Generate certificates
         logger.log("Start generate gr certs.")
+        logger.log(f"Certificate path: {ca_path}")
         gen_cert_cmd = f"source {envFile} && grcmd gencert -t server -d 1000 && grcmd gencert -t client -d 1000"
         status, output = subprocess.getstatusoutput(gen_cert_cmd)
         if status != 0:
             logger.logExit(f"failed to create gr cert, Error output:\n{output}")
         logger.log("Successfully generate gr certs.")
+        
+        # Verify certificates were created
+        if not os.path.exists(ca_path) or not os.listdir(ca_path):
+            logger.logExit(f"Certificate directory {ca_path} is empty or does not exist after generation")
+        logger.log(f"Certificates generated successfully in: {ca_path}")
 
-        # 修正本地权限，确保可scp
+        # Fix local permissions to ensure scp works
         chmod_cmd = f"chmod -R 755 {ca_path}"
         subprocess.getstatusoutput(chmod_cmd)
 
-        # 远端也提前修正权限，防止scp失败
-        for dbNode in clusterInfo.dbNodes:
-            if dbNode.name != GetHostIpOrName():
-                # 先远程修权限
-                fix_perm_cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.name} 'mkdir -p {ca_path}; chmod -R 755 {ca_path}'"
+        # Fix remote permissions in advance to prevent scp failure
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
+            if node_name != GetHostIpOrName():
+                # Fix remote permissions first
+                fix_perm_cmd = f"ssh -q -o ConnectTimeout=5 {node_name} 'mkdir -p {ca_path}; chmod -R 755 {ca_path}'"
                 subprocess.getstatusoutput(fix_perm_cmd)
 
-        # 分发证书
-        for dbNode in clusterInfo.dbNodes:
-            if dbNode.name != GetHostIpOrName():
-                cmd = f"scp -r {ca_path}/* {dbNode.name}:{ca_path}/"
+        # Distribute certificates
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
+            if node_name != GetHostIpOrName():
+                logger.log(f"Distributing certificates to node: {node_name}")
+                cmd = f"scp -r {ca_path}/* {node_name}:{ca_path}/"
                 status, output = subprocess.getstatusoutput(cmd)
                 if status != 0:
-                    logger.logExit(f"failed to distribute gr cert to {dbNode.name}, Error output:\n{output}")
+                    logger.logExit(f"failed to distribute gr cert to {node_name}, Error output:\n{output}")
+                logger.log(f"Successfully distributed certificates to {node_name}")
+            else:
+                logger.log(f"Skipping local node: {node_name}")
         logger.log("Successfully distribute gr certs.")
 
-        # 分发后恢复只读权限
-        for dbNode in clusterInfo.dbNodes:
+        # Restore read-only permissions after distribution
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
             perm_cmd = f"chmod 400 {ca_path}/*"
-            if dbNode.name != GetHostIpOrName():
-                cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.name} '{perm_cmd}'"
+            if node_name != GetHostIpOrName():
+                cmd = f"ssh -q -o ConnectTimeout=5 {node_name} '{perm_cmd}'"
             else:
                 cmd = perm_cmd
             subprocess.getstatusoutput(cmd)
 
-        # reload证书
-        for dbNode in clusterInfo.dbNodes:
+        # Reload certificates
+        for node in nodes:
+            node_name = node.get('ip', node.get('name', ''))
             reload_cmd = f"source {envFile} && grcmd reload_certs"
-            if dbNode.name != GetHostIpOrName():
-                cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.name} '{reload_cmd}'"
+            if node_name != GetHostIpOrName():
+                cmd = f"ssh -q -o ConnectTimeout=5 {node_name} '{reload_cmd}'"
             else:
                 cmd = reload_cmd
             status, output = subprocess.getstatusoutput(cmd)
             if status != 0:
-                logger.logExit(f"failed to reload gr cert on {dbNode.name}, Error output:\n{output}")
+                logger.logExit(f"failed to reload gr cert on {node_name}, Error output:\n{output}")
         logger.log("Successfully reload gr certs on all nodes.")
 
-    def setup_ssh_trust(self, hosts_file):
+    def setup_ssh_trust(self, config_file):
         import getpass
         import tempfile
 
@@ -4741,12 +4875,24 @@ EOF
         YELLOW = '\033[0;33m'
         NC = '\033[0m'
 
-        # Read host list
-        if not os.path.exists(hosts_file):
-            print(f"{RED}Host list file {hosts_file} does not exist!{NC}")
+        # Read host list from JSON config
+        if not os.path.exists(config_file):
+            print(f"{RED}Configuration file {config_file} does not exist!{NC}")
             sys.exit(1)
-        with open(hosts_file, "r") as f:
-            hosts = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception as e:
+            print(f"{RED}Failed to read JSON configuration file: {e}{NC}")
+            sys.exit(1)
+        
+        # Extract hosts from JSON config
+        if 'cluster' not in config or 'nodes' not in config['cluster']:
+            print(f"{RED}Missing cluster.nodes configuration in JSON file!{NC}")
+            sys.exit(1)
+        
+        hosts = [node['ip'] for node in config['cluster']['nodes']]
         hosts = sorted(set(hosts))
         if not hosts:
             print(f"{RED}Host list is empty!{NC}")
@@ -5436,6 +5582,10 @@ class InstallImpl:
 
     def _createCMCALocal(self):
         self.logger.debug("Creating Cm ca files locally.")
+
+        if 'OPENSSL_CONF' in os.environ:
+            del os.environ['OPENSSL_CONF']
+        os.environ['OPENSSL_CONF'] = '/etc/pki/tls/openssl.cnf'
         certPath = os.path.join(self.gaussHome, "share/sslcert/cm")
         mkdirCmd = f"rm -rf {certPath}; mkdir -p {certPath}"
         status, output = subprocess.getstatusoutput(mkdirCmd)
@@ -5448,10 +5598,6 @@ class InstallImpl:
         opensslConf = os.path.join(certPath, "openssl.cnf")
         if not os.path.isfile(opensslConf):
             self.logger.logExit("CM ssl conf does not exist.")
-
-        old_ld_library_path = os.environ.get("LD_LIBRARY_PATH", "")
-        if "LD_LIBRARY_PATH" in os.environ:
-            del os.environ["LD_LIBRARY_PATH"]
 
         # 生成 cakey.pem
         gen_cakey_cmd = f'echo "{passwd}" | openssl genrsa -aes256 -f4 -passout stdin -out {certPath}/cakey.pem 2048'
@@ -5484,9 +5630,6 @@ class InstallImpl:
             # 删除 csr 文件
             rm_csr_cmd = f'rm -f {certPath}/{role}.csr'
             subprocess.getstatusoutput(rm_csr_cmd)
-
-        # 恢复 LD_LIBRARY_PATH
-        os.environ["LD_LIBRARY_PATH"] = old_ld_library_path
 
         # 生成 server cipher 和 rand
         expect_server_cmd = (
@@ -6005,14 +6148,14 @@ def createFileInSafeMode(file_path, mode=stat.S_IWUSR | stat.S_IRUSR):
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         # 原子操作创建文件并设置权限
-        fd = os.open(file_path, os.O_GRONLY | os.O_CREAT | os.O_EXCL, mode)
+        fd = os.open(file_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
         os.close(fd)
     except FileExistsError:
         pass  # 文件已存在则跳过
     except PermissionError as e:
-        raise Exception(f"无权限操作路径: {file_path}. Error:\n{str(e)}")
+        raise Exception(f"No permission to operate path: {file_path}. Error:\n{str(e)}")
     except OSError as e:
-        raise Exception(f"创建文件失败: {file_path}. Error:\n{str(e)}")
+        raise Exception(f"Failed to create file: {file_path}. Error:\n{str(e)}")
 
 
 def removeDirectory(path):
@@ -6197,81 +6340,212 @@ def getEnv(env_param, default_value=None):
 
     return env_value
 
+def json_to_xml(json_file):
+    """将JSON配置文件转换为XML格式"""
+    import json
+    import tempfile
+    import os
+    
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except Exception as e:
+        print(f"Error reading JSON file: {e}")
+        return None, None, None
+    
+    # 提取env_file和user信息
+    env_file = config.get('cluster', {}).get('env_file', '')
+    user = config.get('cluster', {}).get('user', '')
+    
+    # 构建节点列表字符串
+    node_names = [node['name'] for node in config['cluster']['nodes']]
+    back_ips = [node['ip'] for node in config['cluster']['nodes']]
+    gr_nodes_list = []
+    for i, node in enumerate(config['cluster']['nodes']):
+        gr_nodes_list.append(f"{i}:{node['ip']}:{node['gr_port']}")
+    
+    # 创建临时XML文件
+    xml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<ROOT>
+    <CLUSTER>
+        <PARAM name="clusterName" value="{config['cluster']['name']}"/>
+        <PARAM name="nodeNames" value="{','.join(node_names)}"/>
+        <PARAM name="installPath" value="{config['cluster']['install_path']}"/>
+        <PARAM name="backIp1s" value="{','.join(back_ips)}"/>
+        <PARAM name="gr_nodes_list" value="{','.join(gr_nodes_list)}"/>
+    </CLUSTER>
+    <DEVICELIST>'''
+    
+    # 为每个节点生成DEVICE配置
+    for i, node in enumerate(config['cluster']['nodes']):
+        xml_content += f'''
+        <DEVICE sn="{node['name']}">
+            <PARAM name="name" value="{node['name']}"/>
+            <PARAM name="azName" value="AZ1"/>
+            <PARAM name="azPriority" value="1"/>
+            <PARAM name="backIp1" value="{node['ip']}"/>
+            <PARAM name="sshIp1" value="{node['ip']}"/>
+            <PARAM name="cmDir" value="{config['cluster']['install_path']}cm"/>
+            <PARAM name="grIp1" value="{node['ip']}"/>
+            <PARAM name="listen_addr" value="{node['ip']}:33500"/>'''
+        
+        # 为第一个节点添加额外的CM参数
+        if i == 0:
+            other_nodes = [n['name'] for n in config['cluster']['nodes'][1:]]
+            other_ips = [n['ip'] for n in config['cluster']['nodes']]
+            xml_content += f'''
+            <PARAM name="cmsNum" value="1"/>
+            <PARAM name="cmServerPortBase" value="15000"/>
+            <PARAM name="cmServerListenIp1" value="{','.join(other_ips)}"/>
+            <PARAM name="cmServerlevel" value="1"/>
+            <PARAM name="cmServerRelation" value="{','.join([node['name']] + other_nodes)}"/>
+            <PARAM name="dataNum" value="1"/>
+            <PARAM name="dataPortBase" value="16000"/>
+            <PARAM name="dataNode1" value="{config['cluster']['install_path']}data/dn,{config['cluster']['nodes'][1]['name']},{config['cluster']['install_path']}data/dn"/>'''
+        
+        xml_content += '''
+        </DEVICE>'''
+    
+    xml_content += '''
+    </DEVICELIST>
+</ROOT>'''
+    
+    # 创建临时文件
+    temp_xml = tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False, encoding='utf-8')
+    temp_xml.write(xml_content)
+    temp_xml.close()
+    
+    return temp_xml.name, env_file, user
 
 def main():
     clusterInfo = dbClusterInfo()
-
+    
+    # 检查是否有JSON配置文件参数
+    json_file = None
+    xml_file = None
+    json_env_file = None
+    json_user = None
+    
+    # 检查命令行参数中是否有JSON文件
+    if len(sys.argv) > 1:
+        # 检查是否是trust、uninstall、gr_certs或preinstall命令
+        is_json_command = 'trust' in sys.argv or 'uninstall' in sys.argv or 'gr_certs' in sys.argv or 'preinstall' in sys.argv
+        
+        for i, arg in enumerate(sys.argv):
+            if arg.endswith('.json'):
+                json_file = arg
+                # 如果是trust或uninstall命令，跳过XML转换
+                if is_json_command:
+                    # 仍然需要读取JSON中的env_file和user信息
+                    import json
+                    try:
+                        with open(json_file, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                            json_env_file = config.get('cluster', {}).get('env_file', '')
+                            json_user = config.get('cluster', {}).get('user', '')
+                    except Exception as e:
+                        print(f"Error reading JSON file: {e}")
+                    break
+                # 将JSON文件转换为XML
+                xml_file, json_env_file, json_user = json_to_xml(json_file)
+                if xml_file:
+                    print(f"Converted JSON config '{json_file}' to XML: {xml_file}")
+                    # 替换命令行参数中的JSON文件为XML文件
+                    sys.argv[i] = xml_file
+                else:
+                    print(f"Failed to convert JSON file: {json_file}")
+                    sys.exit(1)
+                break
+    
     parser = argparse.ArgumentParser(description='oGRecorder OM Tool')
     subparsers = parser.add_subparsers(dest='command', required=True)
 
     # View command
     view_parser = subparsers.add_parser('view', help='View cluster information')
-    view_parser.add_argument('xmlFile', help='XML configuration file')
+    view_parser.add_argument('xmlFile', help='XML configuration file (or JSON file)')
 
     # Generate-xml command
     gen_parser = subparsers.add_parser('generate-xml', help='Generate XML configuration')
-    gen_parser.add_argument('xmlFile', help='XML configuration file')
+    gen_parser.add_argument('xmlFile', help='XML configuration file (or JSON file)')
 
-    # GR Install command
-    gr_install_parser = subparsers.add_parser('gr_install', help='Install GR package')
-    gr_install_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
-    gr_install_parser.add_argument('--pkg', dest='package', required=True, help='Path to GR installation package')
-
-    # GR Preinstall command
-    preinstall_parser = subparsers.add_parser('preinstall', help='Preinstall cluster')
-    preinstall_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
-    preinstall_parser.add_argument('-u', dest='user', required=True, help='Install user')
-    preinstall_parser.add_argument('-e', dest='envFile', required=True, help='env file path')
-
-    # CM Install command
-    cm_install_parser = subparsers.add_parser('cm_install', help='Deploy CM tool to openGauss cluster')
-    cm_install_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
-    cm_install_parser.add_argument('-e', dest='envFile', default='', help='env file path')
-    cm_install_parser.add_argument('--pkg', dest='package', required=True, help='CM package path')
+    # Install All command (GR + CM)
+    install_all_parser = subparsers.add_parser('install', help='Install both GR and CM packages')
+    install_all_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file (or JSON file)')
+    install_all_parser.add_argument('--grpkg', dest='gr_package', required=True, help='Path to GR installation package')
+    install_all_parser.add_argument('--cmpkg', dest='cm_package', required=True, help='Path to CM package')
 
     # GR uninstall command
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall cluster')
-    uninstall_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
+    uninstall_parser.add_argument('-X', dest='config_file', required=True, help='JSON configuration file path')
 
     # GR certs command
     gr_certs_parser = subparsers.add_parser('gr_certs', help='Generate and distribute GR certs, then reload')
-    gr_certs_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file')
-    gr_certs_parser.add_argument('-e', dest='envFile', required=True, help='env file path')
+    gr_certs_parser.add_argument('-X', dest='config_file', required=True, help='JSON configuration file path')
+
+    # GR preinstall command
+    preinstall_parser = subparsers.add_parser('preinstall', help='Preinstall cluster')
+    preinstall_parser.add_argument('-X', dest='config_file', required=True, help='JSON configuration file path')
 
     # SSH trust command
-    trust_parser = subparsers.add_parser('trust', help='自动配置集群SSH互信')
-    trust_parser.add_argument('-f', dest='hosts_file', required=True, help='主机列表文件')
+    trust_parser = subparsers.add_parser('trust', help='Automatically configure SSH mutual trust for cluster')
+    trust_parser.add_argument('-X', dest='config_file', required=True, help='JSON configuration file path')
 
     args = parser.parse_args()    
     
+    # 直接使用JSON中的值，并检查必要参数是否存在
+    if args.command in ['install', 'gr_certs', 'preinstall']:
+        if not json_env_file:
+            print("Error: env_file not found in JSON configuration")
+            sys.exit(1)
+        args.envFile = json_env_file
+        print(f"Using env file from JSON config: {json_env_file}")
+    
+    if args.command == 'preinstall':
+        if not json_user:
+            print("Error: user not found in JSON configuration")
+            sys.exit(1)
+        args.user = json_user
+        print(f"Using user from JSON config: {json_user}")
+    
+    # 清理临时XML文件
+    def cleanup_temp_xml():
+        if xml_file and os.path.exists(xml_file):
+            try:
+                os.unlink(xml_file)
+                print(f"Cleaned up temporary XML file: {xml_file}")
+            except:
+                pass
+    
     # Dispatch to appropriate handler based on command
-    if args.command == 'view':
-        clusterInfo.initFromXml(args.xmlFile)
-        file_path = "%s/bin/cluster_static_config" % (clusterInfo.appPath)
-        clusterInfo.printStaticConfig(args.xmlFile, file_path)
-    elif args.command == 'generate-xml':
-        clusterInfo.initFromXml(args.xmlFile)
-        clusterInfo.doRebuildConf(args.xmlFile)
-    elif args.command == 'cm_install':
-        install = Install()
-        install.xmlFile = args.xmlFile
-        install.envFile = args.envFile
-        install.cmpkg = args.package
-        install.run()
-    elif args.command == 'gr_install':
-        clusterInfo.gr_install(args.xmlFile, args.package)
-    elif args.command == 'preinstall':
-        clusterInfo.preinstall(args.xmlFile, args.user, args.envFile)
-    elif args.command == 'uninstall':
-        clusterInfo.uninstall(args.xmlFile)
-    elif args.command == 'gr_certs':
-        clusterInfo.distribute_gr_certs(args.xmlFile, args.envFile)
-    elif args.command == 'trust':
-        clusterInfo.setup_ssh_trust(args.hosts_file)
-    else:
-        print("Invalid command")
-        sys.exit(1)
-
+    try:
+        if args.command == 'view':
+            clusterInfo.initFromXml(args.xmlFile)
+            file_path = "%s/bin/cluster_static_config" % (clusterInfo.appPath)
+            clusterInfo.printStaticConfig(args.xmlFile, file_path)
+        elif args.command == 'generate-xml':
+            clusterInfo.initFromXml(args.xmlFile)
+            clusterInfo.doRebuildConf(args.xmlFile)
+        elif args.command == 'install':
+            clusterInfo.gr_install(args.xmlFile, args.gr_package)
+            install = Install()
+            install.xmlFile = args.xmlFile
+            install.envFile = args.envFile
+            install.cmpkg = args.cm_package
+            install.run()
+        elif args.command == 'preinstall':
+            clusterInfo.preinstall(args.config_file, args.user, args.envFile)
+        elif args.command == 'uninstall':
+            clusterInfo.uninstall(args.config_file)
+        elif args.command == 'gr_certs':
+            clusterInfo.distribute_gr_certs(args.config_file, args.envFile)
+        elif args.command == 'trust':
+            clusterInfo.setup_ssh_trust(args.config_file)
+        else:
+            print("Invalid command")
+            sys.exit(1)
+    finally:
+        # 清理临时文件
+        cleanup_temp_xml()
 
 if __name__ == "__main__":
     main()
