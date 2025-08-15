@@ -487,12 +487,12 @@ static void generate_root_cert(const char *certs_path, int days) {
     char cmd[GR_CMD_LEN];
     snprintf(cmd, sizeof(cmd),
         "cd %s && "
-        "openssl rand -base64 32 > ca.pass && "
-        "chmod 400 ca.pass && "
+        "ca_password=$(openssl rand -base64 32); "
         "export OPENSSL_CONF=%s/openssl.cnf; "
-        "openssl genrsa -aes256 -passout file:ca.pass -out demoCA/private/cakey.pem 2048 && "
-        "openssl req -new -x509 -passin file:ca.pass -days %d -key demoCA/private/cakey.pem -out demoCA/cacert.pem -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA\" && "
-        "cp demoCA/cacert.pem .",
+        "echo $ca_password | openssl genrsa -aes256 -passout stdin -out demoCA/private/cakey.pem 2048 && "
+        "echo $ca_password | openssl req -new -x509 -passin stdin -days %d -key demoCA/private/cakey.pem -out demoCA/cacert.pem -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA\" && "
+        "cp demoCA/cacert.pem . && "
+        "echo $ca_password > ca.pass && chmod 400 ca.pass",
         certs_path, certs_path, days);
     system(cmd);
 }
@@ -500,36 +500,32 @@ static void generate_root_cert(const char *certs_path, int days) {
 static void create_server_certs(const char *certs_path, int days) {
     char cmd[GR_CMD_LEN];
     snprintf(cmd, sizeof(cmd),
-        "mkdir -p %s/server && "
-        "touch %s/server/openssl.cnf && "
         "cd %s && "
+        "server_password=$(openssl rand -base64 32); "
+        "ca_password=$(cat ca.pass); "
         "export OPENSSL_CONF=%s/openssl.cnf; "
-        "openssl genrsa -aes256 -passout file:ca.pass -out server.key 2048 && "
-        "openssl req -new -key server.key -passin file:ca.pass -out server.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=server\" && "
-        "openssl x509 -req -days %d -in server.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin file:ca.pass -CAcreateserial -out server.crt -extfile server/openssl.cnf && "
-        "openssl rsa -in server.key -out server.key -passin file:ca.pass && "
+        "echo $server_password | openssl genrsa -aes256 -passout stdin -out server.key 2048 && "
+        "echo $server_password | openssl req -new -key server.key -passin stdin -out server.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=server\" && "
+        "echo $ca_password | openssl x509 -req -days %d -in server.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin stdin -CAcreateserial -out server.crt && "
+        "echo $server_password | openssl rsa -in server.key -out server.key -passin stdin && "
         "chmod 400 server.* && echo '00' >demoCA/crlnumber",
-        certs_path, certs_path, certs_path, certs_path, days);
+        certs_path, certs_path, days);
     system(cmd);
 }
 
 static void create_client_certs(const char *certs_path, int days) {
     char cmd[GR_CMD_LEN];
-    char client_dir[CM_MAX_PATH_LEN];
-    snprintf_s(client_dir, sizeof(client_dir), sizeof(client_dir) -1, "%s/client", certs_path);
-    mkdir(client_dir, GR_PERM_DIR);
-
     snprintf(cmd, sizeof(cmd),
-        "touch %s/client/openssl.cnf && "
         "cd %s && "
-        "password=$(openssl rand -base64 32); "
+        "client_password=$(openssl rand -base64 32); "
+        "ca_password=$(cat ca.pass); "
         "export OPENSSL_CONF=%s/openssl.cnf; "
-        "echo $password | openssl genrsa -aes256 -passout stdin -out client.key 2048 && "
-        "echo $password | openssl req -new -key client.key -passin stdin -out client.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=client\" && "
-        "openssl x509 -req -days %d -in client.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin file:ca.pass -CAcreateserial -out client.crt -extfile client/openssl.cnf && "
-        "echo $password | openssl rsa -in client.key -out client.key -passin stdin && "
+        "echo $client_password | openssl genrsa -aes256 -passout stdin -out client.key 2048 && "
+        "echo $client_password | openssl req -new -key client.key -passin stdin -out client.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=client\" && "
+        "echo $ca_password | openssl x509 -req -days %d -in client.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin stdin -CAcreateserial -out client.crt && "
+        "echo $client_password | openssl rsa -in client.key -out client.key -passin stdin && "
         "chmod 400 client.*",
-        certs_path, certs_path, certs_path, days);
+        certs_path, certs_path, days);
     system(cmd);
 }
 
