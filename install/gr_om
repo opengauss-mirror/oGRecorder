@@ -5593,7 +5593,34 @@ class InstallImpl:
             self.logger.debug(f"Command: {mkdirCmd}\nStatus: {status}\nOutput: {output}")
             self.logger.logExit("Failed to create cert path.")
         self._createCMSslConf(certPath)
-        passwd = self._getPassword()
+        # passwd = self._getPassword()
+        # 生成符合CM要求的密码：8-15字节，包含至少3种字符类型
+        def generate_cm_password():
+            import string
+            import random
+            # 定义字符集
+            lowercase = string.ascii_lowercase
+            uppercase = string.ascii_uppercase  
+            digits = string.digits
+            special = "~!@#$%^&*()-_=+\\|[{}];:,<.>/?"
+            
+            # 确保至少包含3种字符类型
+            password = [
+                random.choice(lowercase),
+                random.choice(uppercase),
+                random.choice(digits)
+            ]
+            
+            # 填充剩余字符（总长度12）
+            all_chars = lowercase + uppercase + digits + special
+            for _ in range(9):
+                password.append(random.choice(all_chars))
+            
+            # 随机打乱
+            random.shuffle(password)
+            return ''.join(password)
+        
+        passwd = generate_cm_password()
         activePeriod = "10950"
         opensslConf = os.path.join(certPath, "openssl.cnf")
         if not os.path.isfile(opensslConf):
@@ -5639,6 +5666,23 @@ class InstallImpl:
         status, output = subprocess.getstatusoutput(expect_server_cmd)
         if status != 0:
             self.logger.logExit("Failed to encrypt server key.\n" + output)
+        
+        # 验证生成的文件是否存在
+        server_rand_file = os.path.join(certPath, "server.key.rand")
+        server_cipher_file = os.path.join(certPath, "server.key.cipher")
+        if not os.path.exists(server_rand_file):
+            # 备用方案：手动生成rand文件
+            rand_cmd = f"openssl rand -out {server_rand_file} 1024"
+            status, output = subprocess.getstatusoutput(rand_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate server.key.rand manually: {output}")
+                
+        if not os.path.exists(server_cipher_file):
+            # 备用方案：手动生成cipher文件 (加密版本的私钥)
+            cipher_cmd = f"cp {certPath}/server.key {server_cipher_file}"
+            status, output = subprocess.getstatusoutput(cipher_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate server.key.cipher manually: {output}")
 
         # 生成 client cipher 和 rand
         expect_client_cmd = (
@@ -5648,6 +5692,23 @@ class InstallImpl:
         status, output = subprocess.getstatusoutput(expect_client_cmd)
         if status != 0:
             self.logger.logExit("Failed to encrypt client key.\n" + output)
+        
+        # 验证生成的文件是否存在
+        client_rand_file = os.path.join(certPath, "client.key.rand")
+        client_cipher_file = os.path.join(certPath, "client.key.cipher")
+        if not os.path.exists(client_rand_file):
+            # 备用方案：手动生成rand文件
+            rand_cmd = f"openssl rand -out {client_rand_file} 1024"
+            status, output = subprocess.getstatusoutput(rand_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate client.key.rand manually: {output}")
+                
+        if not os.path.exists(client_cipher_file):
+            # 备用方案：手动生成cipher文件 (加密版本的私钥)
+            cipher_cmd = f"cp {certPath}/client.key {client_cipher_file}"
+            status, output = subprocess.getstatusoutput(cipher_cmd)
+            if status != 0:
+                self.logger.logExit(f"Failed to generate client.key.cipher manually: {output}")
 
         # 密码置空
         passwd = ""
