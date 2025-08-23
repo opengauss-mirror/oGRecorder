@@ -35,6 +35,7 @@
 #include "gr_defs.h"
 #include <openssl/sha.h>
 #include <openssl/rand.h>
+#include <openssl/evp.h>
 #include "gr_errno.h"
 #include "gr_log.h"
 
@@ -336,22 +337,32 @@ static inline status_t calculate_data_hash(const void *data, size_t size, uint8_
         return CM_ERROR;
     }
 
-    SHA256_CTX sha256;
-    if (SHA256_Init(&sha256) != 1) {
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    if (mdctx == NULL) {
+        LOG_RUN_ERR("[hash]: Failed to create EVP_MD_CTX.");
+        return CM_ERROR;
+    }
+
+    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
         LOG_RUN_ERR("[hash]: Failed to init sha256.");
+        EVP_MD_CTX_free(mdctx);
         return CM_ERROR;
     }
 
-    if (SHA256_Update(&sha256, data, size) != 1) {
+    if (EVP_DigestUpdate(mdctx, data, size) != 1) {
         LOG_RUN_ERR("[hash]: Failed to update sha256.");
+        EVP_MD_CTX_free(mdctx);
         return CM_ERROR;
     }
 
-    if (SHA256_Final(hash, &sha256) != 1) {
+    unsigned int digest_len = SHA256_DIGEST_LENGTH;
+    if (EVP_DigestFinal_ex(mdctx, hash, &digest_len) != 1) {
         LOG_RUN_ERR("[hash]: Failed to calculate sha256.");
+        EVP_MD_CTX_free(mdctx);
         return CM_ERROR;
     }
 
+    EVP_MD_CTX_free(mdctx);
     return CM_SUCCESS;
 }
 

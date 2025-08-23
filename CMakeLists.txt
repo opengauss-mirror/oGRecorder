@@ -68,7 +68,7 @@ endif()
 
 message(STATUS "Version info: ${GR_VERSION_STR}")
 
-set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS} -D__FILE_NAME__='\"$(notdir $(subst .o,,$(abspath $@)))\"'" )
+set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS}" )
 add_compile_options(-fPIC -Wall -MMD -fno-strict-aliasing -fsigned-char -fms-extensions -lpthread)
 add_compile_definitions(_GNU_SOURCE _LARGEFILE64_SOURCE KNL_PREFIX _REENTRANT __PERF_STAT__)
 add_link_options(-pie)
@@ -196,7 +196,6 @@ set(GR_OPENSSL_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/openssl/incl
 set(GR_CBB_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/cbb/include")
 set(LIBAIO_INC_PATH             "${CMAKE_CURRENT_SOURCE_DIR}/library/libaio/include")
 set(ZLIB_INC_PATH               "${CMAKE_CURRENT_SOURCE_DIR}/library/zlib/include")
-set(LZ4_INC_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/lz4/include")
 set(JAVA_HOME                   "$ENV{JAVA_HOME}/include")
 set(JAVA_HOME_INCLUDE           "$ENV{JAVA_HOME}/include/linux")
 
@@ -205,7 +204,6 @@ set(SECUREC_LIB_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/huawei_secu
 set(OPENSSL_LIB_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/openssl/lib")
 set(CBB_LIB_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/cbb/lib")
 set(LIBZ_PATH                   "${CMAKE_CURRENT_SOURCE_DIR}/library/zlib/lib")
-set(LZ4_PATH                   "${CMAKE_CURRENT_SOURCE_DIR}/library/lz4/lib")
 
 ## output path
 set (LIBRARY_OUTPUT_PATH        ${CMAKE_CURRENT_SOURCE_DIR}/output/lib)

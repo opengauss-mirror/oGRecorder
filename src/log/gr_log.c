@@ -103,7 +103,8 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_FILE_SYSTEM_ERROR] = "File system error, reason %m.",
     [ERR_GR_CONNECTION_CLOSED] = "GR connection is closed",
     [ERR_GR_MEM_CMP_FAILED] = "failed to memcpy compare",
-    [ERR_GR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s."
+    [ERR_GR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s.",
+    [ERR_GR_WHITELIST_INVALID] = "GR handshake rejected: IP %s not in whitelist"
 };
 
 gr_log_def_t g_gr_cmd_log[] = {

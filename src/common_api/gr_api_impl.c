@@ -224,8 +224,8 @@ status_t gr_vfs_delete_impl(gr_conn_t *conn, const char *dir, unsigned long long
 
 status_t gr_vfs_mount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle, unsigned long long attrFlag)
 {
-    if (vfs_handle->vfs_name == NULL) {
-        LOG_RUN_ERR("vfs name is NULL.");
+    if (vfs_handle == NULL || vfs_handle->vfs_name[0] == '\0') {
+        LOG_RUN_ERR("vfs handle is NULL or vfs name is empty.");
         return CM_ERROR;
     }
     LOG_DEBUG_INF("gr mount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
@@ -240,8 +240,8 @@ status_t gr_vfs_mount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle, unsigned 
 
 status_t gr_vfs_unmount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle)
 {
-    if (vfs_handle->vfs_name == NULL) {
-        LOG_RUN_ERR("vfs name is NULL.");
+    if (vfs_handle == NULL || vfs_handle->vfs_name[0] == '\0') {
+        LOG_RUN_ERR("vfs handle is NULL or vfs name is empty.");
         return CM_ERROR;
     }
     LOG_DEBUG_INF("gr unmount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
@@ -776,7 +776,7 @@ status_t gr_getcfg_impl(gr_conn_t *conn, const char *name, char *out_str, size_t
 status_t gr_get_inst_status_on_server(gr_conn_t *conn, gr_server_status_t *gr_status)
 {
     if (gr_status == NULL) {
-        GR_THROW_ERROR_EX(ERR_GR_INVALID_PARAM, "gr_dir_item_t");
+        GR_THROW_ERROR_EX(ERR_GR_INVALID_PARAM, "gr_status");
         return CM_ERROR;
     }
     text_t extra_info = CM_NULL_TEXT;

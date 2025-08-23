@@ -18,66 +18,61 @@
 # ----------------------------------------------------------------------------
 # Description  : DbClusterInfo.py is a utility to get cluster information
 #############################################################################
+# Standard library imports
+import argparse
 import binascii
+import copy
+import datetime
+import getopt
+import getpass
+import ipaddress
+import json
+import logging.handlers as _handlers
 import os
-import subprocess
+import pwd
+import re
+import shutil
+import socket
+import stat
 import struct
+import subprocess
+import sys
+import tempfile
+import threading
 import time
 import types
-import sys
-import re
-import pwd
-import copy
-import socket
-import shutil
-import json
-import ipaddress
-import stat
-import argparse
-import getpass
-import getopt
 import xml.etree.ElementTree as ET
 import xml.etree.cElementTree as ETree
-import datetime
-import _thread as thread
-import logging.handlers as _handlers
-from curses.ascii import isdigit, islower, isupper
 
 sys.path.append(os.path.split(os.path.realpath(__file__))[0] + "/../../")
 
+# Network constants
 NET_IPV6 = "ipv6"
 NET_IPV4 = "ipv4"
 ADDRESS_FAMILY_INDEX = 4
 IP_ADDRESS_INDEX = 0
 
+# Environment constants
 ENV_CLUSTERCONFIG = "CLUSTERCONFIGFILE"
 
+# Command path constants
 CMD_PATH = ['/bin', '/usr/local/bin', '/usr/bin', '/sbin', '/usr/sbin']
 CMD_CACHE = {}
+
+# String constants
 BLANK_SPACE = " "
 COLON = ":"
 
-###########################
-# instance role 
-###########################
-# init value
+# Instance role constants
 INSTANCE_ROLE_UNDEFINED = -1
-# cm_server
 INSTANCE_ROLE_CMSERVER = 0
-# gtm
 INSTANCE_ROLE_GTM = 1
-# etcd
 INSTANCE_ROLE_ETCD = 2
-# cn
 INSTANCE_ROLE_COODINATOR = 3
-# dn
 INSTANCE_ROLE_DATANODE = 4
-# cm_agent
 INSTANCE_ROLE_CMAGENT = 5
 
-###########################
-# ID num
-###########################
+# ID number constants
 BASE_ID_CMSERVER = 1
 BASE_ID_GTM = 1001
 BASE_ID_CMAGENT = 10001
@@ -85,75 +80,67 @@ BASE_ID_DUMMYDATANODE = 3001
 BASE_ID_COORDINATOR = 5001
 BASE_ID_DATANODE = 6001
 BASE_ID_ETCD = 7001
+
+# Directory permissions
 DIRECTORY_PERMISSION = 0o750
 
-# For primary/standby instance When the ID > 7000 ,
-# the new id is start from 40001
+# Primary/standby instance ID constants
 OLD_LAST_PRIMARYSTANDBY_BASEID_NUM = 7000
 NEW_FIRST_PRIMARYSTANDBY_BASEID_NUM = 40000
 
-# master instance default port
+# Master instance default ports
 MASTER_BASEPORT_CMS = 5000
 MASTER_BASEPORT_GTM = 6000
-# cm agent has no port, just occupancy index 5
-MASTER_BASEPORT_CMAGENT = 0
+MASTER_BASEPORT_CMAGENT = 0  # cm agent has no port, just occupancy index 5
 MASTER_BASEPORT_COO = 8000
 MASTER_BASEPORT_DATA = 40000
 MASTER_BASEPORT_ETCD = 2379
-# standby instance default port
+# Standby instance default ports
 STANDBY_BASEPORT_CMS = 5500
 STANDBY_BASEPORT_GTM = 6500
-# cm agent has no port, just occupancy index 5
-STANDBY_BASEPORT_CMAGENT = 0
+STANDBY_BASEPORT_CMAGENT = 0  # cm agent has no port, just occupancy index 5
 STANDBY_BASEPORT_COO = 8500
 STANDBY_BASEPORT_DATA = 45000
 STANDBY_BASEPORT_ETCD = 2380
 
-###########################
-# instance type. only for CN/DN 
-###########################
+# Instance type constants (only for CN/DN)
 INSTANCE_TYPE_UNDEFINED = -1
-# master 
 MASTER_INSTANCE = 0
-# standby 
 STANDBY_INSTANCE = 1
-# dummy standby 
 DUMMY_STANDBY_INSTANCE = 2
-#cascade standby
 CASCADE_STANDBY = 3
-DICT_INSTANCE = {MASTER_INSTANCE: "primary", STANDBY_INSTANCE: "standby",
-                 CASCADE_STANDBY: "cascade_standby"}
 
-###########################
-# instance number
-###########################
-# max number of replicationfor CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
-MIRROR_COUNT_REPLICATION_MAX = 9
-# max number of azPriority for CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
-AZPRIORITY_MAX = 10
-# min number of azPriority for CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
-AZPRIORITY_MIN = 1
-# DB port set step size for CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
-PORT_STEP_SIZE = 20
+DICT_INSTANCE = {
+    MASTER_INSTANCE: "primary",
+    STANDBY_INSTANCE: "standby",
+    CASCADE_STANDBY: "cascade_standby"
+}
+
+# Instance number constants
+MIRROR_COUNT_REPLICATION_MAX = 9  # max number of replication for CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
+AZPRIORITY_MAX = 10  # max number of azPriority for CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
+AZPRIORITY_MIN = 1   # min number of azPriority for CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
+PORT_STEP_SIZE = 20  # DB port set step size for CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY
 
 MIRROR_ID_AGENT = -3
 
-# cluster type
+# Cluster type constants
 CLUSTER_TYPE_SINGLE = "single"
 CLUSTER_TYPE_SINGLE_PRIMARY_MULTI_STANDBY = "single-primary-multi-standby"
 CLUSTER_TYPE_SINGLE_INST = "single-inst"
 
-# default config version, it is used by gs_upgrade
+# Default config version constants (used by gs_upgrade)
 BIN_CONFIG_VERSION = 2
 BIN_CONFIG_VERSION_SINGLE = 101
 BIN_CONFIG_VERSION_SINGLE_PRIMARY_MULTI_STANDBY = 201
 BIN_CONFIG_VERSION_SINGLE_INST = 301
 
-# page size
+# Other constants
 PAGE_SIZE = 8192
 MAX_IP_NUM = 3
 CONFIG_IP_NUM = 1
 
+# Length constants
 NODE_ID_LEN = 2
 INSTANCE_ID_LEN = 8
 SPACE_LEN = 1
@@ -162,17 +149,18 @@ SEPERATOR_LEN = 1
 IP_LEN = 16
 PORT_LEN = 10
 
+# Directory permissions
 KEY_DIRECTORY_MODE = 700
-# The default network type is single plane
-g_networkType = 0
 
-# global param to cache gr_om query instance result.
-global_cls_query_rst = {}
+# Network type constants
+g_networkType = 0  # The default network type is single plane
 
+# Global variables
+global_cls_query_rst = {}  # global param to cache gr_om query instance result
 xmlRootNode = None
 
+# Log constants
 MAXLOGFILESIZE = 16 * 1024 * 1024
-
 LOG_DEBUG = 1
 LOG_INFO = 2
 LOG_WARNING = 2.1
@@ -181,14 +169,23 @@ LOG_FATAL = 4
 
 class CMLog:
     """
-    Class to handle log file
+    Class to handle log file operations.
+    
+    This class provides functionality for creating, managing, and writing to log files
+    with automatic rotation and formatting capabilities.
     """
 
-    def __init__(self, logPath, module, prefix, suffix = ".log", expectLevel=LOG_DEBUG, traceId=None):
+    def __init__(self, logPath, module, prefix, suffix=".log", expectLevel=LOG_DEBUG, traceId=None):
         """
-        function: Constructor
-        input : NA
-        output: NA
+        Initialize the CMLog instance.
+        
+        Args:
+            logPath (str): Path to the log directory
+            module (str): Module name for logging
+            prefix (str): Prefix for log file names
+            suffix (str): Suffix for log file names (default: ".log")
+            expectLevel (int): Expected log level (default: LOG_DEBUG)
+            traceId (str): Trace ID for logging (default: None)
         """
         self.logFile = ""
         self.expectLevel = expectLevel
@@ -200,7 +197,7 @@ class CMLog:
         self.logPath = logPath
         self.pid = os.getpid()
         self.step = 0
-        self.lock = thread.allocate_lock()
+        self.lock = threading.Lock()
         self.tmpFile = None
         self.ignoreErr = False
         self.traceId = traceId
@@ -4291,14 +4288,14 @@ class dbClusterInfo():
 
             for dbNode in clusterInfo.dbNodes:
                 if (dbNode.name != GetHostIpOrName()):
-                    cmd = 'ssh -q -o ConnectTimeout=5 %s mkdir -p %s/bin' % (dbNode.name, clusterInfo.appPath)
+                    cmd = 'ssh -q -o ConnectTimeout=5 %s mkdir -p %s/bin' % (dbNode.sshIps[0], clusterInfo.appPath)
                     (status, output) = subprocess.getstatusoutput(cmd)
                     if status != 0:
                         print("ERROR")
                     cmd = \
                         "scp %s/cluster_static_config_%s %s:%s/bin/cluster_static_config" % (
                             tmpDirName,
-                            dbNode.name, dbNode.name, clusterInfo.appPath)
+                            dbNode.name, dbNode.sshIps[0], clusterInfo.appPath)
                 else:
                     cmd = \
                         "mkdir -p %s/bin; cp %s/cluster_static_config_%s %s" \
@@ -4359,7 +4356,7 @@ class dbClusterInfo():
         # 分发
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "scp %s %s:%s" % (PkgPath, dbNode.name, clusterInfo.toolPath)
+                cmd = "scp %s %s:%s" % (PkgPath, dbNode.sshIps[0], clusterInfo.toolPath)
                 status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp %s %s' % (PkgPath, clusterInfo.toolPath)
@@ -4385,6 +4382,7 @@ class dbClusterInfo():
                 f"LOG_LEVEL=255\n"
                 f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
                 f"LISTEN_ADDR={dbNode.listen_addr}\n"
+                f"IP_WHITE_LIST={dbNode.sshIps[0]},127.0.0.1\n"
                 f"DATA_FILE_PATH={clusterInfo.grPath}/data\n"
                 f"GR_CM_SO_NAME=libclient.so\n"
             )
@@ -4469,11 +4467,11 @@ class dbClusterInfo():
                 cmd = 'source %s && grcmd gencert -t server -d 1000 && grcmd gencert -t client -d 1000' % (envfile)
             (status, output) = subprocess.getstatusoutput(cmd)
             if (status != 0):
-                raise Exception(f"failed to create gr cert, Error output:\n{output}")
+                raise Exception(f"failed to create gr cert, Error output:\n{output}, cmd is {cmd}")
 
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = f"scp -r {parent_dir}/gr_cli_inst.ini {parent_dir}/gr_ser_inst.ini {dbNode.name}:{parent_dir}"
+                cmd = f"scp -r {parent_dir}/gr_cli_inst.ini {parent_dir}/gr_ser_inst.ini {dbNode.sshIps[0]}:{parent_dir}"
                 status, output = subprocess.getstatusoutput(cmd)
                 if status != 0:
                     raise Exception(f"failed to distribute int file, Error output:\n{output}")
@@ -4483,7 +4481,7 @@ class dbClusterInfo():
         # gr_om
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "scp gr_om %s:%s/bin" % (dbNode.name, clusterInfo.appPath)
+                cmd = "scp gr_om %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
                 status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp gr_om %s/bin' % (clusterInfo.appPath)
@@ -4492,26 +4490,62 @@ class dbClusterInfo():
                 raise Exception(f"failed tp distribute gr_om, Error output:\n{output}")
         self.logger.log("Successfully distribute gr_om.")
 
+        # pssh
+        for dbNode in clusterInfo.dbNodes:
+            if dbNode.name != GetHostIpOrName():
+                cmd = "scp -r pssh/bin/* %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
+                status, output = subprocess.getstatusoutput(cmd)
+                if status == 0:
+                    # Set execute permissions for pssh binaries
+                    cmd = "ssh -q -o ConnectTimeout=5 %s 'chmod +x %s/bin/*'" % (dbNode.sshIps[0], clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+            else:
+                cmd = 'cp -r pssh/bin/* %s/bin' % (clusterInfo.appPath)
+                status, output = subprocess.getstatusoutput(cmd)
+                if status == 0:
+                    # Set execute permissions for pssh binaries
+                    cmd = 'chmod +x %s/bin/*' % (clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise Exception(f"failed to distribute pssh, Error output:\n{output}")
+        self.logger.log("Successfully distribute pssh.")
+
         # gr_contrl.sh脚本
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "scp gr_contrl.sh %s:%s/bin" % (dbNode.name, clusterInfo.appPath)
+                cmd = "scp gr_contrl.sh %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
                 status, output = subprocess.getstatusoutput(cmd)
+                if status == 0:
+                    # Set execute permissions for gr_contrl.sh
+                    cmd = "ssh -q -o ConnectTimeout=5 %s 'chmod +x %s/bin/gr_contrl.sh'" % (dbNode.sshIps[0], clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp gr_contrl.sh %s/bin' % (clusterInfo.appPath)
                 status, output = subprocess.getstatusoutput(cmd)
+                if status == 0:
+                    # Set execute permissions for gr_contrl.sh
+                    cmd = 'chmod +x %s/bin/gr_contrl.sh' % (clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
             if status != 0:
-                raise Exception(f"failed tp distribute gr_contrl.sh, Error output:\n{output}")
+                raise Exception(f"failed to distribute gr_contrl.sh, Error output:\n{output}")
         self.logger.log("Successfully distribute gr_contrl.sh.")
 
         # py_pstree.py脚本
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "scp py_pstree.py %s:%s/script/" % (dbNode.name, clusterInfo.toolPath)
+                cmd = "scp py_pstree.py %s:%s/script/" % (dbNode.sshIps[0], clusterInfo.toolPath)
                 status, output = subprocess.getstatusoutput(cmd)
+                if status == 0:
+                    # Set execute permissions for py_pstree.py
+                    cmd = "ssh -q -o ConnectTimeout=5 %s 'chmod +x %s/script/py_pstree.py'" % (dbNode.sshIps[0], clusterInfo.toolPath)
+                    status, output = subprocess.getstatusoutput(cmd)
             else:
                 cmd = 'cp py_pstree.py %s/script' % (clusterInfo.toolPath)
                 status, output = subprocess.getstatusoutput(cmd)
+                if status == 0:
+                    # Set execute permissions for py_pstree.py
+                    cmd = 'chmod +x %s/script/py_pstree.py' % (clusterInfo.toolPath)
+                    status, output = subprocess.getstatusoutput(cmd)
             if status != 0:
                 raise Exception(f"failed to distribute py_pstree.py, Error output:\n{output}")
         self.logger.log("Successfully distribute py_pstree.py.")
@@ -4671,11 +4705,6 @@ EOF
         """
         Uninstall oGRecorder from JSON configuration file
         """
-        import getpass
-        import json
-        import os
-        import subprocess
-        import socket
 
         RED = '\033[0;31m'
         GREEN = '\033[0;32m'
@@ -5023,6 +5052,7 @@ class ErrorCode():
         'GAUSS_50000': "[GAUSS-50000] : Unrecognized parameter: %s.",
         'GAUSS_50001': "[GAUSS-50001] : Incorrect parameter. Parameter '-%s' is required",
         'GAUSS_50011': "[GAUSS-50011] : The parameter[%s] value[%s] is invalid.",
+        'GAUSS_50024': "[GAUSS-50024] : The parameter [%s] value is invalid.",
     }
 
     GAUSS_501 = {
@@ -5036,6 +5066,15 @@ class ErrorCode():
         'GAUSS_50201': "[GAUSS-50201] : The %s does not exist.",
         'GAUSS_50203': "[GAUSS-50203] : The %s cannot be empty.",
         'GAUSS_50204': "[GAUSS-50204] : Failed to read %s.",
+        'GAUSS_50205': "[GAUSS-50205] : Failed to write %s.",
+        'GAUSS_50206': "[GAUSS-50206] : The %s is a symbolic link.",
+        'GAUSS_50208': "[GAUSS-50208] : Failed to create %s.",
+        'GAUSS_50209': "[GAUSS-50209] : Failed to access %s.",
+        'GAUSS_50210': "[GAUSS-50210] : The %s is not a regular file.",
+        'GAUSS_50211': "[GAUSS-50211] : The %s is not a directory.",
+        'GAUSS_50213': "[GAUSS-50213] : Failed to parse %s.",
+        'GAUSS_50216': "[GAUSS-50216] : Failed to distribute %s.",
+        'GAUSS_50219': "[GAUSS-50219] : The %s is invalid.",
         'GAUSS_50230': "[GAUSS-50230] : Failed to read/write %s.",
     }
 
@@ -5061,15 +5100,21 @@ class ErrorCode():
         'GAUSS_51230': "[GAUSS-51230] : The number of %s must %s.",
     }
 
-    GAUSS_514 = {}
+    GAUSS_514 = {
+        'GAUSS_51400': "[GAUSS-51400] : Failed to execute command: %s",
+    }
 
     GAUSS_516 = {
+        'GAUSS_51600': "[GAUSS-51600] : Failed to check cluster status.",
+        'GAUSS_51637': "[GAUSS-51637] : Data directory[%s] is conflicting.",
+        'GAUSS_51638': "[GAUSS-51638] : Data directory[%s] is conflicting.",
         'GAUSS_51649': "[GAUSS-51649] : Capture exceptions '%s' : %s.",
         'GAUSS_51650': "[GAUSS-51650] : Unclassified exceptions: %s.",
     }
 
     GAUSS_518 = {
         'GAUSS_51800': "[GAUSS-51800] : The environmental variable %s is empty. or variable has exceeded maximum length",
+        'GAUSS_51802': "[GAUSS-51802] : The environmental variable %s is empty or invalid.",
     }
 
     GAUSS_532 = {}
@@ -5223,10 +5268,27 @@ class InstallImpl:
         self.logger = install.logger
         self.clusterStopped = install.clusterStopped
         self.primaryTermAbnormal = install.primaryTermAbnormal
+        # 初始化 clusterInfo 用于主机名到 IP 的映射
+        self.clusterInfo = None
+        try:
+            self.clusterInfo = dbClusterInfo()
+            self.clusterInfo.initFromXml(self.xmlFile)
+        except:
+            pass  # 如果初始化失败，继续使用原始主机名
 
     def executeCmdOnHost(self, host, cmd, isLocal = False):
         if host == self.localhostName:
             isLocal = True
+        else:
+            # 尝试从 clusterInfo 获取对应的 IP 地址
+            try:
+                if hasattr(self, 'clusterInfo') and self.clusterInfo:
+                    for dbNode in self.clusterInfo.dbNodes:
+                        if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                            host = dbNode.sshIps[0]
+                            break
+            except:
+                pass  # 如果获取失败，继续使用原始主机名
         return executeCmdOnHost(host, cmd, isLocal)
 
     def prepareCMPath(self):
@@ -5264,14 +5326,25 @@ class InstallImpl:
             if host == self.localhostName:
                 continue
             # copy cm pacakage to other hosts
-            if ":" in host:
-                host = "[" + host + "]"
-            scpCmd = "scp %s %s:%s" % (self.cmpkg, host, self.toolPath)
+            # 尝试从 clusterInfo 获取对应的 IP 地址
+            ssh_ip = host
+            try:
+                if hasattr(self, 'clusterInfo') and self.clusterInfo:
+                    for dbNode in self.clusterInfo.dbNodes:
+                        if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                            ssh_ip = dbNode.sshIps[0]
+                            break
+            except:
+                pass  # 如果获取失败，继续使用原始主机名
+            
+            if ":" in ssh_ip:
+                ssh_ip = "[" + ssh_ip + "]"
+            scpCmd = "scp %s %s:%s" % (self.cmpkg, ssh_ip, self.toolPath)
             status, output = subprocess.getstatusoutput(scpCmd)
             if status != 0:
                 self.logger.debug("Command: " + scpCmd)
                 errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
-                self.logger.logExit(("Failed to send cm pacakage to %s." % host) + errorDetail)
+                self.logger.logExit(("Failed to send cm pacakage to %s." % ssh_ip) + errorDetail)
             pkgPath = os.path.join(self.toolPath, cmpkgName)
             decompressCmd = "tar -zxf %s -C %s" % (pkgPath, self.gaussHome)
             status, output = self.executeCmdOnHost(host, decompressCmd)
@@ -5403,14 +5476,25 @@ class InstallImpl:
             if host == self.localhostName:
                 continue
             # copy cronContentTmpFile to other host
-            if ":" in host:
-                host = "[" + host + "]"
-            scpCmd = "scp %s %s:%s" % (cronContentTmpFile, host, self.tmpPath)
+            # 尝试从 clusterInfo 获取对应的 IP 地址
+            ssh_ip = host
+            try:
+                if hasattr(self, 'clusterInfo') and self.clusterInfo:
+                    for dbNode in self.clusterInfo.dbNodes:
+                        if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                            ssh_ip = dbNode.sshIps[0]
+                            break
+            except:
+                pass  # 如果获取失败，继续使用原始主机名
+            
+            if ":" in ssh_ip:
+                ssh_ip = "[" + ssh_ip + "]"
+            scpCmd = "scp %s %s:%s" % (cronContentTmpFile, ssh_ip, self.tmpPath)
             status, output = subprocess.getstatusoutput(scpCmd)
             if status != 0:
                 self.logger.debug("Command: " + scpCmd)
                 errorDetail = "\nStatus: %s\nOutput: %s" % (status, output)
-                self.logger.logExit(("Failed to copy cronContentTmpFile to %s." % host) + errorDetail)
+                self.logger.logExit(("Failed to copy cronContentTmpFile to %s." % ssh_ip) + errorDetail)
             # set om_monitor crontab
             status, output = self.executeCmdOnHost(host, setCronCmd)
             # cleanup cronContentTmpFile
@@ -5593,34 +5677,8 @@ class InstallImpl:
             self.logger.debug(f"Command: {mkdirCmd}\nStatus: {status}\nOutput: {output}")
             self.logger.logExit("Failed to create cert path.")
         self._createCMSslConf(certPath)
-        # passwd = self._getPassword()
-        # 生成符合CM要求的密码：8-15字节，包含至少3种字符类型
-        def generate_cm_password():
-            import string
-            import random
-            # 定义字符集
-            lowercase = string.ascii_lowercase
-            uppercase = string.ascii_uppercase  
-            digits = string.digits
-            special = "~!@#$%^&*()-_=+\\|[{}];:,<.>/?"
-            
-            # 确保至少包含3种字符类型
-            password = [
-                random.choice(lowercase),
-                random.choice(uppercase),
-                random.choice(digits)
-            ]
-            
-            # 填充剩余字符（总长度12）
-            all_chars = lowercase + uppercase + digits + special
-            for _ in range(9):
-                password.append(random.choice(all_chars))
-            
-            # 随机打乱
-            random.shuffle(password)
-            return ''.join(password)
-        
-        passwd = generate_cm_password()
+        passwd = self._getPassword()
+
         activePeriod = "10950"
         opensslConf = os.path.join(certPath, "openssl.cnf")
         if not os.path.isfile(opensslConf):
@@ -5671,18 +5729,9 @@ class InstallImpl:
         server_rand_file = os.path.join(certPath, "server.key.rand")
         server_cipher_file = os.path.join(certPath, "server.key.cipher")
         if not os.path.exists(server_rand_file):
-            # 备用方案：手动生成rand文件
-            rand_cmd = f"openssl rand -out {server_rand_file} 1024"
-            status, output = subprocess.getstatusoutput(rand_cmd)
-            if status != 0:
-                self.logger.logExit(f"Failed to generate server.key.rand manually: {output}")
-                
+            self.logger.logExit("Failed to generate server.key.rand.\n" + output)
         if not os.path.exists(server_cipher_file):
-            # 备用方案：手动生成cipher文件 (加密版本的私钥)
-            cipher_cmd = f"cp {certPath}/server.key {server_cipher_file}"
-            status, output = subprocess.getstatusoutput(cipher_cmd)
-            if status != 0:
-                self.logger.logExit(f"Failed to generate server.key.cipher manually: {output}")
+            self.logger.logExit("Failed to generate server.key.cipher.\n" + output)
 
         # 生成 client cipher 和 rand
         expect_client_cmd = (
@@ -5697,18 +5746,9 @@ class InstallImpl:
         client_rand_file = os.path.join(certPath, "client.key.rand")
         client_cipher_file = os.path.join(certPath, "client.key.cipher")
         if not os.path.exists(client_rand_file):
-            # 备用方案：手动生成rand文件
-            rand_cmd = f"openssl rand -out {client_rand_file} 1024"
-            status, output = subprocess.getstatusoutput(rand_cmd)
-            if status != 0:
-                self.logger.logExit(f"Failed to generate client.key.rand manually: {output}")
-                
+            self.logger.logExit("Failed to generate client.key.rand.\n" + output)
         if not os.path.exists(client_cipher_file):
-            # 备用方案：手动生成cipher文件 (加密版本的私钥)
-            cipher_cmd = f"cp {certPath}/client.key {client_cipher_file}"
-            status, output = subprocess.getstatusoutput(cipher_cmd)
-            if status != 0:
-                self.logger.logExit(f"Failed to generate client.key.cipher manually: {output}")
+            self.logger.logExit("Failed to generate client.key.cipher.\n" + output)
 
         # 密码置空
         passwd = ""
@@ -5735,11 +5775,22 @@ class InstallImpl:
                 errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (createCertPathCmd, status, output)
                 self.logger.debug(errorDetail)
                 self.logger.logExit("Failed to create path of CA for CM on host %s." % host)
+            # 尝试从 clusterInfo 获取对应的 IP 地址
+            ssh_ip = host
+            try:
+                if hasattr(self, 'clusterInfo') and self.clusterInfo:
+                    for dbNode in self.clusterInfo.dbNodes:
+                        if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                            ssh_ip = dbNode.sshIps[0]
+                            break
+            except:
+                pass  # 如果获取失败，继续使用原始主机名
+            
             # Determine if the host is an IPv6 address and format accordingly
-            if ":" in host:
-                formatted_host = "[{}]".format(host)
+            if ":" in ssh_ip:
+                formatted_host = "[{}]".format(ssh_ip)
             else:
-                formatted_host = host
+                formatted_host = ssh_ip
         
             # Create the scp command with the formatted host
             scpCmd = "scp {certPath}/* {host}:{certPath}".format(certPath=certPath, host=formatted_host)
@@ -5915,8 +5966,7 @@ General options:
         cmd = "source %s; ./gr_om generate-xml %s" % (self.envFile, self.xmlFile)
         status, output = subprocess.getstatusoutput(cmd)
         if status != 0:
-            self.logger.logExit((ErrorCode.GAUSS_514["GAUSS_51400"] % cmd) + \
-                "\nStatus:%d\nOutput:" + output)
+            self.logger.logExit((ErrorCode.GAUSS_514["GAUSS_51400"] % cmd) + f"\nStatus:{status}\nOutput:{output}")
 
     def getInfoListOfAllNodes(self):
         """
@@ -5931,7 +5981,7 @@ General options:
         status, output = subprocess.getstatusoutput(cmd)
         if status != 0:
             self.logger.logExit((ErrorCode.GAUSS_514["GAUSS_51400"] % cmd) + \
-                "\nStatus:%d\nOutput:" + output)
+                f"\nStatus:{status}\nOutput:{output}")
         nodesStaticInfoStr = re.split("azName.*:.*", output)
         if len(nodesStaticInfoStr) == 0:
             self.logger.logExit("Failed to get cluster info from static file.")
@@ -5941,10 +5991,26 @@ General options:
         for nodeInfo in nodesStaticInfo:
             if nodeInfo == "":
                 continue
-            nodename = re.findall("nodeName:(.*)", nodeInfo)[0]
+            
+            # Parse node name with error checking
+            nodename_match = re.findall("nodeName:(.*)", nodeInfo)
+            if not nodename_match:
+                self.logger.logExit(f"Failed to parse nodeName from nodeInfo: {nodeInfo}")
+            nodename = nodename_match[0]
             self.hostnames.append(nodename)
-            dataPath = re.findall("datanodeLocalDataPath.*:(.*)", nodeInfo)[0]
-            port = re.findall("datanodePort.*:(.*)", nodeInfo)[0]
+            
+            # Parse data path with error checking
+            dataPath_match = re.findall("datanodeLocalDataPath.*:(.*)", nodeInfo)
+            if not dataPath_match:
+                self.logger.logExit(f"Failed to parse datanodeLocalDataPath from nodeInfo: {nodeInfo}")
+            dataPath = dataPath_match[0]
+            
+            # Parse port with error checking
+            port_match = re.findall("datanodePort.*:(.*)", nodeInfo)
+            if not port_match:
+                self.logger.logExit(f"Failed to parse datanodePort from nodeInfo: {nodeInfo}")
+            port = port_match[0]
+            
             self.nodesInfo[nodename] = {"dataPath": dataPath, "port": port}
 
         # get node info from XML
@@ -6068,7 +6134,20 @@ General options:
         self.checkCM()
         self.getInfoListOfAllNodes()
         self.getLocalhostName()
-        self.checkHostTrust()
+        # self.checkHostTrust()
+        
+        # 设置全局主机名到 IP 的映射
+        try:
+            clusterInfo = dbClusterInfo()
+            clusterInfo.initFromXml(self.xmlFile)
+            hostname_ip_map = {}
+            for dbNode in clusterInfo.dbNodes:
+                if hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                    hostname_ip_map[dbNode.name] = dbNode.sshIps[0]
+            set_hostname_ip_map(hostname_ip_map)
+        except:
+            pass  # 如果设置失败，继续使用原始主机名
+        
         installImpl = InstallImpl(self)
         installImpl.run()
 
@@ -6091,6 +6170,16 @@ def checkPathVaild(obtainpath):
                         " There are illegal characters in the path.")
 
 def getEnvParam(envFile, param):
+    """
+    Get environment parameter value from environment file.
+    
+    Args:
+        envFile (str): Path to the environment file
+        param (str): Parameter name to retrieve
+        
+    Returns:
+        str: Parameter value
+    """
     cmd = "source {envFile}; echo ${param}".format(envFile=envFile, param=param)
     status, output = subprocess.getstatusoutput(cmd)
     if status != 0:
@@ -6100,22 +6189,61 @@ def getEnvParam(envFile, param):
     return output
 
 def getLocalhostName():
+    """
+    Get the local hostname.
+    
+    Returns:
+        str: Local hostname
+    """
     return socket.gethostname()
 
-def executeCmdOnHost(host, cmd, isLocal = False):
+# 全局主机名到 IP 的映射字典
+_hostname_to_ip_map = {}
+
+def set_hostname_ip_map(hostname_ip_map):
+    """
+    Set global hostname to IP mapping.
+    
+    Args:
+        hostname_ip_map (dict): Dictionary mapping hostnames to IP addresses
+    """
+    global _hostname_to_ip_map
+    _hostname_to_ip_map = hostname_ip_map
+
+def executeCmdOnHost(host, cmd, isLocal=False):
+    """
+    Execute command on a remote host via SSH.
+    
+    Args:
+        host (str): Target hostname or IP address
+        cmd (str): Command to execute
+        isLocal (bool): Whether to execute locally (default: False)
+        
+    Returns:
+        tuple: (status, output) - command exit status and output
+    """
     if not isLocal:
+        # Try to get IP address from global mapping
+        if host in _hostname_to_ip_map:
+            host = _hostname_to_ip_map[host]
         cmd = 'ssh -q -o ConnectTimeout=5 %s \"%s\"' % (host, cmd)
     status, output = subprocess.getstatusoutput(cmd)
     return status, output
 
 def checkXMLFile(xmlFile):
     """
-    function: check XML file
-            1.check whether XML file exists
-            2.check whether XML file is file
-            3.permission
-    input : NA
-    output: NA
+    Check XML file validity.
+    
+    Performs the following checks:
+    1. Check whether XML file exists
+    2. Check whether XML file is a regular file
+    3. Check read permission
+    
+    Args:
+        xmlFile (str): Path to the XML file
+        
+    Raises:
+        Exception: If any validation fails
     """
     if xmlFile.startswith('~/'):
         homePath = os.path.expanduser('~')
@@ -6129,16 +6257,25 @@ def checkXMLFile(xmlFile):
 
 def checkHostsTrust(hosts):
     """
-    check trust between current host and the given hosts
+    Check SSH trust between current host and the given hosts.
+    
+    Args:
+        hosts (list): List of hostnames to check trust with
+        
+    Raises:
+        Exception: If any host lacks SSH trust
     """
     hostsWithoutTrust = []
     for host in hosts:
-        checkTrustCmd = "ssh -o ConnectTimeout=3 -o ConnectionAttempts=5 -o PasswordAuthentication=no " \
-            "-o StrictHostKeyChecking=no %s 'pwd > /dev/null'" % host
+        checkTrustCmd = (
+            "ssh -o ConnectTimeout=3 -o ConnectionAttempts=5 "
+            "-o PasswordAuthentication=no -o StrictHostKeyChecking=no "
+            f"{host} 'pwd > /dev/null'"
+        )
         status, output = subprocess.getstatusoutput(checkTrustCmd)
         if status != 0:
             hostsWithoutTrust.append(host)
-    if hostsWithoutTrust != []:
+    if hostsWithoutTrust:
         CMLog.exitWithError(ErrorCode.GAUSS_511["GAUSS_51100"] % ','.join(hostsWithoutTrust))
 
 def GetHostIpOrName():
@@ -6401,6 +6538,15 @@ def getEnv(env_param, default_value=None):
 
     return env_value
 
+def isdigit(c):
+    return '0' <= c <= '9'
+
+def islower(c):
+    return 'a' <= c <= 'z'
+
+def isupper(c):
+    return 'A' <= c <= 'Z'
+
 def json_to_xml(json_file):
     """将JSON配置文件转换为XML格式"""
     import json
@@ -6448,21 +6594,31 @@ def json_to_xml(json_file):
             <PARAM name="sshIp1" value="{node['ip']}"/>
             <PARAM name="cmDir" value="{config['cluster']['install_path']}cm"/>
             <PARAM name="grIp1" value="{node['ip']}"/>
-            <PARAM name="listen_addr" value="{node['ip']}:33500"/>'''
+            <PARAM name="listen_addr" value="{node['ip']}:{node['gr_port'] + 10}"/>'''
         
         # 为第一个节点添加额外的CM参数
         if i == 0:
             other_nodes = [n['name'] for n in config['cluster']['nodes'][1:]]
             other_ips = [n['ip'] for n in config['cluster']['nodes']]
+            
+            # 生成dataNode1参数：根据节点数量动态生成
+            # 格式：${install_path}/data/dn,${hostnames[1]},${install_path}/data/dn,${hostnames[2]},${install_path}/data/dn
+            data_node_parts = []
+            for j, node in enumerate(config['cluster']['nodes']):
+                if j > 0:  # 从第二个节点开始添加节点名
+                    data_node_parts.append(node['name'])
+                data_node_parts.append(f"{config['cluster']['install_path']}data/dn")
+            dataNode1_value = ','.join(data_node_parts)
+            
             xml_content += f'''
             <PARAM name="cmsNum" value="1"/>
-            <PARAM name="cmServerPortBase" value="15000"/>
+            <PARAM name="cmServerPortBase" value="{config['cluster']['nodes'][0]['gr_port'] + 20}"/>
             <PARAM name="cmServerListenIp1" value="{','.join(other_ips)}"/>
             <PARAM name="cmServerlevel" value="1"/>
             <PARAM name="cmServerRelation" value="{','.join([node['name']] + other_nodes)}"/>
             <PARAM name="dataNum" value="1"/>
-            <PARAM name="dataPortBase" value="16000"/>
-            <PARAM name="dataNode1" value="{config['cluster']['install_path']}data/dn,{config['cluster']['nodes'][1]['name']},{config['cluster']['install_path']}data/dn"/>'''
+            <PARAM name="dataPortBase" value="{config['cluster']['nodes'][0]['gr_port'] + 30}"/>
+            <PARAM name="dataNode1" value="{dataNode1_value}"/>'''
         
         xml_content += '''
         </DEVICE>'''
@@ -6568,15 +6724,6 @@ def main():
         args.user = json_user
         print(f"Using user from JSON config: {json_user}")
     
-    # 清理临时XML文件
-    def cleanup_temp_xml():
-        if xml_file and os.path.exists(xml_file):
-            try:
-                os.unlink(xml_file)
-                print(f"Cleaned up temporary XML file: {xml_file}")
-            except:
-                pass
-    
     # Dispatch to appropriate handler based on command
     try:
         if args.command == 'view':
@@ -6606,7 +6753,12 @@ def main():
             sys.exit(1)
     finally:
         # 清理临时文件
-        cleanup_temp_xml()
+        if xml_file and os.path.exists(xml_file):
+            try:
+                os.unlink(xml_file)
+                print(f"Cleaned up temporary XML file: {xml_file}")
+            except:
+                pass
 
 if __name__ == "__main__":
     main()

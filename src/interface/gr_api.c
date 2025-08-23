@@ -46,7 +46,6 @@ typedef struct {
     unsigned long sig[];
 } sigset_t;
 #endif
-#include "libaio.h"
 #ifndef WIN32
 #include "config.h"
 #endif

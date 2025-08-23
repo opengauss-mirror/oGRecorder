@@ -128,8 +128,6 @@ export GR_LIBRARYS=$(pwd)/../library
 mkdir -p $GR_LIBRARYS/huawei_security
 mkdir -p $GR_LIBRARYS/openssl
 mkdir -p $GR_LIBRARYS/zlib
-mkdir -p $GR_LIBRARYS/lz4
-mkdir -p $GR_LIBRARYS/libaio/include
 mkdir -p $GR_LIBRARYS/cbb
 
 export LIB_PATH=$binarylib_dir/kernel/dependency
@@ -139,36 +137,10 @@ COPT_LIB_PATH=${binarylib_dir}/kernel/component
 cp -r $P_LIB_PATH/Huawei_Secure_C/comm/lib     $GR_LIBRARYS/huawei_security/lib
 cp -r $LIB_PATH/openssl/comm/lib               $GR_LIBRARYS/openssl/lib
 cp -r $LIB_PATH/zlib1.2.11/comm/lib            $GR_LIBRARYS/zlib/lib
-cp -r $LIB_PATH/lz4/comm/lib                   $GR_LIBRARYS/lz4/lib
 
 cp -r $P_LIB_PATH/Huawei_Secure_C/comm/include    $GR_LIBRARYS/huawei_security/include
 cp -r $LIB_PATH/openssl/comm/include              $GR_LIBRARYS/openssl/include
 cp -r $LIB_PATH/zlib1.2.11/comm/include           $GR_LIBRARYS/zlib/include
-cp -r $LIB_PATH/lz4/comm/include                  $GR_LIBRARYS/lz4/include
-
-status=0
-if [ -f "/usr/include/libaio.h" ];then
-    echo "begin cp libaio.h from /usr/include/"
-    cp -r /usr/include/libaio.h                   $GR_LIBRARYS/libaio/include
-    status=1
-fi
-
-if [ ${status} -eq 0 ];then
-    for file in "${GR_OPEN_SRC_PATH}"/libaio/libaio-*/src/libaio.h
-    do
-        if [ -f "${file}" ];then
-            echo "begin cp libaio.h from open_source/libaio/"
-            cp -r ${GR_OPEN_SRC_PATH}/libaio/libaio-*/src/libaio.h $GR_LIBRARYS/libaio/include
-            status=1
-        fi
-    done
-
-    if [ ${status} -eq 0 ];then
-        echo "system does not install libaio software, pls install by yum install libaio-devel"
-        exit 1
-    fi
-fi
-
 cp -r $COPT_LIB_PATH/cbb/include                  $GR_LIBRARYS/cbb/include
 cp -r $COPT_LIB_PATH/cbb/lib                      $GR_LIBRARYS/cbb/lib
 

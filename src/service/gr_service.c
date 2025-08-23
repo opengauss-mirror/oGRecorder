@@ -31,6 +31,7 @@
 #include "gr_mes.h"
 #include "gr_api.h"
 #include "gr_thv.h"
+#include "gr_param.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -1166,10 +1167,55 @@ status_t gr_proc_standby_req(gr_session_t *session)
     return gr_exec_cmd(session, CM_FALSE);
 }
 
+static status_t gr_get_session_client_ip(gr_session_t *session, char *ip_buf, size_t buf_size)
+{
+    if (session->pipe.type == CS_TYPE_TCP) {
+        tcp_link_t *tcp_link = &session->pipe.link.tcp;
+        if (tcp_link->remote.addr.ss_family == AF_INET) {
+            struct sockaddr_in *addr_in = (struct sockaddr_in *)&tcp_link->remote.addr;
+            if (inet_ntop(AF_INET, &addr_in->sin_addr, ip_buf, buf_size) == NULL) {
+                return CM_ERROR;
+            }
+            return CM_SUCCESS;
+        } else {
+            LOG_RUN_WAR("[GR_WHITELIST] Non-IPv4 connection not supported, family: %d", 
+                       tcp_link->remote.addr.ss_family);
+            return CM_ERROR;
+        }
+    }
+    return CM_ERROR;
+}
+
+static status_t gr_validate_handshake_whitelist(gr_session_t *session)
+{
+    char client_ip[CM_MAX_IP_LEN] = {0};
+    
+    if (gr_get_session_client_ip(session, client_ip, sizeof(client_ip)) != CM_SUCCESS) {
+        LOG_RUN_ERR("[GR_WHITELIST]session %u failed to get client IP during handshake", session->id);
+        return CM_ERROR;
+    }
+    
+    if (!gr_check_ip_whitelist(client_ip)) {
+        GR_THROW_ERROR(ERR_GR_WHITELIST_INVALID, client_ip);
+        LOG_RUN_WAR("[GR_WHITELIST]session %u handshake rejected: IP %s not in whitelist", 
+                   session->id, client_ip);
+        return CM_ERROR;
+    }
+    
+    LOG_DEBUG_INF("[GR_WHITELIST]session %u handshake accepted: IP %s passed whitelist check", 
+                  session->id, client_ip);
+    return CM_SUCCESS;
+}
+
 status_t gr_process_handshake_cmd(gr_session_t *session, gr_cmd_type_e cmd)
 {
     status_t status = CM_ERROR;
     bool32 ready = CM_FALSE;
+    if (gr_validate_handshake_whitelist(session) != CM_SUCCESS) {
+        LOG_RUN_ERR("[GR_CONNECT]session %u failed whitelist validation during handshake", session->id);
+        return CM_ERROR;
+    }
+    
     do {
         cm_reset_error();
         if (cs_wait(&session->pipe, CS_WAIT_FOR_READ, session->pipe.socket_timeout, &ready) != CM_SUCCESS) {
