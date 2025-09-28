@@ -115,6 +115,7 @@ typedef enum en_gr_rdgr_type_e {
     GR_STATUS_READWRITE,
     GR_SERVER_STATUS_END,
 } gr_rdgr_type_e;
+
 typedef enum en_gr_instance_status {
     GR_STATUS_PREPARE = 0,
     GR_STATUS_RECOVERY,
@@ -133,14 +134,23 @@ typedef struct st_gr_server_status_t {
     unsigned int master_id;
     unsigned int is_maintain;
 } gr_server_status_t;
+
 typedef struct st_gr_stat {
     unsigned long long size;
     unsigned long long written_size;
-    time_t create_time;
-    time_t update_time;
+    long long create_time;
+    long long update_time;
     char name[GR_MAX_NAME_LEN];
     gr_item_type_t type;
 } gr_stat_t;
+
+
+typedef struct st_gr_disk_usage_info {
+    unsigned long total_bytes;
+    unsigned long used_bytes;
+    unsigned long available_bytes;
+    double usage_percent;
+} gr_disk_usage_info_t;
 
 typedef struct st_gr_file_item {
     char name[GR_MAX_NAME_LEN];
@@ -194,10 +204,6 @@ GR_DECLARE int gr_file_stat(
 GR_DECLARE int gr_file_performance();
 GR_DECLARE int gr_file_postpone(gr_vfs_handle vfs_handle, const char *file, const char *time);
 
-// aio
-GR_DECLARE int gr_file_pwrite_async();
-GR_DECLARE int gr_file_pread_async();
-
 // log
 GR_DECLARE int gr_get_error(int *errcode, const char **errmsg);
 GR_DECLARE void gr_register_log_callback(gr_log_output cb_log_output, unsigned int log_level);
@@ -209,12 +215,17 @@ GR_DECLARE int gr_set_conn_timeout(int timeout);
 GR_DECLARE int gr_set_conn_opts(gr_conn_opt_key_e key, void *value, const char *addr);
 GR_DECLARE void gr_set_default_conn_timeout(int timeout);
 GR_DECLARE int gr_create_inst(const char *storageServerAddr, gr_instance_handle *inst_handle);
+GR_DECLARE int gr_create_inst_only_primary(const char *serverAddrs, gr_instance_handle *inst_handle);
 GR_DECLARE int gr_delete_inst(gr_instance_handle inst_handle);
 
 // instance param
 GR_DECLARE int gr_set_main_inst(const char *storageServerAddr);
-GR_DECLARE int gr_get_inst_status(gr_server_status_t *gr_status, gr_instance_handle inst_handle);
-GR_DECLARE int gr_is_maintain(unsigned int *is_maintain, gr_instance_handle inst_handle);
+GR_DECLARE int gr_get_inst_status(gr_instance_handle inst_handle, 
+                                  int *instance_status_id, int *server_status_id,
+                                  int *local_instance_id, int *master_id);
+
+GR_DECLARE int gr_get_disk_usage(gr_instance_handle inst_handle,
+                                 long long *total_bytes, long long *used_bytes, long long *available_bytes);
 
 // config
 GR_DECLARE int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *value);
@@ -222,7 +233,6 @@ GR_DECLARE int gr_get_conf(gr_instance_handle inst_handle, const char *name, cha
 
 // version
 GR_DECLARE int gr_get_lib_version(void);
-GR_DECLARE void gr_show_version(char *version);
 GR_DECLARE void gr_show_version(char *version);
 
 // SDK

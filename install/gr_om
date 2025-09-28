@@ -6619,7 +6619,6 @@ def json_to_xml(json_file):
             <PARAM name="dataNum" value="1"/>
             <PARAM name="dataPortBase" value="{config['cluster']['nodes'][0]['gr_port'] + 30}"/>
             <PARAM name="dataNode1" value="{dataNode1_value}"/>'''
-        
         xml_content += '''
         </DEVICE>'''
     

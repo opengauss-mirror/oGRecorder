@@ -184,7 +184,7 @@ extern "C" {
 #define CM_MAX_UDS_FILE_PERMISSIONS (uint16)777
 #define CM_DEF_UDS_FILE_PERMISSIONS (uint16)600
 
-#define GR_MAX_PACKET_SIZE (uint32_t)(10240) /* 10KB */
+#define GR_MAX_PACKET_SIZE SIZE_K(130)
 #define GR_MAX_PACKET_DATA_SIZE (((GR_MAX_PACKET_SIZE) - sizeof(gr_packet_head_t)) - sizeof(uint32_t))
 
 #define GR_PARAM_BUFFER_SIZE (uint32_t)1024
@@ -363,10 +363,11 @@ extern "C" {
     } while (0)
 
 #define GR_BYTE_BITS_SIZE 8
+#define GR_RW_STEP_SIZE SIZE_K(128)
 
 // if want change the default, compile the gr with set GR_PAGE_SIZE=page_size_you_want
 #ifndef GR_PAGE_SIZE
-#define GR_PAGE_SIZE 8192
+#define GR_PAGE_SIZE 32768
 #endif
 
 #if GR_PAGE_SIZE != 4096 && GR_PAGE_SIZE != 8192 && GR_PAGE_SIZE != 16384 && GR_PAGE_SIZE != 32768

@@ -25,16 +25,21 @@
 #include <stdint.h>
 #include <time.h>
 #include <utime.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 #ifndef WIN32
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <unistd.h>
 #endif  // !WIN32
 #include "gr_file.h"
 #include "gr_thv.h"
 #include "gr_param.h"
 #include <pthread.h>
-#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -113,7 +118,7 @@ status_t gr_filesystem_mkdir(const char *name, mode_t mode) {
     }
 
     if (mkdir(path, mode) != 0) {
-        LOG_RUN_ERR("[FS] Failed to create directory: %s", name);
+        LOG_RUN_ERR("[FS] Failed to create directory: %s, errno: %d", name, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -126,7 +131,7 @@ status_t gr_filesystem_rmdir(const char *name, uint64_t flag) {
     if (flag != 0) {
         DIR *dir = opendir(path);
         if (!dir) {
-            LOG_RUN_ERR("[FS] Failed to open directory: %s", name);
+            LOG_RUN_ERR("[FS] Failed to open directory: %s, errno: %d", name, errno);
             GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
             return CM_ERROR;
         }
@@ -146,7 +151,7 @@ status_t gr_filesystem_rmdir(const char *name, uint64_t flag) {
                 return CM_ERROR;
             }
             if (unlink(subpath) != 0) {
-                LOG_RUN_ERR("[FS] Failed to remove file: %s", subpath);
+                LOG_RUN_ERR("[FS] Failed to remove file: %s, errno: %d", subpath, errno);
                 GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
                 closedir(dir);
                 return CM_ERROR;
@@ -157,7 +162,7 @@ status_t gr_filesystem_rmdir(const char *name, uint64_t flag) {
     }
 
     if (rmdir(path) != 0) {
-        LOG_RUN_ERR("[FS] Failed to remove directory: %s", name);
+        LOG_RUN_ERR("[FS] Failed to remove directory: %s, errno: %d", name, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -176,7 +181,7 @@ status_t gr_filesystem_opendir(const char *name, uint64_t *out_handle)
     gr_get_fs_path(name, path, sizeof(path));
     DIR *dir = opendir(path);
     if (!dir) {
-        LOG_RUN_ERR("[FS] Failed to open directory: %s", name);
+        LOG_RUN_ERR("[FS] Failed to open directory: %s, errno: %d", name, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -194,7 +199,7 @@ status_t gr_filesystem_closedir(uint64_t handle)
         return CM_ERROR;
     }
     if (closedir(dir) != 0) {
-        LOG_RUN_ERR("[FS] Failed to close directory");
+        LOG_RUN_ERR("[FS] Failed to close directory, errno: %d", errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -208,7 +213,7 @@ status_t gr_filesystem_closedir(uint64_t handle)
 status_t gr_filesystem_append(const char *name) {
     off_t end_position;
     if (gr_filesystem_get_file_end_position(name, &end_position) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to get file %s size.", name);
+        LOG_RUN_ERR("Failed to get file %s size, errno: %d", name, errno);
         return CM_ERROR;
     }
     char path[GR_FILE_PATH_MAX_LENGTH];
@@ -217,6 +222,7 @@ status_t gr_filesystem_append(const char *name) {
     if ((access(path, W_OK) == -1) && (end_position == 0)) {
         LOG_RUN_INF("File %s can enter into append mode.", name);
         if (chmod(path, GR_APPEND_MODE) != CM_SUCCESS) {
+            LOG_RUN_ERR("[FS] Failed to change file %s to append mode, errno: %d", name, errno);
             return CM_ERROR;
         }
         return CM_SUCCESS;
@@ -228,20 +234,20 @@ status_t gr_filesystem_touch(const char *name) {
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(name, path, sizeof(path));
     if (access(path, F_OK) == 0) {
-        LOG_RUN_ERR("[FS] File already exists: %s", name);
+        LOG_RUN_ERR("[FS] File already exists: %s, errno: %d", name, errno);
         GR_THROW_ERROR(ERR_GR_DIR_CREATE_DUPLICATED, name);
         return CM_ERROR;
     }
 
     FILE *file = fopen(path, "w");
     if (!file) {
-        LOG_RUN_ERR("[FS] Failed to create file: %s", name);
+        LOG_RUN_ERR("[FS] Failed to create file: %s, errno: %d", name, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
     (void)fclose(file);
     if (chmod(path, GR_LOCK_MODE) != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS] File %d enter lock mode failed", GR_LOCK_MODE);
+        LOG_RUN_ERR("[FS] File %s enter lock mode failed, errno: %d", name, errno);
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -251,7 +257,7 @@ status_t gr_filesystem_rm(const char *name) {
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(name, path, sizeof(path));
     if (unlink(path) != 0) {
-        LOG_RUN_ERR("[FS] Failed to remove file: %s", name);
+        LOG_RUN_ERR("[FS] Failed to remove file: %s, errno: %d", name, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -266,10 +272,12 @@ status_t gr_filesystem_pwrite(int handle, int64 offset, int64 size, const char *
     }
     *rel_size = pwrite(handle, buf, size, offset);
     if (*rel_size == -1) {
-        LOG_RUN_ERR("[FS] Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to write to handle: %d, offset: %lld, size: %lld, errno: %d", handle, offset, size, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
-    }
+    } else if (*rel_size != size) {
+        LOG_RUN_WAR("[FS] Failed to write to handle: %d, offset: %lld, size: %lld, errno: %d", handle, offset, size, errno);
+    }   
     return CM_SUCCESS;
 }
 
@@ -281,7 +289,7 @@ status_t gr_filesystem_pread(int handle, int64 offset, int64 size, char *buf, in
     }
     *rel_size = pread(handle, buf, size, offset);
     if (*rel_size == -1) {
-        LOG_RUN_ERR("[FS] Failed to read from handle: %d, offset: %lld, size: %lld", handle, offset, size);
+        LOG_RUN_ERR("[FS] Failed to read from handle: %d, offset: %lld, size: %lld, errno: %d", handle, offset, size, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -348,7 +356,7 @@ status_t gr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
     struct stat file_stat;
     if (stat(path, &file_stat) != 0) {
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
-        LOG_RUN_ERR("[FS] Failed to stat file: %s", file_path);
+        LOG_RUN_ERR("[FS] Failed to stat file: %s, errno: %d", file_path, errno);
         return CM_ERROR;
     }
 
@@ -358,28 +366,25 @@ status_t gr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
 
 status_t gr_filesystem_open(const char *file_path, int flag, int *fd) {
     if (gr_filesystem_append(file_path) != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS] Failed to change file %s to append mode", file_path);
+        LOG_RUN_ERR("[FS] Failed to change file %s to append mode, errno: %d", file_path, errno);
         return CM_ERROR;
     }
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(file_path, path, sizeof(path));
     *fd = open(path, flag | O_APPEND, 0);
     if (*fd == -1) {
-        LOG_RUN_ERR("[FS] Failed to open file: %s", file_path);
+        LOG_RUN_ERR("[FS] Failed to open file: %s, errno: %d", file_path, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
-status_t gr_filesystem_lock(int fd, int need_lock)
+status_t gr_filesystem_lock(int fd)
 {
-    if (need_lock == 0) {
-        return CM_SUCCESS;
-    }
     struct stat fd_stat;
     if (fstat(fd, &fd_stat) == -1) {
-        LOG_RUN_ERR("failed to get stat for file %d", fd);
+        LOG_RUN_ERR("failed to get stat for file %d, errno: %d", fd, errno);
         return CM_ERROR;
     }
     if ((fd_stat.st_mode & S_IWUSR) == 0) {
@@ -387,19 +392,19 @@ status_t gr_filesystem_lock(int fd, int need_lock)
     }
     LOG_RUN_INF("[FS] current file need to enter lock mode");
     if (fchmod(fd, GR_LOCK_MODE) == CM_ERROR) {
-        LOG_RUN_ERR("[FS] Failed to change current file to lock mode.");
+        LOG_RUN_ERR("[FS] Failed to change current file to lock mode, errno: %d", errno);
         return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
-status_t gr_filesystem_close(int fd, int need_lock) {
-    if (gr_filesystem_lock(fd, need_lock) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to change file to be lock_mode");
+status_t gr_filesystem_close(int fd, bool32 need_lock) {
+    if (need_lock && gr_filesystem_lock(fd) != CM_SUCCESS) {
+        LOG_RUN_ERR("Failed to change file to be lock_mode, errno: %d", errno);
         return CM_ERROR;
     }
     if (close(fd) == -1) {
-        LOG_RUN_ERR("[FS] Failed to close file descriptor: %d", fd);
+        LOG_RUN_ERR("[FS] Failed to close file descriptor: %d, errno: %d", fd, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -408,7 +413,7 @@ status_t gr_filesystem_close(int fd, int need_lock) {
 
 status_t gr_filesystem_truncate(int fd, int64 length) {
     if (ftruncate(fd, length) == -1) {
-        LOG_RUN_ERR("[FS] Failed to truncate file: %d, length: %lld", fd, length);
+        LOG_RUN_ERR("[FS] Failed to truncate file: %d, length: %lld, errno: %d", fd, length, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -419,7 +424,7 @@ status_t gr_filesystem_mode(char *file_path, time_t file_atime, gr_file_status_t
     int w_mode = access(file_path, W_OK);
     time_t systime = time(NULL);
     if (systime == ((time_t)-1)) {
-        LOG_RUN_ERR("Failed to get system time.");
+        LOG_RUN_ERR("Failed to get system time, errno: %d", errno);
         return CM_ERROR;
     }
     if (w_mode == 0 && systime >= file_atime) {
@@ -440,7 +445,7 @@ status_t gr_filesystem_stat(const char *name, int64 *offset, int64 *size, gr_fil
     struct stat file_stat;
     if (stat(path, &file_stat) != 0) {
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
-        LOG_RUN_ERR("[FS] Failed to stat file: %s", name);
+        LOG_RUN_ERR("[FS] Failed to stat file: %s, errno: %d", name, errno);
         return CM_ERROR;
     }
     *offset = file_stat.st_size;
@@ -448,7 +453,7 @@ status_t gr_filesystem_stat(const char *name, int64 *offset, int64 *size, gr_fil
     *atime = file_stat.st_atime;
     status_t status = gr_filesystem_mode(path, file_stat.st_atime, mode);
     if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to get file %s mode", name);
+        LOG_RUN_ERR("Failed to get file %s mode, errno: %d", name, errno);
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -461,7 +466,7 @@ status_t gr_filesystem_check_postpone_time(const char *file_name, time_t new_tim
     time_t atime;
     gr_file_status_t mode;
     if (gr_filesystem_stat(file_name, &offset, &size, &mode, &atime) != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS] Failed to get current file %s expire time.", file_name);
+        LOG_RUN_ERR("[FS] Failed to get current file %s expire time, errno: %d", file_name, errno);
         return CM_ERROR;
     }
 
@@ -481,15 +486,24 @@ status_t gr_filesystem_postpone(const char *file_path, const char *time)
     struct tm time_info;
     strptime(time, "%Y-%m-%d %H:%M:%S", &time_info);
     time_t new_time = mktime(&time_info);
-    if (gr_filesystem_check_postpone_time(file_path, new_time) != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS] Failed to change file %s expired time", file_path);
+
+    struct stat file_stat;
+    if (stat(path, &file_stat) != 0) {
+        LOG_RUN_ERR("[FS] Failed to get file %s stat, errno: %d", file_path, errno);
         return CM_ERROR;
     }
 
-    struct utimbuf new_utimes = {new_time, new_time};
+    if (file_stat.st_atime >= new_time) {
+        LOG_RUN_ERR("[FS] new expire time should be later than current expire time, file %s current expire time is: %s",
+            file_path, ctime(&file_stat.st_atime));
+        GR_THROW_ERROR(ERR_GR_FILE_INVALID_EXPIRE_TIME);
+        return CM_ERROR;
+    }
+
+    struct utimbuf new_utimes = {new_time, file_stat.st_mtime};
     status = utime(path, &new_utimes);
     if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS] Failed to extend file %s expired time", file_path);
+        LOG_RUN_ERR("[FS] Failed to extend file %s expired time, errno: %d", file_path, errno);
         return CM_ERROR;
     }
     return CM_SUCCESS;

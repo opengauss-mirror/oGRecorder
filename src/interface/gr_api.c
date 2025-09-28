@@ -100,6 +100,126 @@ int gr_create_inst(const char *storageServerAddr, gr_instance_handle *inst_handl
     return (int)ret;
 }
 
+static int parse_server_addresses(const char *serverAddrs, char **addresses, int max_count, int *actual_count)
+{
+    if (serverAddrs == NULL || addresses == NULL || actual_count == NULL) {
+        return GR_ERROR;
+    }
+
+    *actual_count = 0;
+    char *input_copy = strdup(serverAddrs);
+    if (input_copy == NULL) {
+        LOG_RUN_ERR("failed to allocate memory for parsing server addresses");
+        return GR_ERROR;
+    }
+
+    const char *delimiters = ",; ";
+    char *token = strtok(input_copy, delimiters);
+    
+    while (token != NULL && *actual_count < max_count) {
+        while (*token == ' ' || *token == '\t') {
+            token++;
+        }
+        char *end = token + strlen(token) - 1;
+        while (end > token && (*end == ' ' || *end == '\t')) {
+            *end = '\0';
+            end--;
+        }
+        
+        if (strlen(token) > 0) {
+            addresses[*actual_count] = strdup(token);
+            if (addresses[*actual_count] == NULL) {
+                LOG_RUN_ERR("failed to allocate memory for address: %s", token);
+                for (int i = 0; i < *actual_count; i++) {
+                    free(addresses[i]);
+                }
+                free(input_copy);
+                return GR_ERROR;
+            }
+            (*actual_count)++;
+        }
+        token = strtok(NULL, delimiters);
+    }
+    
+    free(input_copy);
+    return GR_SUCCESS;
+}
+
+int gr_create_inst_only_primary(const char *serverAddrs, gr_instance_handle *inst_handle)
+{
+    if (serverAddrs == NULL || inst_handle == NULL) {
+        LOG_RUN_ERR("gr_create_inst_only_primary get invalid parameter.");
+        return GR_ERROR;
+    }
+
+    #define MAX_SERVER_COUNT 8
+    char *addresses[MAX_SERVER_COUNT];
+    int addrCount = 0;
+
+    int ret = parse_server_addresses(serverAddrs, addresses, MAX_SERVER_COUNT, &addrCount);
+    if (ret != GR_SUCCESS || addrCount == 0) {
+        LOG_RUN_ERR("failed to parse server addresses or no valid addresses found");
+        return GR_ERROR;
+    }
+
+    int primary_found = 0;
+    int primary_master_id = -1;
+    gr_instance_handle primary_handle = NULL;
+
+    for (int i = 0; i < addrCount; i++) {
+        if (addresses[i] == NULL) {
+            LOG_RUN_ERR("server address at index %d is NULL", i);
+            continue;
+        }
+
+        if (check_server_addr_format(addresses[i]) != GR_SUCCESS) {
+            LOG_RUN_ERR("invalid address at index %d: %s.", i, addresses[i]);
+            continue;
+        }
+
+        gr_instance_handle tmp = NULL;
+        int cret = gr_create_inst(addresses[i], &tmp);
+        if (cret != GR_SUCCESS || tmp == NULL) {
+            LOG_RUN_ERR("failed to create instance for server %s", addresses[i]);
+            continue;
+        }
+
+        int instance_status_id = 0, server_status_id = 0, local_instance_id = -1, master_id = -1;
+        int sret = gr_get_inst_status(tmp, &instance_status_id, &server_status_id, &local_instance_id, &master_id);
+        if (sret == GR_SUCCESS) {
+            LOG_RUN_INF("Server %s: instance_status=%d, server_status=%d, local_id=%d, master_id=%d",
+                addresses[i], instance_status_id, server_status_id, local_instance_id, master_id);
+
+            if (master_id == local_instance_id) {
+                if (primary_handle != NULL) {
+                    (void)gr_delete_inst(primary_handle);
+                    primary_handle = NULL;
+                }
+                primary_handle = tmp;
+                primary_master_id = master_id;
+                primary_found = 1;
+                continue;
+            }
+        } else {
+            LOG_RUN_ERR("failed to get status for server %s", addresses[i]);
+        }
+        (void)gr_delete_inst(tmp);
+    }
+
+    for (int i = 0; i < addrCount; i++) {
+        free(addresses[i]);
+    }
+
+    if (!primary_found || primary_handle == NULL) {
+        LOG_RUN_ERR("no primary server found");
+        return GR_ERROR;
+    }
+
+    *inst_handle = primary_handle;
+    LOG_RUN_INF("Successfully connected to primary server with master_id=%d", primary_master_id);
+    return GR_SUCCESS;
+}
+
 int gr_delete_inst(gr_instance_handle inst_handle)
 {
     if (inst_handle == NULL) {
@@ -387,32 +507,71 @@ int gr_file_postpone(gr_vfs_handle vfs_handle, const char *file, const char *tim
     return (int)ret;
 }
 
-int gr_get_inst_status(gr_server_status_t *gr_status, gr_instance_handle inst_handle)
+int gr_get_inst_status(gr_instance_handle inst_handle, 
+                       int *instance_status_id, int *server_status_id,
+                       int *local_instance_id, int *master_id)
 {
     if (inst_handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
         return GR_ERROR;
     }
+    
+    if (instance_status_id == NULL || server_status_id == NULL ||
+        local_instance_id == NULL || master_id == NULL) {
+        LOG_RUN_ERR("Invalid parameters for gr_get_inst_status");
+        return GR_ERROR;
+    }
+    
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("get conn error when get inst status.");
         return GR_ERROR;
     }
-    status_t ret = gr_get_inst_status_on_server(hdl->conn, gr_status);
-    return (int)ret;
+    
+    gr_server_status_t temp_status = {0};
+    status_t ret = gr_get_inst_status_on_server(hdl->conn, &temp_status);
+    if (ret != CM_SUCCESS) {
+        return (int)ret;
+    }
+    
+    *instance_status_id = (int)temp_status.instance_status_id;
+    *server_status_id = (int)temp_status.server_status_id;
+    *local_instance_id = temp_status.local_instance_id;
+    *master_id = temp_status.master_id;
+    
+    return GR_SUCCESS;
 }
 
-int gr_is_maintain(unsigned int *is_maintain, gr_instance_handle inst_handle)
+int gr_get_disk_usage(gr_instance_handle inst_handle,
+                      long long *total_bytes, long long *used_bytes, long long *available_bytes)
 {
-    if (is_maintain == NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "expected is_maintain not a null pointer");
-        return CM_ERROR;
+    if (inst_handle == NULL) {
+        LOG_RUN_ERR("instance handle is NULL.");
+        return GR_ERROR;
     }
-    gr_server_status_t gr_status = {0};
-    status_t ret = gr_get_inst_status(&gr_status, inst_handle);
-    GR_RETURN_IFERR2(ret, LOG_RUN_ERR("get error when get inst status"));
-    *is_maintain = gr_status.is_maintain;
-    return CM_SUCCESS;
+    
+    if (total_bytes == NULL || used_bytes == NULL || available_bytes == NULL) {
+        LOG_RUN_ERR("Invalid parameters for gr_get_disk_usage");
+        return GR_ERROR;
+    }
+    
+    st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("get conn error when get disk usage.");
+        return GR_ERROR;
+    }
+    
+    gr_disk_usage_info_t temp_info = {0};
+    status_t ret = gr_get_disk_usage_impl(hdl->conn, &temp_info);
+    if (ret != CM_SUCCESS) {
+        return (int)ret;
+    }
+    
+    *total_bytes = temp_info.total_bytes;
+    *used_bytes = temp_info.used_bytes;
+    *available_bytes = temp_info.available_bytes;
+    
+    return GR_SUCCESS;
 }
 
 int gr_set_main_inst(const char *storageServerAddr)
@@ -457,8 +616,6 @@ int gr_file_close(gr_vfs_handle vfs_handle, gr_file_handle *file_handle, bool ne
 long long int gr_file_pwrite(
     gr_vfs_handle vfs_handle, gr_file_handle *file_handle, const void *buf, unsigned long long count, long long offset)
 {
-    timeval_t begin_tv;
-    gr_begin_stat(&begin_tv);
     if (count < 0) {
         LOG_RUN_ERR("File size is invalid:%lld.", count);
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "size must be a positive integer");
@@ -480,9 +637,6 @@ long long int gr_file_pwrite(
     }
 
     long long int ret = gr_pwrite_file_impl(hdl->conn, file_handle, buf, count, offset);
-    if (ret == count) {
-        gr_session_end_stat(hdl->conn->session, &begin_tv, GR_PWRITE);
-    }
     return ret;
 }
 
@@ -514,7 +668,7 @@ long long int gr_file_pread(
 
     long long int ret = gr_pread_file_impl(hdl->conn, HANDLE_VALUE(file_handle.fd), buf, count, offset);
     if (ret == count) {
-        gr_session_end_stat(hdl->conn->session, &begin_tv, GR_PREAD);
+        gr_session_end_stat((gr_session_t *)hdl->conn->session, &begin_tv, GR_PREAD);
     }
     return ret;
 }
@@ -565,25 +719,9 @@ int gr_file_stat(
     return (int)ret;
 }
 
-int gr_file_pwrite_async()
-{
-    return GR_SUCCESS;
-}
-
-int gr_file_pread_async()
-{
-    return GR_SUCCESS;
-}
-
-int gr_file_performance()
-{
-    return GR_SUCCESS;
-}
-
 int gr_get_error(int *errcode, const char **errmsg)
 {
     cm_get_error(errcode, errmsg);
-    cm_reset_error();
     return CM_SUCCESS;
 }
 

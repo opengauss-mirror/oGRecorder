@@ -29,10 +29,97 @@
 #include "gr_file.h"
 #include "cm_system.h"
 #include "gr_thv.h"
+#include "gr_filesystem.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+status_t gr_session_fd_add(gr_session_t *session, int64 fd, uint64 ftid, const char *file_name)
+{
+    gr_session_fd_entry_t *ent = (gr_session_fd_entry_t *)cm_malloc(sizeof(gr_session_fd_entry_t));
+    if (ent == NULL) {
+        return CM_ERROR;
+    }
+    ent->fd = fd;
+    ent->ftid = ftid;
+    ent->next = NULL;
+    if (file_name != NULL) {
+        (void)strncpy_s(ent->file_name, sizeof(ent->file_name), file_name, strlen(file_name));
+    } else {
+        ent->file_name[0] = '\0';
+    }
+
+    cm_spin_lock(&session->fd_lock, NULL);
+    ent->next = session->fd_list_head;
+    session->fd_list_head = ent;
+    session->fd_count++;
+    cm_spin_unlock(&session->fd_lock);
+    return CM_SUCCESS;
+}
+
+bool32 gr_session_fd_remove(gr_session_t *session, int64 fd)
+{
+    cm_spin_lock(&session->fd_lock, NULL);
+    gr_session_fd_entry_t *prev = NULL;
+    gr_session_fd_entry_t *curr = session->fd_list_head;
+    while (curr != NULL) {
+        if (curr->fd == fd) {
+            if (prev == NULL) {
+                session->fd_list_head = curr->next;
+            } else {
+                prev->next = curr->next;
+            }
+            session->fd_count--;
+            cm_spin_unlock(&session->fd_lock);
+            cm_free(curr);
+            return CM_TRUE;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    cm_spin_unlock(&session->fd_lock);
+    return CM_FALSE;
+}
+
+void gr_session_fd_close_all(gr_session_t *session)
+{
+    if (session == NULL) {
+        LOG_RUN_ERR("[GR_SESSION]gr_session_fd_close_all: session is NULL");
+        return;
+    }
+
+    LOG_DEBUG_INF("[GR_SESSION]session %u starting to close all file descriptors", session->id);
+    
+    cm_spin_lock(&session->fd_lock, NULL);
+    gr_session_fd_entry_t *curr = session->fd_list_head;
+    uint32_t fd_count = session->fd_count;
+    session->fd_list_head = NULL;
+    session->fd_count = 0;
+    cm_spin_unlock(&session->fd_lock);
+
+    LOG_DEBUG_INF("[GR_SESSION]session %u found %u file descriptors to close", session->id, fd_count);
+
+    uint32_t closed_count = 0;
+    while (curr != NULL) {
+        gr_session_fd_entry_t *next = curr->next;
+        LOG_DEBUG_INF("[GR_SESSION]session %u closing fd %lld (entry %u/%u)", 
+                     session->id, curr->fd, closed_count + 1, fd_count);
+        
+        status_t close_status = gr_filesystem_close(curr->fd, CM_FALSE);
+        if (close_status != CM_SUCCESS) {
+            LOG_RUN_WAR("[GR_SESSION]session %u failed to close fd %lld, status: %d", 
+                       session->id, curr->fd, close_status);
+        } else {
+            closed_count++;
+        }
+        
+        cm_free(curr);
+        curr = next;
+    }
+
+    LOG_RUN_INF("[GR_SESSION]session %u completed closing file descriptors: %u/%u closed successfully", 
+               session->id, closed_count, fd_count);
+}
 
 gr_session_ctrl_t g_gr_session_ctrl = {0};
 
@@ -145,6 +232,10 @@ static status_t gr_init_session(gr_session_t *session, const cs_pipe_t *pipe)
     securec_check_ret(errcode);
     session->is_holding_hotpatch_latch = CM_FALSE;
     GR_RETURN_IF_ERROR(init_session_hash_mgr(session));
+    // init session fd tracking
+    GS_INIT_SPIN_LOCK(session->fd_lock);
+    session->fd_list_head = NULL;
+    session->fd_count = 0;
     return CM_SUCCESS;
 }
 
@@ -216,6 +307,7 @@ void gr_destroy_session_inner(gr_session_t *session)
     session->is_holding_hotpatch_latch = CM_FALSE;
     CM_FREE_PTR(session->hash_mgr.hash_items);
 }
+
 void gr_destroy_session(gr_session_t *session)
 {
     cm_spin_lock(&g_gr_session_ctrl.lock, NULL);
@@ -495,6 +587,12 @@ void gr_clean_session_latch(gr_session_t *session, bool32 is_daemon)
         start_time, session->cli_info.process_name);
     LOG_DEBUG_INF("Clean sid:%u latch_stack op:%u, stack_top:%hu.", GR_SESSIONID_IN_LOCK(session->id),
         session->latch_stack.op, session->latch_stack.stack_top);
+    
+    if (session->latch_stack.stack_top == GR_MAX_LATCH_STACK_BOTTON) {
+        LOG_DEBUG_INF("Clean sid:%u latch_stack is empty, nothing to clean.", GR_SESSIONID_IN_LOCK(session->id));
+        return;
+    }
+    
     for (i = (int32_t)session->latch_stack.stack_top; i >= GR_MAX_LATCH_STACK_BOTTON; i--) {
         // the stack_top may NOT be moveed to the right place
         if (i == GR_MAX_LATCH_STACK_DEPTH) {

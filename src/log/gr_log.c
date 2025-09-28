@@ -52,6 +52,7 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_FILE_PATH_ILL] = "Path %s decode error %s",
     [ERR_GR_FILE_INVALID_SIZE] = "Invalid extend offset %lld, size %d.",
     [ERR_GR_FILE_INVALID_FLAG] = "Invalid gr file flag, O_CREAT and O_TRUNC not supported.",
+    [ERR_GR_FILE_INVALID_EXPIRE_TIME] = "Invalid expire time.",
     [ERR_GR_DIR_REMOVE_NOT_EMPTY] = "The dir is not empty, can not remove.",
     [ERR_GR_DIR_CREATE_DUPLICATED] = "Make dir or Create file failed, %s has already existed",
     [ERR_GR_LINK_READ_NOT_LINK] = "The path %s is not a soft link.",

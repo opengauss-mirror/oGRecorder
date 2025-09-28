@@ -31,13 +31,10 @@ extern "C" {
 const char *g_gr_stat_events[GR_EVT_COUNT] = {
     [GR_PREAD] = "GR Pread",
     [GR_PWRITE] = "GR Pwrite",
-    [GR_PREAD_SYN_META] = "GR Pread Sync Metadata",
-    [GR_PWRITE_SYN_META] = "GR Pwrite Sync Metadata",
     [GR_PREAD_DISK] = "GR Pread Disk",
     [GR_PWRITE_DISK] = "GR Pwrite Disk",
     [GR_FOPEN] = "GR File Open",
     [GR_STAT] = "GR Stat",
-    [GR_FIND_FT_ON_SERVER] = "Find File Node On Server",
 };
 
 const char *gr_get_stat_event(gr_wait_event_e event)

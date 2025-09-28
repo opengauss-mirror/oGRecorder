@@ -145,6 +145,10 @@ typedef struct st_gr_session {
     bool8 is_holding_hotpatch_latch;
     spinlock_t shm_lock;  // for control current rw of the same session in shm
     session_hash_mgr_t hash_mgr;
+    // session-owned open file list for resource cleanup
+    spinlock_t fd_lock;
+    struct st_gr_session_fd_entry *fd_list_head;
+    uint32_t fd_count;
 } gr_session_t;
 
 static inline char *gr_init_sendinfo_buf(char *input)
@@ -192,6 +196,18 @@ status_t init_session_hash_mgr(gr_session_t *session);
 status_t update_file_hash(gr_session_t *session, uint32_t file_handle, const uint8_t *new_hash);
 status_t get_file_hash(gr_session_t *session, uint32_t file_handle, uint8_t *curr_hash, uint8_t *prev_hash);
 status_t generate_random_sha256(unsigned char *hash);
+
+// session fd tracking APIs
+typedef struct st_gr_session_fd_entry {
+    int64 fd;
+    uint64 ftid; // optional
+    char file_name[GR_MAX_NAME_LEN];
+    struct st_gr_session_fd_entry *next;
+} gr_session_fd_entry_t;
+
+status_t gr_session_fd_add(gr_session_t *session, int64 fd, uint64 ftid, const char *file_name);
+bool32 gr_session_fd_remove(gr_session_t *session, int64 fd);
+void gr_session_fd_close_all(gr_session_t *session);
 
 #ifdef __cplusplus
 }

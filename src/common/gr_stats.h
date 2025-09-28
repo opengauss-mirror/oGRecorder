@@ -36,13 +36,10 @@ extern "C" {
 typedef enum en_gr_wait_event {
     GR_PREAD = 0,
     GR_PWRITE,
-    GR_PREAD_SYN_META,
-    GR_PWRITE_SYN_META,
     GR_PREAD_DISK,
     GR_PWRITE_DISK,
     GR_FOPEN,
     GR_STAT,
-    GR_FIND_FT_ON_SERVER,
     GR_EVT_COUNT,
 } gr_wait_event_e;
 

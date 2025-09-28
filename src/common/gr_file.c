@@ -29,7 +29,6 @@
 #include "gr_hashmap.h"
 #include "gr_shm.h"
 #include "gr_malloc.h"
-#include "gr_open_file.h"
 #include "cm_system.h"
 #include "gr_latch.h"
 #include "gr_session.h"

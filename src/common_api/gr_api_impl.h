@@ -179,7 +179,6 @@ typedef struct st_gr_mount_vfs_info {
 typedef struct st_gr_get_server_info {
     char *home;
     uint32_t objectid;
-    uint32_t server_pid;
 } gr_get_server_info_t;
 
 typedef struct st_gr_fallocate_info {
@@ -267,8 +266,6 @@ status_t gr_get_disk_usage_impl(gr_conn_t *conn, gr_disk_usage_info_t *info);
 
 #define GR_UNLOCK_VG_META_S(vg_item, session) \
     (void)gr_unlock_shm_meta_s_with_stack((session), (vg_item)->vg_latch, CM_FALSE)
-
-#define GR_RW_STEP_SIZE (8192)
 
 #ifdef __cplusplus
 }

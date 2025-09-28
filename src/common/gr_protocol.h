@@ -116,10 +116,9 @@ typedef struct st_gr_packet_head {
 typedef enum en_gr_packet_version {
     GR_VERSION_0 = 0, /* version 0 */
     GR_VERSION_1 = 1, /* version 1 */
-    GR_VERSION_2 = 2, /* version 2 */
 } gr_packet_version_e;
 
-#define GR_PROTO_VERSION GR_VERSION_2
+#define GR_PROTO_VERSION GR_VERSION_1
 #define GR_INVALID_VERSION (int32_t)0x7FFFFFFF
 
 #define GR_PACKET_SIZE(pack) ((pack)->head->size)
@@ -332,7 +331,7 @@ static inline status_t calculate_data_hash(const void *data, size_t size, uint8_
     CM_ASSERT(data != NULL);
     CM_ASSERT(hash != NULL);
 
-    if (size <=0 || size > GR_PAGE_SIZE) {
+    if (size <= 0 || size > GR_RW_STEP_SIZE) {
         LOG_RUN_ERR("[hash]: invalid length: %zu.", size);
         return CM_ERROR;
     }
