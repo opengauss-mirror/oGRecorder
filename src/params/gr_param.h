@@ -137,6 +137,13 @@ static inline char *gr_get_cfg_dir(gr_config_t *inst_cfg)
 status_t gr_set_ssl_param(const char *param_name, const char *param_value);
 
 /*
+ * @brief check if client IP is in whitelist
+ * @[in] client_ip - client IP address string
+ * @return CM_TRUE - IP is allowed; CM_FALSE - IP is rejected
+ */
+bool32 gr_check_ip_whitelist(const char *client_ip);
+
+/*
  * @brief get ssl relevant param
  * @[in] param name(SSL_CA、SSL_KEY、SSL_PWD_PLAINTEXT、SSL_CERT).
  * @[in]size--ssl cert or ssl key size

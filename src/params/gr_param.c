@@ -67,80 +67,93 @@ static config_item_t g_gr_ssl_params[] = {
 };
 
 static config_item_t g_gr_params[] = {
-    {"SSL_CERT_NOTIFY_TIME", CM_TRUE, ATTR_READONLY, "30", NULL, NULL, "-", "[7,180]", "GS_TYPE_INTEGER",
-        NULL, 0, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"GR_CM_SO_NAME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 1, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"LOG_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
-        NULL, 3, EFFECT_REBOOT, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
-    {"LOG_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
-        NULL, 4, EFFECT_REBOOT, CFG_INS, gr_verify_log_file_size, gr_notify_log_file_size, NULL, NULL},
+    // ==================== Basic Configuration ====================
     {"INST_ID", CM_TRUE, ATTR_READONLY, "0", NULL, NULL, "-", "[0,64)", "GS_TYPE_INTEGER",
+        NULL, 0, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 1, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"GR_CM_SO_NAME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SHM_KEY", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER",
+        NULL, 4, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+
+    // ==================== Logging Configuration ====================
+    {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 5, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER",
         NULL, 6, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
-    {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
-        NULL, 7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"AUDIT_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
-        NULL, 8, EFFECT_REBOOT, CFG_INS, gr_verify_audit_backup_file_count, gr_notify_audit_backup_file_count, NULL, NULL},
-    {"AUDIT_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
-        NULL, 9, EFFECT_REBOOT, CFG_INS, gr_verify_audit_file_size, gr_notify_audit_file_size, NULL, NULL},
+    {"LOG_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
+        NULL, 7, EFFECT_REBOOT, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
+    {"LOG_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
+        NULL, 8, EFFECT_REBOOT, CFG_INS, gr_verify_log_file_size, gr_notify_log_file_size, NULL, NULL},
+    {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
+        NULL, 9, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_FILE_PERMISSIONS", CM_TRUE, ATTR_READONLY, "600", NULL, NULL, "-", "[600-777]", "GS_TYPE_INTEGER",
         NULL, 10, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_PATH_PERMISSIONS", CM_TRUE, ATTR_READONLY, "700", NULL, NULL, "-", "[700-777]", "GS_TYPE_INTEGER",
         NULL, 11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_PWD_CIPHERTEXT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+    {"LOG_ALARM_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 12, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SHM_KEY", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER",
-        NULL, 13, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 14, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
-    {"INTERCONNECT_TYPE", CM_TRUE, ATTR_READONLY, "TCP", NULL, NULL, "-", "TCP,RDMA", "GS_TYPE_VARCHAR",
-        NULL, 15, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"INTERCONNECT_CHANNEL_NUM", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,32]", "GS_TYPE_INTEGER",
-        NULL, 16, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"MES_WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER",
-        NULL, 17, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER",
-        NULL, 18, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"MES_ELAPSED_SWITCH", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
-        NULL, 19, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 20, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 21, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_CRL", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 22, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 23, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SSL_CIPHER", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 24, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+
+    // ==================== Audit Configuration ====================
     {"AUDIT_LEVEL", CM_TRUE, ATTR_NONE, "1", NULL, NULL, "-", "[0,255]", "GS_TYPE_INTEGER",
-        NULL, 25, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_audit_level, gr_notify_audit_level, NULL, NULL},
+        NULL, 13, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_audit_level, gr_notify_audit_level, NULL, NULL},
+    {"AUDIT_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
+        NULL, 14, EFFECT_REBOOT, CFG_INS, gr_verify_audit_backup_file_count, gr_notify_audit_backup_file_count, NULL, NULL},
+    {"AUDIT_MAX_FILE_SIZE", CM_TRUE, ATTR_NONE, "256M", NULL, NULL, "-", "[1M,4G]", "GS_TYPE_INTEGER",
+        NULL, 15, EFFECT_REBOOT, CFG_INS, gr_verify_audit_file_size, gr_notify_audit_file_size, NULL, NULL},
+
+    // ==================== SSL Security Configuration ====================
+    {"SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 16, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 17, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 18, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CRL", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 19, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CIPHER", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 20, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_PWD_CIPHERTEXT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 21, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SSL_CERT_NOTIFY_TIME", CM_TRUE, ATTR_READONLY, "30", NULL, NULL, "-", "[7,180]", "GS_TYPE_INTEGER",
+        NULL, 22, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SSL_PERIOD_DETECTION", CM_TRUE, ATTR_READONLY, "7", NULL, NULL, "-", "[1,180]", "GS_TYPE_INTEGER",
+        NULL, 23, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+
+    // ==================== Network and Cluster Configuration ====================
+    {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 24, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
+    {"INTERCONNECT_TYPE", CM_TRUE, ATTR_READONLY, "TCP", NULL, NULL, "-", "TCP,RDMA", "GS_TYPE_VARCHAR",
+        NULL, 25, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"INTERCONNECT_CHANNEL_NUM", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,32]", "GS_TYPE_INTEGER",
         NULL, 26, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"MES_WITH_IP", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
         NULL, 27, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"IP_WHITE_LIST_ON", CM_TRUE, ATTR_READONLY, "TRUE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
-        NULL, 28, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"IO_THREADS", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,8]", "GS_TYPE_INTEGER",
+    {"IP_WHITE_LIST", CM_TRUE, ATTR_NONE, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 28, EFFECT_IMMEDIATELY, CFG_INS, NULL, NULL, NULL, NULL},
+
+    // ==================== Performance and Thread Configuration ====================
+    {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
         NULL, 29, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER",
+    {"IO_THREADS", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,8]", "GS_TYPE_INTEGER",
         NULL, 30, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"MES_WAIT_TIMEOUT", CM_TRUE, ATTR_NONE, "10000", NULL, NULL, "-", "[500,30000]", "GS_TYPE_INTEGER",
-        NULL, 31, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_mes_wait_timeout, gr_notify_mes_wait_timeout, NULL, NULL},
-    {"DELAY_CLEAN_INTERVAL", CM_TRUE, ATTR_NONE, "5", NULL, NULL, "-", "[5,1000000]", "GS_TYPE_INTEGER",
-        NULL, 32, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_delay_clean_interval, gr_notify_delay_clean_interval, NULL, NULL},
-    {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
-        NULL, 33, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"LOG_ALARM_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+    {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER",
+        NULL, 31, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"MES_WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER",
+        NULL, 32, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+
+    // ==================== Message and Memory Configuration ====================
+    {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER",
         NULL, 34, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 35, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+    {"MES_WAIT_TIMEOUT", CM_TRUE, ATTR_NONE, "10000", NULL, NULL, "-", "[500,30000]", "GS_TYPE_INTEGER",
+        NULL, 35, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_mes_wait_timeout, gr_notify_mes_wait_timeout, NULL, NULL},
+    {"MES_ELAPSED_SWITCH", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
         NULL, 36, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"DELAY_CLEAN_INTERVAL", CM_TRUE, ATTR_NONE, "5", NULL, NULL, "-", "[5,1000000]", "GS_TYPE_INTEGER",
+        NULL, 37, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_delay_clean_interval, gr_notify_delay_clean_interval, NULL, NULL},
 };
 
 static const char *g_gr_config_file = (const char *)"gr_inst.ini";
@@ -511,18 +524,180 @@ static status_t gr_load_instance_id(gr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-static status_t gr_load_ip_white_list(gr_config_t *inst_cfg)
+// 白名单IP地址结构
+#define GR_MAX_WHITE_LIST_COUNT 64
+#define GR_MAX_IP_RANGE_LEN 32
+
+typedef struct st_ip_whitelist_entry {
+    char ip_addr[CM_MAX_IP_LEN];
+    char subnet_mask[CM_MAX_IP_LEN];
+    bool32 is_range;
+    struct sockaddr_storage sock_addr;
+    struct sockaddr_storage mask_addr;
+} ip_whitelist_entry_t;
+
+typedef struct st_ip_whitelist {
+    ip_whitelist_entry_t entries[GR_MAX_WHITE_LIST_COUNT];
+    uint32 count;
+} ip_whitelist_t;
+
+static ip_whitelist_t g_ip_whitelist = {0};
+
+// 解析IP范围 (支持: 192.168.1.100, 192.168.1.0/24, 192.168.1.*)
+static status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
 {
-    char *value = cm_get_config_value(&inst_cfg->config, "IP_WHITE_LIST_ON");
-    if (cm_str_equal_ins(value, "TRUE")) {
-        inst_cfg->params.ip_white_list_on = CM_TRUE;
-    } else if (cm_str_equal_ins(value, "FALSE")) {
-        inst_cfg->params.ip_white_list_on = CM_FALSE;
-    } else {
-        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "value of IP_WHITE_LIST_ON is invalid"));
+    char temp_str[CM_MAX_IP_LEN];
+    char *slash_pos, *star_pos;
+    
+    if (strlen(ip_str) >= CM_MAX_IP_LEN) {
+        return CM_ERROR;
     }
-    LOG_DEBUG_INF("IP_WHITE_LIST status: %u. (0: off, 1: on)", inst_cfg->params.ip_white_list_on);
+    
+    strcpy_s(temp_str, CM_MAX_IP_LEN, ip_str);
+    
+    // 检查通配符格式 (192.168.1.* 或 192.168.*.*)  
+    star_pos = strchr(temp_str, '*');
+    if (star_pos != NULL) {
+        // 将*替换为0，并根据*的位置确定掩码
+        char *dot_count = temp_str;
+        int dots = 0;
+        while (*dot_count) {
+            if (*dot_count == '.') dots++;
+            dot_count++;
+        }
+        
+        // 替换*为0来构建网络地址
+        char network_ip[CM_MAX_IP_LEN];
+        strcpy_s(network_ip, CM_MAX_IP_LEN, temp_str);
+        char *p = network_ip;
+        while (*p) {
+            if (*p == '*') *p = '0';
+            p++;
+        }
+        
+        strcpy_s(entry->ip_addr, CM_MAX_IP_LEN, network_ip);
+        
+        // 根据*的位置生成掩码
+        if (strstr(temp_str, "*.*.*") != NULL) {
+            // a.*.*.*  -> /8
+            strcpy_s(entry->subnet_mask, CM_MAX_IP_LEN, "255.0.0.0");
+        } else if (strstr(temp_str, "*.* ") != NULL || strstr(temp_str, "*.*") == (temp_str + strlen(temp_str) - 3)) {
+            // a.b.*.*  -> /16
+            strcpy_s(entry->subnet_mask, CM_MAX_IP_LEN, "255.255.0.0");
+        } else if (strstr(temp_str, "*") != NULL) {
+            // a.b.c.*  -> /24
+            strcpy_s(entry->subnet_mask, CM_MAX_IP_LEN, "255.255.255.0");
+        }
+        
+        entry->is_range = CM_TRUE;
+        return CM_SUCCESS;
+    }
+    
+    // 检查CIDR格式 (192.168.1.0/24)
+    slash_pos = strchr(temp_str, '/');
+    if (slash_pos != NULL) {
+        *slash_pos = '\0';
+        strcpy_s(entry->ip_addr, CM_MAX_IP_LEN, temp_str);
+        
+        int prefix_len = atoi(slash_pos + 1);
+        if (prefix_len <= 0 || prefix_len > 32) {
+            return CM_ERROR;
+        }
+        
+        // 生成子网掩码
+        uint32 mask = 0xFFFFFFFF << (32 - prefix_len);
+        snprintf_s(entry->subnet_mask, CM_MAX_IP_LEN, CM_MAX_IP_LEN - 1, 
+                  "%d.%d.%d.%d", 
+                  (mask >> 24) & 0xFF, 
+                  (mask >> 16) & 0xFF, 
+                  (mask >> 8) & 0xFF, 
+                  mask & 0xFF);
+        entry->is_range = CM_TRUE;
+        return CM_SUCCESS;
+    }
+    
+    // 单个IP地址
+    strcpy_s(entry->ip_addr, CM_MAX_IP_LEN, temp_str);
+    entry->is_range = CM_FALSE;
     return CM_SUCCESS;
+}
+
+// 检查IPv4地址是否在白名单中
+static bool32 is_ip_in_whitelist(const char *client_ip)
+{
+    struct sockaddr_in client_addr;
+    if (inet_pton(AF_INET, client_ip, &client_addr.sin_addr) != 1) {
+        LOG_RUN_WAR("[GR_WHITELIST] Invalid IPv4 address format: %s", client_ip);
+        return CM_FALSE;
+    }
+    
+    for (uint32 i = 0; i < g_ip_whitelist.count; i++) {
+        ip_whitelist_entry_t *entry = &g_ip_whitelist.entries[i];
+        
+        if (!entry->is_range) {
+            if (strcmp(client_ip, entry->ip_addr) == 0) {
+                LOG_DEBUG_INF("[GR_WHITELIST] IP %s matched exact entry: %s", 
+                             client_ip, entry->ip_addr);
+                return CM_TRUE;
+            }
+        } else {
+            struct sockaddr_in entry_addr, mask_addr;
+            if (inet_pton(AF_INET, entry->ip_addr, &entry_addr.sin_addr) == 1 &&
+                inet_pton(AF_INET, entry->subnet_mask, &mask_addr.sin_addr) == 1) {
+                
+                uint32 client_ip_int = ntohl(client_addr.sin_addr.s_addr);
+                uint32 entry_ip_int = ntohl(entry_addr.sin_addr.s_addr);
+                uint32 mask_int = ntohl(mask_addr.sin_addr.s_addr);
+                
+                if ((client_ip_int & mask_int) == (entry_ip_int & mask_int)) {
+                    LOG_DEBUG_INF("[GR_WHITELIST] IP %s matched range entry: %s/%s", 
+                                 client_ip, entry->ip_addr, entry->subnet_mask);
+                    return CM_TRUE;
+                }
+            }
+        }
+    }
+    
+    LOG_DEBUG_INF("[GR_WHITELIST] IP %s not found in whitelist", client_ip);
+    return CM_FALSE;
+}
+
+// 加载白名单IP地址列表
+static status_t gr_load_ip_white_list_addrs(gr_config_t *inst_cfg)
+{
+    char *value = cm_get_config_value(&inst_cfg->config, "IP_WHITE_LIST");
+    
+    g_ip_whitelist.count = 0;
+    
+    char temp_value[1024];
+    strcpy_s(temp_value, sizeof(temp_value), value);
+    
+    char *token = strtok(temp_value, ",;");
+    while (token != NULL && g_ip_whitelist.count < GR_MAX_WHITE_LIST_COUNT) {
+        // 去除前后空格
+        while (*token == ' ' || *token == '\t') token++;
+        char *end = token + strlen(token) - 1;
+        while (end > token && (*end == ' ' || *end == '\t')) *end-- = '\0';
+        
+        if (strlen(token) > 0) {
+            if (parse_ip_range(token, &g_ip_whitelist.entries[g_ip_whitelist.count]) == CM_SUCCESS) {
+                g_ip_whitelist.count++;
+            } else {
+                LOG_RUN_WAR("Invalid IP address in whitelist: %s", token);
+            }
+        }
+        
+        token = strtok(NULL, ",;");
+    }
+    
+    LOG_RUN_INF("Loaded %u IP addresses into whitelist", g_ip_whitelist.count);
+    
+    return CM_SUCCESS;
+}
+
+bool32 gr_check_ip_whitelist(const char *client_ip)
+{
+    return is_ip_in_whitelist(client_ip);
 }
 
 static status_t gr_load_mes_with_ip(gr_config_t *inst_cfg)
@@ -681,7 +856,7 @@ status_t gr_load_config(gr_config_t *inst_cfg)
     CM_RETURN_IFERR(gr_load_mes_params(inst_cfg));
     CM_RETURN_IFERR(gr_load_shm_key(inst_cfg));
     CM_RETURN_IFERR(gr_load_mes_with_ip(inst_cfg));
-    CM_RETURN_IFERR(gr_load_ip_white_list(inst_cfg));
+    CM_RETURN_IFERR(gr_load_ip_white_list_addrs(inst_cfg));
     CM_RETURN_IFERR(gr_load_threadpool_cfg(inst_cfg));
     CM_RETURN_IFERR(gr_load_listen_addr(inst_cfg));
     CM_RETURN_IFERR(gr_load_delay_clean_interval(inst_cfg));

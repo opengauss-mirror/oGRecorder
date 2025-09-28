@@ -69,6 +69,8 @@ endif()
 message(STATUS "Version info: ${GR_VERSION_STR}")
 
 set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS} -D__FILE_NAME__='\"$(notdir $(subst .o,,$(abspath $@)))\"'" )
+
+
 add_compile_options(-fPIC -Wall -MMD -fno-strict-aliasing -fsigned-char -fms-extensions -lpthread)
 add_compile_definitions(_GNU_SOURCE _LARGEFILE64_SOURCE KNL_PREFIX _REENTRANT __PERF_STAT__)
 add_link_options(-pie)
@@ -104,8 +106,12 @@ add_compile_options(-Wno-implicit-fallthrough)
 add_compile_options(-Wno-unused-parameter)
 add_compile_options(-Wno-missing-field-initializers)
 add_compile_options(-Wno-ignored-qualifiers)
-add_compile_options(-Wno-cast-function-type)
-add_compile_options(-Wno-enum-conversion)
+if(CMAKE_COMPILER_IS_GNUCC AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 8.0)
+    add_compile_options(-Wno-cast-function-type)
+endif()
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wno-enum-conversion)
+endif()
 if(CMAKE_COMPILER_IS_GNUCC AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 9.0)
     add_compile_options(-Wno-psabi)
 endif()
@@ -196,7 +202,6 @@ set(GR_OPENSSL_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/openssl/incl
 set(GR_CBB_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/cbb/include")
 set(LIBAIO_INC_PATH             "${CMAKE_CURRENT_SOURCE_DIR}/library/libaio/include")
 set(ZLIB_INC_PATH               "${CMAKE_CURRENT_SOURCE_DIR}/library/zlib/include")
-set(LZ4_INC_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/lz4/include")
 set(JAVA_HOME                   "$ENV{JAVA_HOME}/include")
 set(JAVA_HOME_INCLUDE           "$ENV{JAVA_HOME}/include/linux")
 
@@ -205,7 +210,6 @@ set(SECUREC_LIB_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/huawei_secu
 set(OPENSSL_LIB_PATH            "${CMAKE_CURRENT_SOURCE_DIR}/library/openssl/lib")
 set(CBB_LIB_PATH                "${CMAKE_CURRENT_SOURCE_DIR}/library/cbb/lib")
 set(LIBZ_PATH                   "${CMAKE_CURRENT_SOURCE_DIR}/library/zlib/lib")
-set(LZ4_PATH                   "${CMAKE_CURRENT_SOURCE_DIR}/library/lz4/lib")
 
 ## output path
 set (LIBRARY_OUTPUT_PATH        ${CMAKE_CURRENT_SOURCE_DIR}/output/lib)

@@ -52,6 +52,7 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_FILE_PATH_ILL] = "Path %s decode error %s",
     [ERR_GR_FILE_INVALID_SIZE] = "Invalid extend offset %lld, size %d.",
     [ERR_GR_FILE_INVALID_FLAG] = "Invalid gr file flag, O_CREAT and O_TRUNC not supported.",
+    [ERR_GR_FILE_INVALID_EXPIRE_TIME] = "Invalid expire time.",
     [ERR_GR_DIR_REMOVE_NOT_EMPTY] = "The dir is not empty, can not remove.",
     [ERR_GR_DIR_CREATE_DUPLICATED] = "Make dir or Create file failed, %s has already existed",
     [ERR_GR_LINK_READ_NOT_LINK] = "The path %s is not a soft link.",
@@ -103,7 +104,8 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_FILE_SYSTEM_ERROR] = "File system error, reason %m.",
     [ERR_GR_CONNECTION_CLOSED] = "GR connection is closed",
     [ERR_GR_MEM_CMP_FAILED] = "failed to memcpy compare",
-    [ERR_GR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s."
+    [ERR_GR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s.",
+    [ERR_GR_WHITELIST_INVALID] = "GR handshake rejected: IP %s not in whitelist"
 };
 
 gr_log_def_t g_gr_cmd_log[] = {

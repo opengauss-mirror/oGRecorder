@@ -26,11 +26,11 @@
 #include "cm_system.h"
 #include "gr_instance.h"
 #include "gr_malloc.h"
-#include "gr_open_file.h"
 #include "gr_filesystem.h"
 #include "gr_mes.h"
 #include "gr_api.h"
 #include "gr_thv.h"
+#include "gr_param.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -152,7 +152,6 @@ status_t gr_diag_proto_type(gr_session_t *session)
     return cs_send_bytes(&session->pipe, (char *)&ack, sizeof(link_ready_ack_t));
 }
 
-// TODO: 后期考虑启用
 static void gr_clean_open_files(gr_session_t *session)
 {
     if (cm_sys_process_alived(session->cli_info.cli_pid, session->cli_info.start_time)) {
@@ -160,7 +159,8 @@ static void gr_clean_open_files(gr_session_t *session)
             session->cli_info.cli_pid, session->cli_info.start_time);
         return;
     }
-
+    // close all fds owned by session before disconnect
+    gr_session_fd_close_all(session);
     LOG_RUN_INF("Clean open files for pid:%llu.", session->cli_info.cli_pid);
 }
 
@@ -432,9 +432,10 @@ static status_t gr_process_open_file(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &name));
     GR_RETURN_IF_ERROR(gr_get_int32(&session->recv_pack, &flag));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%s", name));
-    GR_LOG_DEBUG_OP("Begin to close file, fd:%d", fd);
+    GR_LOG_DEBUG_OP("Begin to open file, fd:%d", fd);
     GR_RETURN_IF_ERROR(gr_open_file(session, (const char *)name, flag, &fd));
-    LOG_DEBUG_INF("Succeed to close file, fd:%d", fd);
+    (void)gr_session_fd_add(session, (int64)fd, 0, name);
+    LOG_DEBUG_INF("Succeed to open file, fd:%d", fd);
     GR_RETURN_IF_ERROR(gr_put_int32(&session->send_pack, fd));
 
     if (generate_random_sha256(hash) != GR_SUCCESS) {
@@ -449,14 +450,15 @@ static status_t gr_process_open_file(gr_session_t *session)
 static status_t gr_process_close_file(gr_session_t *session)
 {
     int64 fd;
-    int32 need_lock;
+    bool32 need_lock;
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &fd));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "fd:%d", fd));
-    GR_RETURN_IF_ERROR(gr_get_int32(&session->recv_pack, &need_lock));
+    GR_RETURN_IF_ERROR(gr_get_int32(&session->recv_pack, (int32*)&need_lock));
 
     GR_LOG_DEBUG_OP("Begin to close file, fd:%lld", fd);
     GR_RETURN_IF_ERROR(gr_filesystem_close(fd, need_lock));
+    (void)gr_session_fd_remove(session, fd);
     LOG_DEBUG_INF("Succeed to close file, fd:%lld", fd);
     return CM_SUCCESS;
 }
@@ -506,12 +508,14 @@ static status_t gr_process_write_file(gr_session_t *session)
         return CM_ERROR;
     }
 
-    
+    timeval_t begin_tv_disk;
+    gr_begin_stat(&begin_tv_disk);
     status = gr_filesystem_pwrite(handle, offset, file_size, buf, &rel_size);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, file_size);
         return CM_ERROR;
     }
+    gr_end_stat_base(&session->gr_session_stat[GR_PWRITE_DISK], &begin_tv_disk);
     status = update_file_hash(session, handle, combine_hash);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("update hash failed.");
@@ -616,15 +620,11 @@ static status_t gr_process_handshake(gr_session_t *session)
     char *server_home = gr_get_cfg_dir(ZFS_CFG);
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_QUERY, "%s", server_home));
     LOG_RUN_INF("[GR_CONNECT]Server home is %s, when get home.", server_home);
-    uint32_t server_pid = getpid();
     text_t data;
     cm_str2text(server_home, &data);
     data.len++;  // for keeping the '\0'
     GR_RETURN_IF_ERROR(gr_put_text(&session->send_pack, &data));
     GR_RETURN_IF_ERROR(gr_put_int32(&session->send_pack, session->objectid));
-    if (session->proto_version >= GR_VERSION_2) {
-        GR_RETURN_IF_ERROR(gr_put_int32(&session->send_pack, server_pid));
-    }
     return CM_SUCCESS;
 }
 
@@ -1166,10 +1166,55 @@ status_t gr_proc_standby_req(gr_session_t *session)
     return gr_exec_cmd(session, CM_FALSE);
 }
 
+static status_t gr_get_session_client_ip(gr_session_t *session, char *ip_buf, size_t buf_size)
+{
+    if (session->pipe.type == CS_TYPE_TCP) {
+        tcp_link_t *tcp_link = &session->pipe.link.tcp;
+        if (tcp_link->remote.addr.ss_family == AF_INET) {
+            struct sockaddr_in *addr_in = (struct sockaddr_in *)&tcp_link->remote.addr;
+            if (inet_ntop(AF_INET, &addr_in->sin_addr, ip_buf, buf_size) == NULL) {
+                return CM_ERROR;
+            }
+            return CM_SUCCESS;
+        } else {
+            LOG_RUN_WAR("[GR_WHITELIST] Non-IPv4 connection not supported, family: %d", 
+                       tcp_link->remote.addr.ss_family);
+            return CM_ERROR;
+        }
+    }
+    return CM_ERROR;
+}
+
+static status_t gr_validate_handshake_whitelist(gr_session_t *session)
+{
+    char client_ip[CM_MAX_IP_LEN] = {0};
+    
+    if (gr_get_session_client_ip(session, client_ip, sizeof(client_ip)) != CM_SUCCESS) {
+        LOG_RUN_ERR("[GR_WHITELIST]session %u failed to get client IP during handshake", session->id);
+        return CM_ERROR;
+    }
+    
+    if (!gr_check_ip_whitelist(client_ip)) {
+        GR_THROW_ERROR(ERR_GR_WHITELIST_INVALID, client_ip);
+        LOG_RUN_WAR("[GR_WHITELIST]session %u handshake rejected: IP %s not in whitelist", 
+                   session->id, client_ip);
+        return CM_ERROR;
+    }
+    
+    LOG_DEBUG_INF("[GR_WHITELIST]session %u handshake accepted: IP %s passed whitelist check", 
+                  session->id, client_ip);
+    return CM_SUCCESS;
+}
+
 status_t gr_process_handshake_cmd(gr_session_t *session, gr_cmd_type_e cmd)
 {
     status_t status = CM_ERROR;
     bool32 ready = CM_FALSE;
+    if (gr_validate_handshake_whitelist(session) != CM_SUCCESS) {
+        LOG_RUN_ERR("[GR_CONNECT]session %u failed whitelist validation during handshake", session->id);
+        return CM_ERROR;
+    }
+    
     do {
         cm_reset_error();
         if (cs_wait(&session->pipe, CS_WAIT_FOR_READ, session->pipe.socket_timeout, &ready) != CM_SUCCESS) {

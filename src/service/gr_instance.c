@@ -309,7 +309,7 @@ static status_t gr_lsnr_proc(tcp_lsnr_t *lsnr, cs_pipe_t *pipe)
     status = gr_handshake(session);
     GR_RETURN_IFERR3(status, LOG_RUN_ERR("[GR_CONNECT] handshake failed.\n"), gr_destroy_session(session));
     status = gr_certificate(session);
-    GR_RETURN_IFERR2(status, LOG_RUN_ERR("[GR_CONNECT]SSL certificate failed."));
+    GR_RETURN_IFERR3(status, LOG_RUN_ERR("[GR_CONNECT] SSL certificate failed."), gr_destroy_session(session));
     LOG_RUN_INF("[GR_CONNECT]The certification between client and server has finished.");
     status = gr_reactors_add_session(session);
     GR_RETURN_IFERR3(status,

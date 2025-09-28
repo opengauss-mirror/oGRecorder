@@ -169,19 +169,6 @@ static status_t gr_get_conn(gr_conn_t **conn, const char *addr)
         return CM_ERROR;
     }
 
-#ifdef ENABLE_GRTEST
-    if ((*conn)->flag && (*conn)->conn_pid != getpid()) {
-        LOG_RUN_INF("gr client need re-connect, last conn pid:%llu.", (uint64)(*conn)->conn_pid);
-        gr_disconnect(*conn);
-        if (gr_conn_sync(NULL, *conn, addr) != CM_SUCCESS) {
-            LOG_RUN_ERR("[GR API] ABORT INFO: gr server stoped, application need restart.");
-            cm_fync_logfile();
-            gr_exit_error();
-        }
-        (*conn)->conn_pid = getpid();
-    }
-#endif
-
     if ((*conn)->pipe.link.uds.closed) {
         LOG_RUN_ERR("[GR API] connection is closed");
         GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED);

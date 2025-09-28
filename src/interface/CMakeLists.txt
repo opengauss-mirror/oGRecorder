@@ -17,7 +17,6 @@ endif(ENABLE_FUZZASAN)
 ## other dependency include
 include_directories(${GR_SECUREC_INC_PATH})
 include_directories(${GR_OPENSSL_PATH})
-include_directories(${LIBAIO_INC_PATH})
 include_directories(${GR_CBB_PATH})
 include_directories(${LZ4_INC_PATH})
 ## source

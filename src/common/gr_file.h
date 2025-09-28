@@ -43,13 +43,6 @@ typedef struct st_gr_node_data {
     char *vg_name;
 } gr_node_data_t;
 
-typedef struct {
-    unsigned long total_bytes;
-    unsigned long used_bytes;
-    unsigned long available_bytes;
-    double usage_percent;
-} gr_disk_usage_info_t;
-
 int gr_check_readwrite(const char *name);
 
 status_t gr_exist_item(gr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type);

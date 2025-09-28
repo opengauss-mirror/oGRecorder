@@ -100,8 +100,8 @@ void writeToFileWithPerformance(gr_vfs_handle vfs_handle, const std::string& fil
 }
 
 TEST_F(GRApiConcurrentPerformanceTest, TestConcurrentWritePerformance) {
-    const int step_size = 8 * 1024; // 8KB
-    const int total_size = 80 * 1024 * 1024; // 80MB
+    const int step_size = 1024 * 1024; // 1MB
+    const int total_size = 1024 * 1024 * 1024; // 1GB
     char *data = new char[step_size];
     memset(data, 'C', step_size);
 

@@ -28,7 +28,6 @@
 #include "cm_dlock.h"
 #include "cm_disklock.h"
 #include "cm_utils.h"
-#include "gr_open_file.h"
 #include "gr_diskgroup.h"
 
 #ifndef WIN32

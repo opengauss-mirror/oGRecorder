@@ -45,7 +45,7 @@ extern "C" {
 #define GR_ACCMODE 00000003
 #define GR_OPEN_MODE(flag) ((flag + 1) & GR_ACCMODE)
 int32_t g_gr_tcp_conn_timeout = GR_TCP_CONNECT_TIMEOUT;
-uint32_t g_gr_server_pid = 0;
+
 
 typedef struct str_files_rw_ctx {
     int32_t handle;
@@ -144,16 +144,8 @@ status_t gr_cli_handshake(gr_conn_t *conn, uint32_t max_open_file)
         return CM_ERROR;
     }
     conn->cli_info.connect_time = cm_clock_monotonic_now();
-    gr_get_server_info_t output_info = {NULL, GR_INVALID_SESSIONID, 0};
+    gr_get_server_info_t output_info = {NULL, GR_INVALID_SESSIONID};
     CM_RETURN_IFERR(gr_msg_interact(conn, GR_CMD_HANDSHAKE, (void *)&conn->cli_info, (void *)&output_info));
-    if (conn->pack.head->version >= GR_VERSION_2) {
-        if (g_gr_server_pid == 0) {
-            g_gr_server_pid = output_info.server_pid;
-        } else if (g_gr_server_pid != output_info.server_pid) {
-            GR_THROW_ERROR(ERR_GR_SERVER_REBOOT);
-            return ERR_GR_SERVER_REBOOT;
-        }
-    }
 
     if (getenv(GR_ENV_HOME) != NULL) {
         output_info.home = getenv(GR_ENV_HOME);
@@ -224,8 +216,8 @@ status_t gr_vfs_delete_impl(gr_conn_t *conn, const char *dir, unsigned long long
 
 status_t gr_vfs_mount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle, unsigned long long attrFlag)
 {
-    if (vfs_handle->vfs_name == NULL) {
-        LOG_RUN_ERR("vfs name is NULL.");
+    if (vfs_handle == NULL || vfs_handle->vfs_name[0] == '\0') {
+        LOG_RUN_ERR("vfs handle is NULL or vfs name is empty.");
         return CM_ERROR;
     }
     LOG_DEBUG_INF("gr mount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
@@ -240,8 +232,8 @@ status_t gr_vfs_mount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle, unsigned 
 
 status_t gr_vfs_unmount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle)
 {
-    if (vfs_handle->vfs_name == NULL) {
-        LOG_RUN_ERR("vfs name is NULL.");
+    if (vfs_handle == NULL || vfs_handle->vfs_name[0] == '\0') {
+        LOG_RUN_ERR("vfs handle is NULL or vfs name is empty.");
         return CM_ERROR;
     }
     LOG_DEBUG_INF("gr unmount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
@@ -461,7 +453,7 @@ int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const vo
     status_t status;
     unsigned long long total_size = 0;
     unsigned long long remaining_size = size;
-    long long int rel_size;
+    long long int rel_size = 0;
     uint8_t hash[SHA256_DIGEST_LENGTH];
 
     while (total_size < size) {
@@ -484,7 +476,7 @@ int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const vo
 
         status = gr_msg_interact(conn, GR_CMD_WRITE_FILE, (void *)&send_info, (void *)&rel_size);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to write file, total_size:%lld, size:%lld, offset:%lld, errmsg:%s.",
+            LOG_RUN_ERR("Failed to write file, total_size:%lld, reansize:%lld, offset:%lld, errmsg:%s.",
                 total_size, size - total_size, offset, strerror(errno));
             return CM_ERROR;
         }
@@ -776,7 +768,7 @@ status_t gr_getcfg_impl(gr_conn_t *conn, const char *name, char *out_str, size_t
 status_t gr_get_inst_status_on_server(gr_conn_t *conn, gr_server_status_t *gr_status)
 {
     if (gr_status == NULL) {
-        GR_THROW_ERROR_EX(ERR_GR_INVALID_PARAM, "gr_dir_item_t");
+        GR_THROW_ERROR_EX(ERR_GR_INVALID_PARAM, "gr_status");
         return CM_ERROR;
     }
     text_t extra_info = CM_NULL_TEXT;
@@ -956,9 +948,6 @@ static status_t gr_decode_handshake(gr_packet_t *ack_pack, void *ack)
     gr_get_server_info_t *output_info = (gr_get_server_info_t *)ack;
     output_info->home = ack_info.str;
     CM_RETURN_IFERR(gr_get_int32(ack_pack, (int32_t *)&output_info->objectid));
-    if (ack_pack->head->version >= GR_VERSION_2) {
-        CM_RETURN_IFERR(gr_get_int32(ack_pack, (int32_t *)&output_info->server_pid));
-    }
     return CM_SUCCESS;
 }
 
@@ -1216,7 +1205,11 @@ status_t gr_msg_interact(gr_conn_t *conn, uint8 cmd, void *send_info, void *ack)
         send_pack->head->flags = 0;
         make_proc = &g_gr_packet_proc[cmd];
         if (make_proc->encode_proc != NULL) {
-            GR_RETURN_IF_ERROR(make_proc->encode_proc(conn, send_pack, send_info));
+            status_t ret = make_proc->encode_proc(conn, send_pack, send_info);
+            if (ret != CM_SUCCESS) {
+                LOG_RUN_ERR("Encode %s msg failed", make_proc->cmd_info);
+                return ret;
+            }
         }
         ack_pack = &conn->pack;
         GR_RETURN_IF_ERROR(gr_call_ex(&conn->pipe, send_pack, ack_pack));
