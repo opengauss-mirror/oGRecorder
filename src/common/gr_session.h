@@ -36,7 +36,7 @@
 #include "gr_protocol.h"
 #include "gr_latch.h"
 #include "gr_stats.h"
-#include "gr_shm.h"
+// #include "gr_shm.h"
 
 #ifdef __cplusplus
 extern "C" {

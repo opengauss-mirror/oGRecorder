@@ -25,6 +25,7 @@ status_t gr_filesystem_truncate(int fd, int64 length);
 status_t gr_filesystem_stat(const char *name, int64 *offset, int64 *size, gr_file_status_t *mode, time_t *atime);
 status_t gr_filesystem_postpone(const char *file_path, const char *time);
 status_t gr_filesystem_get_file_end_position(const char *file_path, off_t *end_position);
+status_t gr_filesystem_exist_item(const char *dir_path, bool32 *result, gft_item_type_t *output_type);
 
 #ifdef __cplusplus
 }

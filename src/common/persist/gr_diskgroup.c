@@ -54,8 +54,6 @@ typedef struct st_vglock_fp {
 vglock_fp_t g_fp_list[GR_MAX_OPEN_VG];
 #endif
 
-gr_vg_info_t *g_vgs_info = NULL;
-
 bool32 g_is_gr_server = GR_FALSE;
 static gr_rdgr_type_e g_is_gr_readwrite = GR_STATUS_NORMAL;
 static uint32_t g_master_instance_id = GR_INVALID_ID32;
@@ -113,22 +111,6 @@ gr_get_instance_status_proc_t get_instance_status_proc = NULL;
 void regist_get_instance_status_proc(gr_get_instance_status_proc_t proc)
 {
     get_instance_status_proc = proc;
-}
-
-void gr_free_vg_info()
-{
-    LOG_RUN_INF("free g_vgs_info.");
-    GR_FREE_POINT(g_vgs_info)
-}
-
-gr_vg_info_item_t *gr_find_vg_item(const char *vg_name)
-{
-    for (uint32_t i = 0; i < g_vgs_info->group_num; i++) {
-        if (strcmp(g_vgs_info->volume_group[i].vg_name, vg_name) == 0) {
-            return &g_vgs_info->volume_group[i];
-        }
-    }
-    return NULL;
 }
 
 gr_remote_read_proc_t remote_read_proc = NULL;

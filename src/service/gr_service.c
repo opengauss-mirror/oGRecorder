@@ -292,6 +292,7 @@ static status_t gr_process_mount_vfs(gr_session_t *session)
         return CM_ERROR;
     }
     (void)gr_put_int64(&session->send_pack, (int64)handle);
+    LOG_DEBUG_INF("Succeed to mount vfs:%s, handle:%llu.", vfs_name, (uint64)handle);
     return CM_SUCCESS;
 }
 
@@ -484,28 +485,28 @@ static status_t gr_process_write_file(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_data(&session->recv_pack, file_size, (void**)&buf));
     GR_RETURN_IF_ERROR(gr_check_readwrite("write file"));
 
-    status_t status = calculate_data_hash(buf, file_size, data_hash);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to calcalate data hash.");
-        return CM_ERROR;
-    }
-
-    status = get_file_hash(session, handle, session_curr_hash, session_prev_hash);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to get session hash.");
-        return CM_ERROR;
-    }
-
-    status = xor_sha256_hash(data_hash, session_curr_hash, combine_hash);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to calcalate combine_hash.");
-        return CM_ERROR;
-    }
-
-    status = compare_sha256(cli_hash, combine_hash);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("combine hash return failed.");
-        return CM_ERROR;
+    status_t status = CM_SUCCESS;
+    if (gr_get_hash_auth_enable()) {
+        status = calculate_data_hash(buf, file_size, data_hash);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("Failed to calcalate data hash.");
+            return CM_ERROR;
+        }
+        status = get_file_hash(session, handle, session_curr_hash, session_prev_hash);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("Failed to get session hash.");
+            return CM_ERROR;
+        }
+        status = xor_sha256_hash(data_hash, session_curr_hash, combine_hash);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("Failed to calcalate combine_hash.");
+            return CM_ERROR;
+        }
+        status = compare_sha256(cli_hash, combine_hash);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("combine hash return failed.");
+            return CM_ERROR;
+        }
     }
 
     timeval_t begin_tv_disk;
@@ -516,10 +517,12 @@ static status_t gr_process_write_file(gr_session_t *session)
         return CM_ERROR;
     }
     gr_end_stat_base(&session->gr_session_stat[GR_PWRITE_DISK], &begin_tv_disk);
-    status = update_file_hash(session, handle, combine_hash);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("update hash failed.");
-        return CM_ERROR;
+    if (gr_get_hash_auth_enable()) {
+        status = update_file_hash(session, handle, combine_hash);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("update hash failed.");
+            return CM_ERROR;
+        }
     }
 
     GR_RETURN_IF_ERROR(gr_put_int64(&session->send_pack, rel_size));
@@ -625,6 +628,12 @@ static status_t gr_process_handshake(gr_session_t *session)
     data.len++;  // for keeping the '\0'
     GR_RETURN_IF_ERROR(gr_put_text(&session->send_pack, &data));
     GR_RETURN_IF_ERROR(gr_put_int32(&session->send_pack, session->objectid));
+    
+    // 添加HASH_AUTH_ENABLE参数到握手响应
+    bool32 hash_auth_enable = gr_get_hash_auth_enable();
+    GR_RETURN_IF_ERROR(gr_put_int32(&session->send_pack, (int32_t)hash_auth_enable));
+    LOG_RUN_INF("[GR_CONNECT]Return HASH_AUTH_ENABLE=%d to client", hash_auth_enable);
+    
     return CM_SUCCESS;
 }
 

@@ -28,7 +28,6 @@
 #include "gr_errno.h"
 #include "gr_param.h"
 #include "gr_fault_injection.h"
-#include "gr_ga.h"
 #include "gr_param_verify.h"
 
 #ifdef __cplusplus

@@ -109,7 +109,6 @@ typedef struct st_gft_block_info {
 } gft_block_info_t;
 
 typedef struct st_gr_check_dir_param_t {
-    gr_vg_info_item_t *vg_item;
     gft_node_t *p_node;
     gft_node_t *last_node;
     gft_node_t *link_node;
@@ -121,7 +120,6 @@ typedef struct st_gr_check_dir_param_t {
 
 typedef struct st_gr_check_dir_output_t {
     gft_node_t **out_node;
-    gr_vg_info_item_t **item;
     gft_node_t **parent_node;
     bool8 is_lock_x;
 } gr_check_dir_output_t;
@@ -211,40 +209,10 @@ typedef enum en_gr_file_mode {
     GR_FILE_MODE_WRITE = 0x00000002,
     GR_FILE_MODE_RDWR = GR_FILE_MODE_READ | GR_FILE_MODE_WRITE,
 } gr_file_mode_e;
-
-typedef struct st_gr_file_context {
-    latch_t latch;
-    gft_node_t *node;
-    uint32_t next;
-    uint32_t flag : 2;  // GR_FILE_CONTEXT_FLAG_USED,GR_FILE_CONTEXT_FLAG_FREE
-    uint32_t tid : 22;  // 64-bit OS: pid_max [0, 2^22]
-    uint32_t reserve : 8;
-    int64 offset;
-    int64 vol_offset;
-    gr_vg_info_item_t *vg_item;
-    uint64 fid;
-    char file_path[GR_MAX_NAME_LEN];
-    uint32_t vgid;
-    uint32_t id;
-    gr_file_mode_e mode;
-} gr_file_context_t;
-
-typedef struct st_gr_file_context_group_t {
-    gr_file_context_t *files_group[GR_MAX_FILE_CONTEXT_GROUP_NUM];
-    uint32_t group_num;
-} gr_file_context_group_t;
-
 typedef struct st_gr_ft_au_list_t {
     void *au_addr[GR_MAX_FT_AU_NUM];
     uint32_t count;
 } gr_ft_au_list_t;
-
-typedef struct st_gr_file_run_ctx {
-    uint32_t max_open_file;
-    uint32_t has_opened_files;
-    uint32_t file_free_first;  // the first free file context.
-    gr_file_context_group_t files;
-} gr_file_run_ctx_t;
 
 typedef struct st_gr_env {
     latch_t latch;
@@ -257,11 +225,9 @@ typedef struct st_gr_env {
 #ifdef ENABLE_GRTEST
     pid_t inittor_pid;
 #endif
-    gr_file_run_ctx_t file_run_ctx;
 } gr_env_t;
 
 typedef struct st_gr_dir_t {
-    gr_vg_info_item_t *vg_item;
     uint64 version;
     ftid_t cur_ftid;
     gft_node_t cur_node;

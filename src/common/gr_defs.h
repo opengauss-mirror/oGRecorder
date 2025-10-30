@@ -94,10 +94,6 @@ extern "C" {
 #define GR_MAX_DLOCK_RETRY_COUNT 500000
 #define GR_MIN_DELAY_CLEAN_INTERVAL 5
 #define GR_MAX_DELAY_CLEAN_INTERVAL 1000000
-#define GR_MIN_SHM_KEY 1
-#define GR_MAX_SHM_KEY 64
-#define GR_MAX_SHM_KEY_BITS 8
-
 #define GR_MAX_NAME_LEN 64
 #define GR_MAX_VOLUME_PATH_LEN 64
 #define GR_MAX_CMD_LEN (512)
@@ -177,12 +173,6 @@ extern "C" {
 #define GR_DFLT_CTRL_BLOCK_SIZE SIZE_K(16)
 #define GR_DFLT_LOG_BLOCK_SIZE (uint32_t)512
 #define GR_MAX_ARCH_FILES_SIZE SIZE_T(32)
-
-#define GSDB_UDS_EMERG_CLIENT "gsdb_uds_emerg.client"
-#define GSDB_UDS_EMERG_SERVER "gsdb_uds_emerg.server"
-
-#define CM_MAX_UDS_FILE_PERMISSIONS (uint16)777
-#define CM_DEF_UDS_FILE_PERMISSIONS (uint16)600
 
 #define GR_MAX_PACKET_SIZE SIZE_K(130)
 #define GR_MAX_PACKET_DATA_SIZE (((GR_MAX_PACKET_SIZE) - sizeof(gr_packet_head_t)) - sizeof(uint32_t))

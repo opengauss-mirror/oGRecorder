@@ -57,11 +57,11 @@ typedef struct str_files_rw_ctx {
 status_t gr_connect(const char *server_locator, gr_conn_opt_t *options, gr_conn_t *conn)
 {
     if (server_locator == NULL) {
-        GR_THROW_ERROR(ERR_GR_UDS_INVALID_URL, "NULL", 0);
+        GR_THROW_ERROR(ERR_GR_TCP_INVALID_URL, "NULL", 0);
         return CM_ERROR;
     }
 
-    if ((conn->flag == CM_TRUE) && (conn->pipe.link.uds.closed == CM_FALSE)) {
+    if ((conn->flag == CM_TRUE) && (conn->pipe.link.tcp.closed == CM_FALSE)) {
         return CM_SUCCESS;
     }
 
@@ -144,12 +144,16 @@ status_t gr_cli_handshake(gr_conn_t *conn, uint32_t max_open_file)
         return CM_ERROR;
     }
     conn->cli_info.connect_time = cm_clock_monotonic_now();
-    gr_get_server_info_t output_info = {NULL, GR_INVALID_SESSIONID};
+    gr_get_server_info_t output_info = {NULL, GR_INVALID_SESSIONID, CM_FALSE};
     CM_RETURN_IFERR(gr_msg_interact(conn, GR_CMD_HANDSHAKE, (void *)&conn->cli_info, (void *)&output_info));
 
     if (getenv(GR_ENV_HOME) != NULL) {
         output_info.home = getenv(GR_ENV_HOME);
     }
+    
+    conn->hash_auth_enable = output_info.hash_auth_enable;
+    LOG_RUN_INF("[GR_CONNECT]Client received HASH_AUTH_ENABLE=%d from server", conn->hash_auth_enable);
+    
     return gr_set_server_info(conn, output_info.home, output_info.objectid, max_open_file);
 }
 
@@ -297,50 +301,6 @@ status_t gr_remove_file_impl(gr_conn_t *conn, const char *file_path)
     return status;
 }
 
-/*  
-1 after extend success, will generate new linked list
-context[file_run_ctx->files->group_num - 1] [0]->context[file_run_ctx->files->group_num - 1] 
-[1]->...->context[file_run_ctx->files->group_num - 1] [GR_FILE_CONTEXT_PER_GROUP - 1]
-2 insert new linked list head into the old linked list
-*/
-status_t gr_extend_files_context(gr_file_run_ctx_t *file_run_ctx)
-{
-    if (file_run_ctx->files.group_num == GR_MAX_FILE_CONTEXT_GROUP_NUM) {
-        GR_THROW_ERROR(ERR_INVALID_VALUE, "file group num", file_run_ctx->files.group_num);
-        LOG_RUN_ERR_INHIBIT(
-            LOG_INHIBIT_LEVEL1, "file context group exceeds upper limit %d", GR_MAX_FILE_CONTEXT_GROUP_NUM);
-        return CM_ERROR;
-    }
-    uint32_t context_size = GR_FILE_CONTEXT_PER_GROUP * (uint32_t)sizeof(gr_file_context_t);
-    uint32_t i = file_run_ctx->files.group_num;
-    file_run_ctx->files.files_group[i] = (gr_file_context_t *)cm_malloc(context_size);
-    if (file_run_ctx->files.files_group[i] == NULL) {
-        GR_THROW_ERROR(ERR_ALLOC_MEMORY, context_size, "gr extend files context");
-        return CM_ERROR;
-    }
-    errno_t rc = memset_s(file_run_ctx->files.files_group[i], context_size, 0, context_size);
-    if (rc != EOK) {
-        GR_FREE_POINT(file_run_ctx->files.files_group[i]);
-        CM_THROW_ERROR(ERR_SYSTEM_CALL, rc);
-        return CM_ERROR;
-    }
-    file_run_ctx->files.group_num++;
-    gr_file_context_t *context = NULL;
-    for (uint32_t j = 0; j < GR_FILE_CONTEXT_PER_GROUP; j++) {
-        context = &file_run_ctx->files.files_group[i][j];
-        context->id = i * GR_FILE_CONTEXT_PER_GROUP + j;
-        if (j == GR_FILE_CONTEXT_PER_GROUP - 1) {
-            context->next = CM_INVALID_ID32;
-        } else {
-            context->next = context->id + 1;
-        }
-    }
-    file_run_ctx->file_free_first = (&file_run_ctx->files.files_group[file_run_ctx->files.group_num - 1][0])->id;
-    LOG_RUN_INF("Succeed to extend alloc open files, group num is %u, file free first is %u.",
-        file_run_ctx->files.group_num, file_run_ctx->file_free_first);
-    return CM_SUCCESS;
-}
-
 status_t gr_open_file_on_server(gr_conn_t *conn, const char *file_path, int flag, gr_file_handle *file_handle)
 {
     gr_open_file_info_t send_info;
@@ -368,6 +328,7 @@ status_t gr_postpone_file_time_impl(gr_conn_t *conn, const char *file_name, cons
     send_info.file_atime = time;
     status_t status = gr_msg_interact(conn, GR_CMD_POSTPONE_FILE_TIME, (void *)&send_info, NULL);
     LOG_DEBUG_INF("gr extend file expired time");
+
     return status;
 }
 
@@ -402,9 +363,9 @@ status_t gr_check_path_exist(gr_conn_t *conn, const char *path)
 
     GR_RETURN_IFERR2(
         gr_exist_impl(conn, path, &exist, &type),
-            GR_THROW_ERROR_EX(ERR_GR_FILE_NOT_EXIST, "Failed to check the path %s exists.\n", path));
+            GR_THROW_ERROR(ERR_GR_FILE_NOT_EXIST, "Failed to check the path %s exists.\n", path));
     if (!exist) {
-        GR_THROW_ERROR_EX(ERR_GR_FILE_NOT_EXIST, "%s not exist, please check", path);
+        GR_THROW_ERROR(ERR_GR_FILE_NOT_EXIST, "%s not exist, please check", path);
         return CM_ERROR;
     }
     if (type != GFT_PATH) {
@@ -417,15 +378,18 @@ status_t gr_check_path_exist(gr_conn_t *conn, const char *path)
 
 status_t gr_check_file_exist(gr_conn_t *conn, const char *path, bool *is_exist)
 {
+    if (is_exist == NULL) {
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "is_exist parameter is NULL");
+        return CM_ERROR;
+    }
+    
     bool32 exist = false;
     gft_item_type_t type;
 
     GR_RETURN_IFERR2(gr_exist_impl(conn, path, &exist, &type),
         GR_THROW_ERROR_EX(ERR_GR_FILE_NOT_EXIST, "Failed to check the path %s exists.\n", path));
-    if (!exist || type != GFT_FILE) {
-        *is_exist = false;
-    }
-    *is_exist = true;
+    
+    *is_exist = (exist && type == GFT_FILE);
     return CM_SUCCESS;
 }
 
@@ -444,6 +408,12 @@ int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const vo
         LOG_RUN_ERR("File size is invalid: %lld.", size);
         return CM_ERROR;
     }
+    
+    if (file_handle == NULL || buf == NULL) {
+        LOG_RUN_ERR("Invalid parameters: file_handle or buf is NULL");
+        return CM_ERROR;
+    }
+    
     LOG_DEBUG_INF("gr pwrite file entry, handle:%d, size:%lld, offset:%lld",
                     HANDLE_VALUE(file_handle->fd), size, offset);
 
@@ -455,50 +425,57 @@ int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const vo
     unsigned long long remaining_size = size;
     long long int rel_size = 0;
     uint8_t hash[SHA256_DIGEST_LENGTH];
+    const char *buf_ptr = (const char *)buf;
 
     while (total_size < size) {
-        unsigned long long curr_size = (remaining_size > GR_RW_STEP_SIZE) ? GR_RW_STEP_SIZE : remaining_size;
+        const unsigned long long curr_size = (remaining_size > GR_RW_STEP_SIZE) ? 
+                                           GR_RW_STEP_SIZE : remaining_size;
+        
         send_info.offset = offset + total_size;
         send_info.size = curr_size;
-        send_info.buf = (char *)buf + total_size;
+        send_info.buf = (char *)(buf_ptr + total_size);
 
-        status = calculate_data_hash(send_info.buf, curr_size, hash);
-        if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to calcalate data hash.");
-            return CM_ERROR;
-        }
+        if (conn->hash_auth_enable) {
+            status = calculate_data_hash(send_info.buf, curr_size, hash);
+            if (status != CM_SUCCESS) {
+                LOG_RUN_ERR("Failed to calculate data hash.");
+                return CM_ERROR;
+            }
 
-        status = xor_sha256_hash(hash, file_handle->hash, send_info.hash);
-        if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to calcalate combine_hash.");
-            return CM_ERROR;
+            status = xor_sha256_hash(hash, file_handle->hash, send_info.hash);
+            if (status != CM_SUCCESS) {
+                LOG_RUN_ERR("Failed to calculate combine_hash.");
+                return CM_ERROR;
+            }
         }
 
         status = gr_msg_interact(conn, GR_CMD_WRITE_FILE, (void *)&send_info, (void *)&rel_size);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to write file, total_size:%lld, reansize:%lld, offset:%lld, errmsg:%s.",
-                total_size, size - total_size, offset, strerror(errno));
+            LOG_RUN_ERR("Failed to write file, total_size:%lld, remaining:%lld, offset:%lld, errmsg:%s.",
+                total_size, remaining_size, offset, strerror(errno));
             return CM_ERROR;
         }
+        
         if (rel_size != curr_size) {
-            LOG_RUN_WAR("Failed to write file, total_size:%lld, size:%lld, offset:%lld, rel_size:%lld, errmsg:%s.",
-                total_size, size - total_size, offset, rel_size, strerror(errno));
+            LOG_RUN_WAR("Partial write: expected %lld, actual %lld, total_size:%lld, offset:%lld",
+                curr_size, rel_size, total_size, offset);
             total_size += rel_size;
             break;
         }
 
         total_size += curr_size;
         remaining_size -= curr_size;
+        
         errno_t errcode = memcpy_s(file_handle->hash, SHA256_DIGEST_LENGTH,
                                     send_info.hash, SHA256_DIGEST_LENGTH);
         if (errcode != EOK) {
-            LOG_RUN_ERR("Failed to memcpy, size:%d.", SHA256_DIGEST_LENGTH);
+            LOG_RUN_ERR("Failed to memcpy hash, size:%d.", SHA256_DIGEST_LENGTH);
             GR_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
             return CM_ERROR;
         }
     }
 
-    LOG_DEBUG_INF("gr pwrite file leave");
+    LOG_DEBUG_INF("gr pwrite file leave, total written: %lld", total_size);
     return total_size;
 }
 
@@ -594,16 +571,8 @@ void gr_heartbeat_entry(thread_t *thread)
 }
 
 static status_t gr_init_err_proc(
-    gr_env_t *gr_env, bool32 detach, bool32 destroy, const char *errmsg, status_t errcode)
+    gr_env_t *gr_env, const char *errmsg, status_t errcode)
 {
-    if (detach == CM_TRUE) {
-        ga_detach_area();
-    }
-
-    if (destroy == CM_TRUE) {
-        cm_destroy_shm();
-    }
-    GR_FREE_POINT(gr_env->file_run_ctx.files.files_group[0]);
     gr_unlatch(&gr_env->latch);
 
     if (errmsg != NULL) {
@@ -613,58 +582,8 @@ static status_t gr_init_err_proc(
     return errcode;
 }
 
-static status_t gr_init_shm(gr_env_t *gr_env, char *home)
-{
-    status_t status = gr_set_cfg_dir(home, &gr_env->inst_cfg);
-    if (status != CM_SUCCESS) {
-        return gr_init_err_proc(gr_env, CM_FALSE, CM_FALSE, "Environment variant GR_HOME not found", status);
-    }
-
-    status = gr_load_config(&gr_env->inst_cfg);
-    if (status != CM_SUCCESS) {
-        return gr_init_err_proc(gr_env, CM_FALSE, CM_FALSE, "load config failed", status);
-    }
-
-    status = gr_load_cli_ssl(&gr_env->inst_cfg);
-    if (status != CM_SUCCESS) {
-        return gr_init_err_proc(gr_env, CM_FALSE, CM_FALSE, "load client ssl config failed", status);
-    }
-
-    uint32_t shm_key = (uint32_t)(gr_env->inst_cfg.params.shm_key << (uint8)GR_MAX_SHM_KEY_BITS) +
-                     (uint32_t)gr_env->inst_cfg.params.inst_id;
-    status = cm_init_shm(shm_key);
-    if (status != CM_SUCCESS) {
-        return gr_init_err_proc(gr_env, CM_FALSE, CM_FALSE, "Failed to init shared memory", status);
-    }
-
-    status = ga_attach_area(CM_SHM_ATTACH_RW);
-    if (status != CM_SUCCESS) {
-        return gr_init_err_proc(gr_env, CM_FALSE, CM_TRUE, "Failed to attach shared area", status);
-    }
-    return CM_SUCCESS;
-}
-
-static status_t gr_init_files(gr_env_t *gr_env, uint32_t max_open_files)
-{
-    gr_file_run_ctx_t *file_run_ctx = &gr_env->file_run_ctx;
-    file_run_ctx->max_open_file = max_open_files;
-    errno_t rc = memset_s(&file_run_ctx->files, sizeof(gr_file_context_group_t), 0, sizeof(gr_file_context_group_t));
-    if (rc != EOK) {
-        CM_THROW_ERROR(ERR_SYSTEM_CALL, rc);
-        return gr_init_err_proc(gr_env, CM_TRUE, CM_TRUE, "memory init failed", CM_ERROR);
-    }
-    status_t status = gr_extend_files_context(file_run_ctx);
-    if (status != CM_SUCCESS) {
-        return gr_init_err_proc(gr_env, CM_TRUE, CM_TRUE, "extend file context failed", status);
-    }
-    return status;
-}
-
 status_t gr_init_client(uint32_t max_open_files, char *home)
 {
-    GR_STATIC_ASSERT(GR_BLOCK_SIZE / sizeof(gft_node_t) <= (1 << GR_MAX_BIT_NUM_ITEM));
-    GR_STATIC_ASSERT(sizeof(gr_root_ft_block_t) == 256);
-
     if (max_open_files > GR_MAX_OPEN_FILES) {
         GR_THROW_ERROR(ERR_INVALID_VALUE, "max_open_files", max_open_files);
         return CM_ERROR;
@@ -680,23 +599,36 @@ status_t gr_init_client(uint32_t max_open_files, char *home)
 #ifdef ENABLE_GRTEST
         if (gr_env->inittor_pid == getpid()) {
 #endif
-            return gr_init_err_proc(gr_env, CM_FALSE, CM_FALSE, NULL, CM_SUCCESS);
+            return gr_init_err_proc(gr_env, NULL, CM_SUCCESS);
 #ifdef ENABLE_GRTEST
         } else {
             LOG_RUN_INF("gr client need re-initalization gr env, last init pid:%llu.", (uint64)gr_env->inittor_pid);
-            (void)gr_init_err_proc(gr_env, CM_TRUE, CM_TRUE, "need reinit by a new process", CM_SUCCESS);
+            (void)gr_init_err_proc(gr_env, "need reinit by a new process", CM_SUCCESS);
 
             gr_env->initialized = CM_FALSE;
             gr_env->inittor_pid = 0;
         }
 #endif
     }
-    CM_RETURN_IFERR(gr_init_shm(gr_env, home));
-    CM_RETURN_IFERR(gr_init_files(gr_env, max_open_files));
 
-    status_t status = cm_create_thread(gr_heartbeat_entry, SIZE_K(512), NULL, &gr_env->thread_heartbeat);
+    status_t status = gr_set_cfg_dir(home, &gr_env->inst_cfg);
     if (status != CM_SUCCESS) {
-        return gr_init_err_proc(gr_env, CM_TRUE, CM_TRUE, "GR failed to create heartbeat thread", status);
+        return gr_init_err_proc(gr_env, "Environment variant GR_HOME not found", status);
+    }
+
+    status = gr_load_config(&gr_env->inst_cfg); 
+    if (status != CM_SUCCESS) {
+        return gr_init_err_proc(gr_env, "load config failed", status);
+    }
+
+    status = gr_load_cli_ssl(&gr_env->inst_cfg);
+    if (status != CM_SUCCESS) {
+        return gr_init_err_proc(gr_env, "load client ssl config failed", status);
+    }
+
+    status = cm_create_thread(gr_heartbeat_entry, SIZE_K(512), NULL, &gr_env->thread_heartbeat);
+    if (status != CM_SUCCESS) {
+        return gr_init_err_proc(gr_env, "GR failed to create heartbeat thread", status);
     }
 
 #ifdef ENABLE_GRTEST
@@ -719,11 +651,6 @@ void gr_destroy(void)
     }
 
     cm_close_thread_nowait(&gr_env->thread_heartbeat);
-    gr_file_run_ctx_t *file_run_ctx = &gr_env->file_run_ctx;
-    for (uint32_t i = 0; i < file_run_ctx->files.group_num; i++) {
-        GR_FREE_POINT(file_run_ctx->files.files_group[i]);
-    }
-    ga_detach_area();
     gr_env->initialized = 0;
     gr_unlatch(&gr_env->latch);
 }
@@ -948,6 +875,13 @@ static status_t gr_decode_handshake(gr_packet_t *ack_pack, void *ack)
     gr_get_server_info_t *output_info = (gr_get_server_info_t *)ack;
     output_info->home = ack_info.str;
     CM_RETURN_IFERR(gr_get_int32(ack_pack, (int32_t *)&output_info->objectid));
+    
+    // 读取HASH_AUTH_ENABLE参数
+    int32_t hash_auth_enable_int;
+    CM_RETURN_IFERR(gr_get_int32(ack_pack, &hash_auth_enable_int));
+    output_info->hash_auth_enable = (bool32)hash_auth_enable_int;
+    LOG_RUN_INF("[GR_CONNECT]Received HASH_AUTH_ENABLE=%d from server", output_info->hash_auth_enable);
+    
     return CM_SUCCESS;
 }
 
@@ -1234,6 +1168,14 @@ void gr_clean_file_handle(gr_file_handle *file_handle)
     file_handle->fd = -1;
     file_handle->hash[0] = '\0';
     file_handle->file_name[0] = '\0';
+}
+
+bool32 gr_get_conn_hash_auth_enable(gr_conn_t *conn)
+{
+    if (conn == NULL) {
+        return CM_FALSE;
+    }
+    return conn->hash_auth_enable;
 }
 
 #ifdef __cplusplus

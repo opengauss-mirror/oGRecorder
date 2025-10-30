@@ -174,7 +174,6 @@ function Check()
 CMD=${1}
 INSTANCE_ID=${2}
 export GR_HOME=${3}
-CONN_PATH=UDS:${GR_HOME}/.gr_unix_d_socket
 startgr_log=${GR_HOME}/startgr.log
 
 get_startgr_log()

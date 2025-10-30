@@ -27,7 +27,6 @@
 
 #include "gr_defs.h"
 #include "cm_types.h"
-#include "gr_hashmap.h"
 #include "gr_latch.h"
 #include "cm_checksum.h"
 #include "gr_file_def.h"
@@ -78,43 +77,6 @@ typedef struct st_gr_allvg_vlm_space_t {
 } gr_allvg_vlm_space_t;
 #pragma pack()
 
-typedef handle_t gr_directory_t;  // gr_vfs_t
-
-void gr_free_vg_info();
-gr_vg_info_item_t *gr_find_vg_item(const char *vg_name);
-
-status_t gr_lock_disk_vg(const char *entry_path, gr_config_t *inst_cfg);
-
-status_t gr_unlock_vg_raid(gr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id);
-status_t gr_unlock_vg_share_disk(gr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id);
-status_t gr_unlock_vg(int32_t gr_mode, gr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id);
-status_t gr_lock_vg_storage_r(gr_vg_info_item_t *vg_item, const char *entry_path, gr_config_t *inst_cfg);
-status_t gr_unlock_vg_storage(gr_vg_info_item_t *vg_item, const char *entry_path, gr_config_t *inst_cfg);
-status_t gr_lock_vg_storage_core(gr_vg_info_item_t *vg_item, const char *entry_path, gr_config_t *inst_cfg);
-status_t gr_unlock_vg_storage_core(gr_vg_info_item_t *vg_item, const char *entry_path, gr_config_t *inst_cfg);
-
-extern gr_vg_info_t *g_vgs_info;
-#define VGS_INFO (g_vgs_info)
-status_t gr_cmp_volume_head(gr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id);
-status_t gr_check_lock_remain_inner(
-    int32_t gr_mode, gr_vg_info_item_t *vg_item, const char *entry_path, int64 inst_id, bool32 *is_remain);
-static inline gr_vg_info_item_t *gr_get_first_vg_item()
-{
-    return &g_vgs_info->volume_group[0];
-}
-
-static inline uint64 gr_get_redo_log_lsn(gr_vg_info_item_t *vg_item)
-{
-    return vg_item->gr_ctrl->redo_ctrl.lsn;
-}
-
-static inline uint64 gr_inc_redo_log_lsn(gr_vg_info_item_t *vg_item)
-{
-    uint64 lsn = gr_get_redo_log_lsn(vg_item);
-    lsn++;
-    return lsn;
-}
-
 // NOTE:has minus checksum field.
 static inline uint32_t gr_get_checksum(void *data, uint32_t len)
 {
@@ -123,22 +85,6 @@ static inline uint32_t gr_get_checksum(void *data, uint32_t len)
     CM_ASSERT(len - sizeof(uint32_t) > 0);
     uint32_t size = (uint32_t)(len - sizeof(uint32_t));
     return cm_get_checksum(buf, size);
-}
-
-static inline void gr_check_checksum(uint32_t checksum0, uint32_t checksum1)
-{
-    if (checksum0 != checksum1) {
-        LOG_RUN_ERR("Failed to check checksum:%u,%u.", checksum0, checksum1);
-        cm_panic(0);
-    }
-}
-
-static inline bool32 gr_read_remote_checksum(void *buf, int32_t size)
-{
-    uint32_t sum1 = *(uint32_t *)buf;
-    uint32_t sum2 = gr_get_checksum(buf, (uint32_t)size);
-    LOG_DEBUG_INF("read remote checksum, checksum1 is %u, checksum2 is %u.", sum1, sum2);
-    return sum1 == sum2;
 }
 
 static inline uint64 gr_get_vg_au_size(gr_ctrl_t *ctrl)
@@ -150,12 +96,6 @@ static inline void gr_set_vg_au_size(gr_ctrl_t *ctrl, uint32_t au_size)
 {
     CM_ASSERT(au_size <= GR_MAX_AU_SIZE);
     ctrl->core.au_size = au_size;
-}
-
-static inline bool32 gr_check_volume_is_used(gr_vg_info_item_t *vg_item, uint32_t vid)
-{
-    return (CM_CALC_ALIGN(GR_VOLUME_HEAD_SIZE, gr_get_vg_au_size(vg_item->gr_ctrl)) <
-            vg_item->gr_ctrl->core.volume_attrs[vid].hwm);
 }
 
 static inline bool32 gr_compare_version(uint64 disk_version, uint64 mem_version)
@@ -179,17 +119,12 @@ int32_t gr_get_server_status_flag(void);
 void gr_set_server_status_flag(int32_t gr_status);
 void gr_set_recover_thread_id(uint32_t thread_id);
 
-status_t gr_check_write_volume(gr_vg_info_item_t *vg_item, uint32_t volumeid, int64 offset, void *buf, uint32_t size);
 typedef status_t (*gr_remote_read_proc_t)(
     const char *vg_name, gr_volume_t *volume, int64 offset, void *buf, int size);
 status_t gr_add_volume_vg_ctrl(
     gr_ctrl_t *vg_ctrl, uint32_t id, uint64 vol_size, const char *volume_name, volume_slot_e volume_flag);
-status_t gr_gen_volume_head(
-    gr_volume_header_t *vol_head, gr_vg_info_item_t *vg_item, const char *volume_name, uint32_t id);
-status_t gr_check_remove_volume(gr_vg_info_item_t *vg_item, const char *volume_name, uint32_t *volume_id);
 void gr_remove_volume_vg_ctrl(gr_ctrl_t *vg_ctrl, uint32_t id);
 bool32 gr_meta_syn(gr_session_t *session, gr_bg_task_info_t *bg_task_info);
-status_t gr_update_redo_ctrl(gr_vg_info_item_t *vg_item, uint32_t index, uint64 offset, uint64 lsn);
 
 #ifdef __cplusplus
 }

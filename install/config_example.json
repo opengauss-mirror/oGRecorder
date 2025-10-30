@@ -3,6 +3,7 @@
     "name": "cluster",
     "install_path": "/home/omm/install/",
     "env_file": "/home/omm/env/gr_env",
+    "worm_path": "/home/omm/data/",
     "user": "omm",
     "nodes": [
       {

@@ -55,10 +55,6 @@ status_t gr_meta_syn_remote(gr_session_t *session, gr_meta_syn_t *meta_syn, uint
 status_t gr_invalidate_meta_remote(
     gr_session_t *session, gr_invalidate_meta_msg_t *invalidate_meta_msg, uint32_t size, bool32 *invalid_ack);
 
-typedef status_t (*gr_meta_syn2other_nodes_proc_t)(
-    gr_vg_info_item_t *vg_item, char *meta_syn, uint32_t meta_syn_size, bool32 *cmd_ack);
-void regist_meta_syn2other_nodes_proc(gr_meta_syn2other_nodes_proc_t proc);
-
 #ifdef __cplusplus
 }
 #endif

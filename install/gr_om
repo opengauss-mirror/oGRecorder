@@ -2213,6 +2213,9 @@ class dbClusterInfo():
         self.tmpPath = os.path.join(self.installPath, "tmp")
         self.logPath = os.path.join(self.installPath, "log")
         self.grPath = os.path.join(self.installPath, "gr")
+        self.wormPath = self.__read_and_check_config_item(xmlRootNode, "wormPath", "cluster", False)
+        if not self.wormPath:
+            self.wormPath = os.path.join(self.installPath, "data")
 
         if not self.logPath:
             self.logPath = "/var/log/gaussdb"
@@ -4375,15 +4378,14 @@ class dbClusterInfo():
         self.logger.log("Successfully decompress gr pkg.")
 
         # 修改配置文件
-        for dbNode in clusterInfo.dbNodes:
+        for i, dbNode in enumerate(clusterInfo.dbNodes):
             config_content = (
-                f"INST_ID={dbNode.id - 1}\n"
-                f"SHM_KEY=6\n"
+                f"INST_ID={i}\n"
                 f"LOG_LEVEL=255\n"
                 f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
                 f"LISTEN_ADDR={dbNode.listen_addr}\n"
                 f"IP_WHITE_LIST={dbNode.sshIps[0]},127.0.0.1\n"
-                f"DATA_FILE_PATH={clusterInfo.grPath}/data\n"
+                f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
                 f"GR_CM_SO_NAME=libclient.so\n"
             )
             cmd = f"printf \"%s\" \"{config_content}\" > {cfg_path}"
@@ -4455,7 +4457,32 @@ class dbClusterInfo():
                     raise Exception(f"failed to create gr_res.sh file, Error output:\n{output}")
         self.logger.log("Successfully create gr_res.sh file.")
 
-        # 生成证书
+
+        # 只在主节点生成配置文件
+        main_node = clusterInfo.dbNodes[0]  # 使用第一个节点作为主节点
+        main_config_content = (
+            f"INST_ID=0\n"
+            f"LOG_LEVEL=255\n"
+            f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
+            f"LISTEN_ADDR={main_node.listen_addr}\n"
+            f"IP_WHITE_LIST={main_node.sshIps[0]},127.0.0.1\n"
+            f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
+            f"GR_CM_SO_NAME=libclient.so\n"
+        )
+        
+        # 在主节点生成配置文件
+        main_config_path = f"{parent_dir}/gr_inst.ini"
+        with open(main_config_path, 'w') as f:
+            f.write(main_config_content)
+        
+        # 复制为gr_cli_inst.ini
+        cli_config_path = f"{parent_dir}/gr_cli_inst.ini"
+        with open(cli_config_path, 'w') as f:
+            f.write(main_config_content)
+        
+        self.logger.log("Successfully create initial config file on main node.")
+
+        # 生成证书（grcmd会在配置文件中添加证书相关配置）
         envfile = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
         ca_path = clusterInfo.grPath
         if not ca_path.endswith("CA"):
@@ -4469,12 +4496,37 @@ class dbClusterInfo():
             if (status != 0):
                 raise Exception(f"failed to create gr cert, Error output:\n{output}, cmd is {cmd}")
 
-        for dbNode in clusterInfo.dbNodes:
-            if dbNode.name != GetHostIpOrName():
-                cmd = f"scp -r {parent_dir}/gr_cli_inst.ini {parent_dir}/gr_ser_inst.ini {dbNode.sshIps[0]}:{parent_dir}"
-                status, output = subprocess.getstatusoutput(cmd)
-                if status != 0:
-                    raise Exception(f"failed to distribute int file, Error output:\n{output}")
+        # 为每个节点生成正确的配置文件并分发
+        for i, dbNode in enumerate(clusterInfo.dbNodes):
+            # 读取主节点的配置文件（包含证书配置）
+            with open(main_config_path, 'r') as f:
+                config_content = f.read()
+            
+            # 修改INST_ID和LISTEN_ADDR
+            config_content = config_content.replace(f"INST_ID=0", f"INST_ID={i}")
+            config_content = config_content.replace(f"LISTEN_ADDR={main_node.listen_addr}", f"LISTEN_ADDR={dbNode.listen_addr}")
+            config_content = config_content.replace(f"IP_WHITE_LIST={main_node.sshIps[0]},127.0.0.1", f"IP_WHITE_LIST={dbNode.sshIps[0]},127.0.0.1")
+            
+            # 在本地生成节点特定的gr_inst.ini配置文件
+            local_config_path = f"{parent_dir}/gr_inst_{dbNode.name}.ini"
+            with open(local_config_path, 'w') as f:
+                f.write(config_content)
+            
+            # 分发配置文件到对应节点
+            cmd = f"scp {local_config_path} {dbNode.sshIps[0]}:{parent_dir}/gr_inst.ini"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise Exception(f"failed to distribute gr_inst.ini to {dbNode.name}, Error output:\n{output}")
+            
+            # 分发gr_cli_inst.ini（直接使用主节点的配置）
+            cmd = f"scp {cli_config_path} {dbNode.sshIps[0]}:{parent_dir}/gr_cli_inst.ini"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise Exception(f"failed to distribute gr_cli_inst.ini to {dbNode.name}, Error output:\n{output}")
+            
+            # 清理本地临时文件
+            if os.path.exists(local_config_path):
+                os.remove(local_config_path)
 
         self.logger.log("Successfully create gr cert.")
 
@@ -4586,12 +4638,14 @@ class dbClusterInfo():
         
         # Set paths based on JSON configuration
         install_path = cluster_config.get('install_path', '/home/czk/install/')
+        worm_path = cluster_config.get('worm_path', '/home/czk/data/')
         clusterInfo.installPath = install_path
         clusterInfo.toolPath = os.path.join(install_path, "tool")
         clusterInfo.grPath = os.path.join(install_path, "gr")
         clusterInfo.appPath = os.path.join(install_path, "gr")
         clusterInfo.logPath = os.path.join(install_path, "log")
         clusterInfo.tmpPath = os.path.join(install_path, "tmp")
+        clusterInfo.wormPath = worm_path  # 保存worm_path到clusterInfo中
         datadnPath = os.path.join(install_path, "data/dn") # cm need "dn" to check disk, maybe need to change
         logger.log("Start preinstall oGRecorder.")
         
@@ -4609,6 +4663,29 @@ class dbClusterInfo():
         # Change permissions
         for node in nodes:
             node_name = node.get('ip', node.get('name', ''))
+            # 先设置wormPath权限（root用户执行，可以修改权限）
+            cmd = f'chown {user}:{user} {clusterInfo.wormPath} && chmod 777 {clusterInfo.wormPath}'
+            status, output = self.execute_on_node(
+                node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
+            if status != 0:
+                logger.warn(f"Failed to set wormPath permissions on {node_name}: {output}")
+                logger.warn(f"wormPath may be read-only or NFS mounted, continuing...")
+            else:
+                logger.log(f"Successfully set wormPath permissions on {node_name}")
+            
+            # 创建磁盘文件并设置权限（root用户执行）
+            sharedisk_path = os.path.join(clusterInfo.wormPath, "sharedisk")
+            votingdisk_path = os.path.join(clusterInfo.wormPath, "votingdisk")
+            cmd = f"truncate -s 1G {sharedisk_path} && truncate -s 1G {votingdisk_path} && chmod 777 {sharedisk_path} && chmod 777 {votingdisk_path}"
+            status, output = self.execute_on_node(
+                node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
+            if status != 0:
+                logger.warn(f"Failed to create and set permissions for disk files on {node_name}: {output}")
+                logger.warn(f"Continuing installation...")
+            else:
+                logger.log(f"Successfully created and set permissions for disk files on {node_name}")
+            
+            # 设置其他目录权限
             cmd = f'chown -R {user}:{user} {clusterInfo.toolPath} {clusterInfo.grPath} {clusterInfo.appPath} {clusterInfo.logPath} {clusterInfo.tmpPath} {datadnPath}'
             status, output = self.execute_on_node(
                 node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
@@ -4819,8 +4896,10 @@ EOF
         
         # Set paths based on JSON configuration
         install_path = cluster_config.get('install_path', '/home/czk/install/')
+        worm_path = cluster_config.get('worm_path', '/home/czk/data/')
         clusterInfo.installPath = install_path
         clusterInfo.grPath = os.path.join(install_path, "gr")
+        clusterInfo.wormPath = worm_path  # 保存worm_path到clusterInfo中
         
         # Certificate directory, avoid duplicate CA concatenation
         ca_path = clusterInfo.grPath
@@ -5393,10 +5472,20 @@ class InstallImpl:
     def initCMServer(self):
         self.logger.log("Initializing cm_server.")
         for (cmdir, host) in zip(self.cmDirs, self.hostnames):
+            # 构建磁盘文件路径
+            sharedisk_path = os.path.join(self.clusterInfo.wormPath, "sharedisk")
+            votingdisk_path = os.path.join(self.clusterInfo.wormPath, "votingdisk")
+            
             cmd = """
                 cp {gaussHome}/share/config/cm_server.conf.sample {cmdir}/cm_server/cm_server.conf
                 sed 's#log_dir = .*#log_dir = {gaussLog}/cm/cm_server#' {cmdir}/cm_server/cm_server.conf -i
-                """.format(gaussHome=self.gaussHome, gaussLog=self.gaussLog, cmdir=cmdir)
+                sed 's#ddb_type = .*#ddb_type = 2#' {cmdir}/cm_server/cm_server.conf -i
+                sed 's#dn_arbitrate_mode = .*#dn_arbitrate_mode = share_disk#' {cmdir}/cm_server/cm_server.conf -i
+                sed 's#share_disk_path = .*#share_disk_path = \'{sharedisk_path}\'#' {cmdir}/cm_server/cm_server.conf -i
+                sed 's#voting_disk_path = .*#voting_disk_path = \'{votingdisk_path}\'#' {cmdir}/cm_server/cm_server.conf -i
+                sed 's#disk_timeout = .*#disk_timeout = 6#' {cmdir}/cm_server/cm_server.conf -i
+                """.format(gaussHome=self.gaussHome, gaussLog=self.gaussLog, cmdir=cmdir, 
+                          sharedisk_path=sharedisk_path, votingdisk_path=votingdisk_path)
             status, output = self.executeCmdOnHost(host, cmd)
             if status != 0:
                 self.logger.debug("Command: " + cmd)
@@ -5406,11 +5495,17 @@ class InstallImpl:
     def initCMAgent(self):
         self.logger.log("Initializing cm_agent.")
         for (cmdir, host) in zip(self.cmDirs, self.hostnames):
+            # 构建投票磁盘文件路径
+            votingdisk_path = os.path.join(self.clusterInfo.wormPath, "votingdisk")
+            
             cmd = """
                 cp {gaussHome}/share/config/cm_agent.conf.sample {cmdir}/cm_agent/cm_agent.conf && 
                 sed 's#log_dir = .*#log_dir = {gaussLog}/cm/cm_agent#' {cmdir}/cm_agent/cm_agent.conf -i && 
-                sed 's#unix_socket_directory = .*#unix_socket_directory = {gaussHome}#' {cmdir}/cm_agent/cm_agent.conf -i
-                """.format(gaussHome=self.gaussHome, gaussLog=self.gaussLog, cmdir=cmdir)
+                sed 's#unix_socket_directory = .*#unix_socket_directory = {gaussHome}#' {cmdir}/cm_agent/cm_agent.conf -i &&
+                sed 's#voting_disk_path = .*#voting_disk_path = \'{votingdisk_path}\'#' {cmdir}/cm_agent/cm_agent.conf -i &&
+                sed 's#disk_timeout = .*#disk_timeout = 6#' {cmdir}/cm_agent/cm_agent.conf -i
+                """.format(gaussHome=self.gaussHome, gaussLog=self.gaussLog, cmdir=cmdir, 
+                          votingdisk_path=votingdisk_path)
             status, output = self.executeCmdOnHost(host, cmd)
             if status != 0:
                 self.logger.debug("Command: " + cmd)
@@ -6580,6 +6675,7 @@ def json_to_xml(json_file):
         <PARAM name="installPath" value="{config['cluster']['install_path']}"/>
         <PARAM name="backIp1s" value="{','.join(back_ips)}"/>
         <PARAM name="gr_nodes_list" value="{','.join(gr_nodes_list)}"/>
+        <PARAM name="wormPath" value="{config['cluster'].get('worm_path', '/tmp/')}"/>
     </CLUSTER>
     <DEVICELIST>'''
     

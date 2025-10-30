@@ -83,10 +83,10 @@ typedef struct st_gr_params {
     uint32_t work_thread_cnt;
     cs_pipe_type_t pipe_type;
     bool32 elapsed_switch;
-    uint32_t shm_key;
     uint32_t ssl_detect_day;
     bool32 mes_with_ip;
     bool32 ip_white_list_on;
+    bool32 hash_auth_enable;
     uint32_t iothread_count;
     uint32_t workthread_count;
     uint32_t xlog_vg_id;
@@ -164,6 +164,12 @@ status_t gr_set_cfg_param(char *name, char *value, char *scope);
 status_t gr_get_cfg_param(const char *name, char **value);
 status_t gr_load_delay_clean_interval_core(char *value, gr_config_t *inst_cfg);
 status_t gr_set_cert_param(const char *param_name, const char *param_value);
+
+/*
+ * @brief 获取hash认证开关状态
+ * @return CM_TRUE - hash认证开启; CM_FALSE - hash认证关闭
+ */
+bool32 gr_get_hash_auth_enable(void);
 
 #ifdef __cplusplus
 }

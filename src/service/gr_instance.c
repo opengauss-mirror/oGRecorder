@@ -22,8 +22,8 @@
  * -------------------------------------------------------------------------
  */
 
-#include "gr_ga.h"
-#include "gr_shm.h"
+// #include "gr_ga.h"
+// #include "gr_shm.h"
 #include "cm_timer.h"
 #include "cm_error.h"
 #include "cm_iofence.h"
@@ -51,17 +51,6 @@ gr_instance_t g_gr_instance;
 
 static const char *const g_gr_lock_file = "gr.lck";
 
-static void instance_set_pool_def(ga_pool_id_e pool_id, uint32_t obj_count, uint32_t obj_size, uint32_t ex_max)
-{
-    ga_pool_def_t pool_def;
-
-    CM_ASSERT(ex_max <= ((uint32_t)GA_MAX_EXTENDED_POOLS));
-    pool_def.object_count = obj_count;
-    pool_def.object_size = obj_size;
-    pool_def.ex_max = ex_max;
-
-    ga_set_pool_def(pool_id, &pool_def);
-}
 
 status_t gr_lock_instance(void)
 {
@@ -85,26 +74,6 @@ status_t gr_lock_instance(void)
     return CM_SUCCESS;
 }
 
-static status_t instance_init_ga(gr_instance_t *inst)
-{
-    int32_t ret;
-    ga_destroy_global_area();
-    instance_set_pool_def(GA_INSTANCE_POOL, 1, sizeof(gr_share_vg_item_t), GR_MAX_VOLUME_GROUP_NUM - 1);
-    instance_set_pool_def(
-        GA_SESSION_POOL, GR_SESSION_NUM_PER_GROUP, sizeof(gr_session_t), GA_MAX_SESSION_EXTENDED_POOLS);
-    instance_set_pool_def(GA_8K_POOL, GR_MAX_MEM_BLOCK_SIZE / (GR_BLOCK_SIZE + GR_BLOCK_CTRL_SIZE),
-        GR_BLOCK_SIZE + GR_BLOCK_CTRL_SIZE, GA_MAX_8K_EXTENDED_POOLS);
-    instance_set_pool_def(GA_16K_POOL, GR_MAX_MEM_BLOCK_SIZE / (GR_FILE_SPACE_BLOCK_SIZE + GR_BLOCK_CTRL_SIZE),
-        GR_FILE_SPACE_BLOCK_SIZE + GR_BLOCK_CTRL_SIZE, GA_MAX_EXTENDED_POOLS);
-    instance_set_pool_def(GA_FS_AUX_POOL, GR_MAX_MEM_BLOCK_SIZE / (GR_FS_AUX_SIZE + GR_BLOCK_CTRL_SIZE),
-        GR_FS_AUX_SIZE + GR_BLOCK_CTRL_SIZE, GA_MAX_EXTENDED_POOLS);
-    instance_set_pool_def(
-        GA_SEGMENT_POOL, GR_MAX_VOLUME_GROUP_NUM, GR_BUCKETS_SIZE_PER_SEGMENT, GR_MAX_SEGMENT_NUM - 1);
-    ret = ga_create_global_area();
-    GR_RETURN_IF_ERROR(ret);
-    LOG_RUN_INF("Init GA pool and area successfully.");
-    return CM_SUCCESS;
-}
 
 static status_t gr_init_thread(gr_instance_t *inst)
 {
@@ -134,17 +103,17 @@ status_t gr_init_certification(gr_instance_t *inst)
 static status_t instance_init_core(gr_instance_t *inst)
 {
     status_t status = gr_init_session_pool(gr_get_max_total_session_cnt());
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_GA_INIT, "GR instance failed to initialize sessions."));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_SESSION_CREATE, "GR instance failed to initialize sessions."));
     status = gr_init_thread(inst);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_GA_INIT, "GR instance failed to initialize thread."));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_SESSION_CREATE, "GR instance failed to initialize thread."));
     status = gr_startup_mes();
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_GA_INIT, "GR instance failed to startup mes"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_SESSION_CREATE, "GR instance failed to startup mes"));
     status = gr_create_reactors();
     GR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to start reactors!"));
     status = gr_start_lsnr(inst);
     GR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to start lsnr!"));
     status = gr_init_certification(inst);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_GA_INIT, "GR instance failed to startup certification"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_SESSION_CREATE, "GR instance failed to startup certification"));
     status = gr_init_inst_handle_session(inst);
     GR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance int handle session!"));
     return CM_SUCCESS;
@@ -170,18 +139,13 @@ static status_t instance_init(gr_instance_t *inst)
 {
     status_t status = gr_lock_instance();
     GR_RETURN_IFERR2(status, LOG_RUN_ERR("Another grinstance is running"));
-    uint32_t shm_key =
-        (uint32_t)(inst->inst_cfg.params.shm_key << (uint8)GR_MAX_SHM_KEY_BITS) + (uint32_t)inst->inst_cfg.params.inst_id;
-    status = cm_init_shm(shm_key);
-    GR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to initialize shared memory!"));
-    status = instance_init_ga(inst);
-    GR_RETURN_IFERR4(status, (void)del_shm_by_key(CM_SHM_CTRL_KEY), cm_destroy_shm(),
-        LOG_RUN_ERR("GR instance failed to initialize ga!"));
     status = instance_init_core(inst);
     if (status != CM_SUCCESS) {
-        (void)del_shm_by_key(CM_SHM_CTRL_KEY);
-        ga_detach_area();
-        cm_destroy_shm();
+        for (uint32_t i = 0; i < g_gr_session_ctrl.alloc_sessions; i++) {
+            if (g_gr_session_ctrl.sessions[i] != NULL) {
+                CM_FREE_PTR(g_gr_session_ctrl.sessions[i]);
+            }
+        }
         CM_FREE_PTR(g_gr_session_ctrl.sessions);
         return CM_ERROR;
     }
@@ -262,7 +226,7 @@ status_t gr_startup(gr_instance_t *inst, gr_srv_args_t gr_args)
 
     status = instance_init(inst);
     GR_RETURN_IFERR2(status, LOG_RUN_ERR("GR instance failed to initialized!"));
-    cm_set_shm_ctrl_flag(CM_SHM_CTRL_FLAG_TRUE);
+    // cm_set_shm_ctrl_flag(CM_SHM_CTRL_FLAG_TRUE);
     inst->abort_status = CM_FALSE;
     return CM_SUCCESS;
 }
@@ -313,7 +277,7 @@ static status_t gr_lsnr_proc(tcp_lsnr_t *lsnr, cs_pipe_t *pipe)
     LOG_RUN_INF("[GR_CONNECT]The certification between client and server has finished.");
     status = gr_reactors_add_session(session);
     GR_RETURN_IFERR3(status,
-        LOG_RUN_ERR("[GR_CONNECT]Session:%u socket:%u closed.", session->id, pipe->link.uds.sock),
+        LOG_RUN_ERR("[GR_CONNECT]Session:%u socket:%u closed.", session->id, pipe->link.tcp.sock),
         gr_destroy_session(session));
     LOG_RUN_INF("[GR_CONNECT]The client has connected, session %u.", session->id);
     return CM_SUCCESS;
@@ -328,7 +292,6 @@ status_t gr_start_lsnr(gr_instance_t *inst)
                      LOG_RUN_ERR("gr_start_lsnr strncpy_s failed"));
     inst->lsnr.host[1][0] = '\0';
     inst->lsnr.port = g_inst_cfg->params.listen_addr.port;
-    // return cs_start_uds_lsnr(&inst->lsnr, gr_lsnr_proc);
     return cs_start_tcp_lsnr(&inst->lsnr, gr_lsnr_proc);
 }
 
@@ -377,15 +340,6 @@ void gr_uninit_cm(gr_instance_t *inst)
 
 void gr_free_log_ctrl()
 {
-    if (g_vgs_info == NULL) {
-        return;
-    }
-    for (uint32_t i = 0; i < g_vgs_info->group_num; i++) {
-        gr_vg_info_item_t *vg_item = &g_vgs_info->volume_group[i];
-        if (vg_item != NULL && vg_item->log_file_ctrl.log_buf != NULL) {
-            GR_FREE_POINT(vg_item->log_file_ctrl.log_buf);
-        }
-    }
 }
 
 void gr_check_peer_by_inst(gr_instance_t *inst, uint64 inst_id)

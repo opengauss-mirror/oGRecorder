@@ -54,6 +54,104 @@ typedef struct {
 extern "C" {
 #endif
 
+// 统一参数验证宏
+#define VALIDATE_PARAM_RETURN(condition, func_name, param_name, error_msg) \
+    do { \
+        if (!(condition)) { \
+            LOG_RUN_ERR("%s: %s %s", func_name, param_name, error_msg); \
+            GR_THROW_ERROR(ERR_GR_INVALID_PARAM, param_name " " error_msg); \
+            return GR_ERROR; \
+        } \
+    } while(0)
+
+static int validate_instance_handle(gr_instance_handle inst_handle, const char *func_name)
+{
+    VALIDATE_PARAM_RETURN(inst_handle != NULL, func_name, "instance handle", "is NULL");
+    
+    st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
+    VALIDATE_PARAM_RETURN(hdl->conn != NULL, func_name, "connection", "is NULL");
+    
+    return GR_SUCCESS;
+}
+
+static int validate_vfs_handle(gr_vfs_handle vfs_handle, const char *func_name)
+{
+    VALIDATE_PARAM_RETURN(vfs_handle.handle != NULL, func_name, "vfs handle", "is NULL");
+    return validate_instance_handle(vfs_handle.handle, func_name);
+}
+
+static int validate_file_name(const char *name, const char *func_name)
+{
+    VALIDATE_PARAM_RETURN(name != NULL && name[0] != '\0', func_name, "file name", "is NULL or empty");
+    VALIDATE_PARAM_RETURN(strpbrk(name, "\\:*?\"<>|") == NULL, func_name, "file name", "contains invalid characters");
+    return GR_SUCCESS;
+}
+
+static int validate_string_param(const char *param, const char *param_name, const char *func_name)
+{
+    if (param == NULL) {
+        LOG_RUN_ERR("%s: %s is NULL.", func_name, param_name);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s is NULL", param_name);
+        return GR_ERROR;
+    }
+    if (strlen(param) == 0) {
+        LOG_RUN_ERR("%s: %s is empty.", func_name, param_name);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s is empty", param_name);
+        return GR_ERROR;
+    }
+    return GR_SUCCESS;
+}
+
+static int validate_pointer_param(const void *param, const char *param_name, const char *func_name)
+{
+    if (param == NULL) {
+        LOG_RUN_ERR("%s: %s is NULL.", func_name, param_name);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s is NULL", param_name);
+        return GR_ERROR;
+    }
+    return GR_SUCCESS;
+}
+
+static int validate_size_param(long long size, const char *param_name, const char *func_name)
+{
+    if (size < 0) {
+        LOG_RUN_ERR("%s: %s is invalid: %lld.", func_name, param_name, size);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s must be a positive integer", param_name);
+        return GR_ERROR;
+    }
+    if (size > (int64_t)GR_MAX_FILE_SIZE) {
+        LOG_RUN_ERR("%s: %s exceeds maximum size: %lld.", func_name, param_name, size);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s must less than GR_MAX_FILE_SIZE", param_name);
+        return GR_ERROR;
+    }
+    return GR_SUCCESS;
+}
+
+static int validate_timeout_param(int32_t timeout, const char *func_name)
+{
+    if (timeout < 0 && timeout != GR_CONN_NEVER_TIMEOUT) {
+        LOG_RUN_ERR("%s: invalid timeout value: %d.", func_name, timeout);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid timeout when set connection timeout");
+        return GR_ERROR;
+    }
+    return GR_SUCCESS;
+}
+
+static int build_full_path(const char *vfs_name, const char *file_name, char *full_path, size_t path_size, const char *func_name)
+{
+    if (validate_string_param(vfs_name, "vfs_name", func_name) != GR_SUCCESS ||
+        validate_string_param(file_name, "file_name", func_name) != GR_SUCCESS) {
+        return GR_ERROR;
+    }
+    
+    errno_t err = sprintf_s(full_path, path_size, "%s/%s", vfs_name, file_name);
+    if (SECUREC_UNLIKELY(err < 0)) {
+        LOG_RUN_ERR("%s: failed to build full path.", func_name);
+        GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+        return GR_ERROR;
+    }
+    return GR_SUCCESS;
+}
 
 void gr_set_default_conn_timeout(int timeout)
 {
@@ -66,19 +164,21 @@ void gr_set_default_conn_timeout(int timeout)
 
 int gr_create_inst(const char *storageServerAddr, gr_instance_handle *inst_handle)
 {
-    if (storageServerAddr == NULL || inst_handle == NULL) {
-        LOG_RUN_ERR("create instance get invalid parameter.");
+    if (validate_string_param(storageServerAddr, "storageServerAddr", "gr_create_inst") != GR_SUCCESS ||
+        validate_pointer_param(inst_handle, "inst_handle", "gr_create_inst") != GR_SUCCESS) {
         return GR_ERROR;
     }
 
     if (check_server_addr_format(storageServerAddr) != GR_SUCCESS) {
-        LOG_RUN_ERR("invalid address: %s.", storageServerAddr);
+        LOG_RUN_ERR("gr_create_inst: invalid address: %s.", storageServerAddr);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid address format");
         return GR_ERROR;
     }
 
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)malloc(sizeof(st_gr_instance_handle));
     if (hdl == NULL) {
         LOG_RUN_ERR("failed to allocate memory for instance handle");
+        GR_THROW_ERROR(ERR_ALLOC_MEMORY, sizeof(st_gr_instance_handle), "gr_create_inst");
         return GR_ERROR;
     }
     hdl->conn = NULL;
@@ -86,8 +186,9 @@ int gr_create_inst(const char *storageServerAddr, gr_instance_handle *inst_handl
                             storageServerAddr, strlen(storageServerAddr) + 1);
     if (err != EOK) {
         LOG_RUN_ERR("Error occured when copying addr, errno code is %d.\n", err);
+        GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
         free(hdl);
-        return (int)err;
+        return GR_ERROR;
     }
 
     status_t ret = gr_enter_api(&hdl->conn, storageServerAddr);
@@ -166,6 +267,7 @@ int gr_create_inst_only_primary(const char *serverAddrs, gr_instance_handle *ins
     int primary_master_id = -1;
     gr_instance_handle primary_handle = NULL;
 
+    LOG_RUN_INF("Starting primary server search among %d addresses", addrCount);
     for (int i = 0; i < addrCount; i++) {
         if (addresses[i] == NULL) {
             LOG_RUN_ERR("server address at index %d is NULL", i);
@@ -192,20 +294,25 @@ int gr_create_inst_only_primary(const char *serverAddrs, gr_instance_handle *ins
 
             if (master_id == local_instance_id) {
                 if (primary_handle != NULL) {
+                    LOG_RUN_INF("Found new primary, releasing previous connection");
                     (void)gr_delete_inst(primary_handle);
                     primary_handle = NULL;
                 }
                 primary_handle = tmp;
                 primary_master_id = master_id;
                 primary_found = 1;
-                continue;
+                
+                LOG_RUN_INF("Primary server found at %s, stopping search", addresses[i]);
+                break;
             }
         } else {
             LOG_RUN_ERR("failed to get status for server %s", addresses[i]);
         }
+        
         (void)gr_delete_inst(tmp);
     }
 
+    // 清理地址数组
     for (int i = 0; i < addrCount; i++) {
         free(addresses[i]);
     }
@@ -241,44 +348,36 @@ int gr_delete_inst(gr_instance_handle inst_handle)
 
 int gr_vfs_create(gr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag)
 {
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_instance_handle(inst_handle, "gr_vfs_create") != GR_SUCCESS ||
+        validate_string_param(vfs_name, "vfs_name", "gr_vfs_create") != GR_SUCCESS) {
         return GR_ERROR;
     }
+    
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("vfs create get conn error.");
-        return GR_ERROR;
-    }
     status_t ret = gr_vfs_create_impl(hdl->conn, vfs_name, attrFlag);
     return (int)ret;
 }
 
 int gr_vfs_delete(gr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag)
 {
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_instance_handle(inst_handle, "gr_vfs_delete") != GR_SUCCESS ||
+        validate_string_param(vfs_name, "vfs_name", "gr_vfs_delete") != GR_SUCCESS) {
         return GR_ERROR;
     }
+    
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("dremove get conn error.");
-        return GR_ERROR;
-    }
     status_t ret = gr_vfs_delete_impl(hdl->conn, vfs_name, attrFlag);
     return (int)ret;
 }
 
 int gr_vfs_mount(gr_instance_handle inst_handle, const char *vfs_name, gr_vfs_handle *vfs_handle)
 {
-    if (inst_handle == NULL || vfs_handle == NULL) {
-        LOG_RUN_ERR("instance handle or vfs_handle is NULL.");
+    if (validate_instance_handle(inst_handle, "gr_vfs_mount") != GR_SUCCESS ||
+        validate_pointer_param(vfs_handle, "vfs_handle", "gr_vfs_mount") != GR_SUCCESS ||
+        validate_string_param(vfs_name, "vfs_name", "gr_vfs_mount") != GR_SUCCESS) {
         return GR_ERROR;
     }
-    if (vfs_name == NULL || vfs_name[0] == '\0') {
-        LOG_RUN_ERR("invalid argument vfs_name.");
-        return GR_ERROR;
-    }
+    
     errno_t err = memset_s(vfs_handle, sizeof(gr_vfs_handle), 0, sizeof(gr_vfs_handle));
     if (SECUREC_UNLIKELY(err != EOK)) {
         GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
@@ -286,10 +385,6 @@ int gr_vfs_mount(gr_instance_handle inst_handle, const char *vfs_name, gr_vfs_ha
     }
 
     st_gr_instance_handle *hdl = (st_gr_instance_handle *)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("mount get conn error.");
-        return GR_ERROR;
-    }
     if (gr_check_path_exist(hdl->conn, vfs_name) != GR_SUCCESS) {
         return GR_ERROR;
     }
@@ -310,8 +405,12 @@ int gr_vfs_unmount(gr_vfs_handle *vfs_handle)
         LOG_RUN_ERR("vfs_handle is NULL.");
         return GR_ERROR;
     }
+    if (vfs_handle->handle == NULL) {
+        LOG_RUN_ERR("vfs_handle->handle is NULL.");
+        return GR_ERROR;
+    }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)vfs_handle->handle;
-    if (hdl->conn == NULL) {
+    if (hdl == NULL || hdl->conn == NULL) {
         LOG_RUN_ERR("dremove get conn error.");
         return GR_ERROR;
     }
@@ -325,12 +424,8 @@ int gr_vfs_unmount(gr_vfs_handle *vfs_handle)
 
 int gr_vfs_query_file_num(gr_vfs_handle vfs_handle, int *file_num)
 {
-    if (file_num == NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "file_num");
-        return GR_ERROR;
-    }
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_pointer_param(file_num, "file_num", "gr_vfs_query_file_num") != GR_SUCCESS ||
+        validate_vfs_handle(vfs_handle, "gr_vfs_query_file_num") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -350,12 +445,8 @@ int gr_vfs_query_file_num(gr_vfs_handle vfs_handle, int *file_num)
 
 int gr_vfs_query_file_info(gr_vfs_handle vfs_handle, gr_file_item_t *result, bool is_continue)
 {
-    if (result == NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "result");
-        return GR_ERROR;
-    }
-   if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_pointer_param(result, "result", "gr_vfs_query_file_info") != GR_SUCCESS ||
+        validate_vfs_handle(vfs_handle, "gr_vfs_query_file_info") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -374,8 +465,8 @@ int gr_vfs_query_file_info(gr_vfs_handle vfs_handle, gr_file_item_t *result, boo
 
 int gr_file_create(gr_vfs_handle vfs_handle, const char *name, const FileParameter *param)
 {
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_create") != GR_SUCCESS ||
+        validate_file_name(name, "gr_file_create") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -397,8 +488,8 @@ int gr_file_create(gr_vfs_handle vfs_handle, const char *name, const FileParamet
 
 int gr_file_delete(gr_vfs_handle vfs_handle, const char *name)
 {
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_delete") != GR_SUCCESS ||
+        validate_file_name(name, "gr_file_delete") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -414,42 +505,39 @@ int gr_file_delete(gr_vfs_handle vfs_handle, const char *name)
         return GR_ERROR;
     }
     status_t ret = gr_remove_file_impl(hdl->conn, full_name);
-    // (void)gr_clean_file_handle(file_handle);
     return (int)ret;
 }
 
 int gr_file_exist(gr_vfs_handle vfs_handle, const char *name, bool *is_exist)
 {
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
-    st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("gr_file_exist get conn error.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_exist") != GR_SUCCESS ||
+        validate_file_name(name, "gr_file_exist") != GR_SUCCESS ||
+        validate_pointer_param(is_exist, "is_exist", "gr_file_exist") != GR_SUCCESS) {
         return GR_ERROR;
     }
 
     char full_name[GR_MAX_NAME_LEN];
-    errno_t err = sprintf_s(full_name, GR_MAX_NAME_LEN, "%s/%s", vfs_handle.vfs_name, name);
-    if (SECUREC_UNLIKELY(err < 0)) {
-        GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
+    if (build_full_path(vfs_handle.vfs_name, name, full_name, sizeof(full_name), "gr_file_exist") != GR_SUCCESS) {
         return GR_ERROR;
     }
+    
+    st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     status_t ret = gr_check_file_exist(hdl->conn, full_name, is_exist);
     return (int)ret;
 }
 
 int gr_file_open(gr_vfs_handle vfs_handle, const char *name, int flag, gr_file_handle *file_handle)
 {
-    timeval_t begin_tv;
-    file_handle->fd = -1;
-
-    gr_begin_stat(&begin_tv);
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_open") != GR_SUCCESS ||
+        validate_string_param(name, "name", "gr_file_open") != GR_SUCCESS ||
+        validate_pointer_param(file_handle, "file_handle", "gr_file_open") != GR_SUCCESS) {
         return GR_ERROR;
     }
+
+    timeval_t begin_tv;
+    file_handle->fd = -1;
+    gr_begin_stat(&begin_tv);
+    
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fopen get conn error.");
@@ -479,16 +567,9 @@ int gr_file_open(gr_vfs_handle vfs_handle, const char *name, int flag, gr_file_h
 
 int gr_file_postpone(gr_vfs_handle vfs_handle, const char *file, const char *time)
 {
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
-    if (file == NULL || strlen(file) == 0) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "fileName is NULL or empty");
-        return GR_ERROR;
-    }
-    if (strpbrk(file, "\\:*?\"<>|") != NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "fileName contains invalid characters.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_postpone") != GR_SUCCESS ||
+        validate_string_param(file, "file", "gr_file_postpone") != GR_SUCCESS ||
+        validate_string_param(time, "time", "gr_file_postpone") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -511,14 +592,11 @@ int gr_get_inst_status(gr_instance_handle inst_handle,
                        int *instance_status_id, int *server_status_id,
                        int *local_instance_id, int *master_id)
 {
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
-    
-    if (instance_status_id == NULL || server_status_id == NULL ||
-        local_instance_id == NULL || master_id == NULL) {
-        LOG_RUN_ERR("Invalid parameters for gr_get_inst_status");
+    if (validate_instance_handle(inst_handle, "gr_get_inst_status") != GR_SUCCESS ||
+        validate_pointer_param(instance_status_id, "instance_status_id", "gr_get_inst_status") != GR_SUCCESS ||
+        validate_pointer_param(server_status_id, "server_status_id", "gr_get_inst_status") != GR_SUCCESS ||
+        validate_pointer_param(local_instance_id, "local_instance_id", "gr_get_inst_status") != GR_SUCCESS ||
+        validate_pointer_param(master_id, "master_id", "gr_get_inst_status") != GR_SUCCESS) {
         return GR_ERROR;
     }
     
@@ -545,13 +623,10 @@ int gr_get_inst_status(gr_instance_handle inst_handle,
 int gr_get_disk_usage(gr_instance_handle inst_handle,
                       long long *total_bytes, long long *used_bytes, long long *available_bytes)
 {
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
-    
-    if (total_bytes == NULL || used_bytes == NULL || available_bytes == NULL) {
-        LOG_RUN_ERR("Invalid parameters for gr_get_disk_usage");
+    if (validate_instance_handle(inst_handle, "gr_get_disk_usage") != GR_SUCCESS ||
+        validate_pointer_param(total_bytes, "total_bytes", "gr_get_disk_usage") != GR_SUCCESS ||
+        validate_pointer_param(used_bytes, "used_bytes", "gr_get_disk_usage") != GR_SUCCESS ||
+        validate_pointer_param(available_bytes, "available_bytes", "gr_get_disk_usage") != GR_SUCCESS) {
         return GR_ERROR;
     }
     
@@ -576,8 +651,7 @@ int gr_get_disk_usage(gr_instance_handle inst_handle,
 
 int gr_set_main_inst(const char *storageServerAddr)
 {
-    if (storageServerAddr == NULL) {
-        LOG_RUN_ERR("gr_set_main_inst get invalid parameter.");
+    if (validate_string_param(storageServerAddr, "storageServerAddr", "gr_set_main_inst") != GR_SUCCESS) {
         return GR_ERROR;
     }
 
@@ -616,26 +690,15 @@ int gr_file_close(gr_vfs_handle vfs_handle, gr_file_handle *file_handle, bool ne
 long long int gr_file_pwrite(
     gr_vfs_handle vfs_handle, gr_file_handle *file_handle, const void *buf, unsigned long long count, long long offset)
 {
-    if (count < 0) {
-        LOG_RUN_ERR("File size is invalid:%lld.", count);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "size must be a positive integer");
-        return CM_ERROR;
-    }
-    if (offset > (int64_t)GR_MAX_FILE_SIZE) {
-        LOG_RUN_ERR("Invalid parameter offset:%lld.", offset);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "offset must less than GR_MAX_FILE_SIZE");
-        return CM_ERROR;
-    }
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
-    st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("pwrite get conn error.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_pwrite") != GR_SUCCESS ||
+        validate_pointer_param(file_handle, "file_handle", "gr_file_pwrite") != GR_SUCCESS ||
+        validate_pointer_param(buf, "buf", "gr_file_pwrite") != GR_SUCCESS ||
+        validate_size_param(count, "count", "gr_file_pwrite") != GR_SUCCESS ||
+        validate_size_param(offset, "offset", "gr_file_pwrite") != GR_SUCCESS) {
         return GR_ERROR;
     }
 
+    st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     long long int ret = gr_pwrite_file_impl(hdl->conn, file_handle, buf, count, offset);
     return ret;
 }
@@ -646,18 +709,10 @@ long long int gr_file_pread(
     timeval_t begin_tv;
     gr_begin_stat(&begin_tv);
 
-    if (count < 0) {
-        LOG_RUN_ERR("File size is invalid:%lld.", count);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "size must be a positive integer");
-        return CM_ERROR;
-    }
-    if (offset > (int64_t)GR_MAX_FILE_SIZE) {
-        LOG_RUN_ERR("Invalid parameter offset:%lld.", offset);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "offset must less than GR_MAX_FILE_SIZE");
-        return CM_ERROR;
-    }
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_pread") != GR_SUCCESS ||
+        validate_pointer_param(buf, "buf", "gr_file_pread") != GR_SUCCESS ||
+        validate_size_param(count, "count", "gr_file_pread") != GR_SUCCESS ||
+        validate_size_param(offset, "offset", "gr_file_pread") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -675,8 +730,8 @@ long long int gr_file_pread(
 
 int gr_file_truncate(gr_vfs_handle vfs_handle, gr_file_handle file_handle, int truncateType, long long offset)
 {
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_truncate") != GR_SUCCESS ||
+        validate_size_param(offset, "offset", "gr_file_truncate") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -691,16 +746,12 @@ int gr_file_truncate(gr_vfs_handle vfs_handle, gr_file_handle file_handle, int t
 int gr_file_stat(
     gr_vfs_handle vfs_handle, const char *fileName, long long *offset, unsigned long long *count, int *mode, char **time)
 {
-    if (vfs_handle.handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
-    if (fileName == NULL || strlen(fileName) == 0) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "fileName is NULL or empty");
-        return GR_ERROR;
-    }
-    if (strpbrk(fileName, "\\:*?\"<>|") != NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "fileName contains invalid characters.");
+    if (validate_vfs_handle(vfs_handle, "gr_file_stat") != GR_SUCCESS ||
+        validate_string_param(fileName, "fileName", "gr_file_stat") != GR_SUCCESS ||
+        validate_pointer_param(offset, "offset", "gr_file_stat") != GR_SUCCESS ||
+        validate_pointer_param(count, "count", "gr_file_stat") != GR_SUCCESS ||
+        validate_pointer_param(mode, "mode", "gr_file_stat") != GR_SUCCESS ||
+        validate_pointer_param(time, "time", "gr_file_stat") != GR_SUCCESS) {
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
@@ -796,22 +847,21 @@ void gr_refresh_logger(char *log_field, unsigned long long *value)
 
 int gr_set_conn_timeout(int32_t timeout)
 {
-    if (timeout < 0 && timeout != GR_CONN_NEVER_TIMEOUT) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid timeout when set connection timeout");
-        return CM_ERROR;
+    if (validate_timeout_param(timeout, "gr_set_conn_timeout") != GR_SUCCESS) {
+        return GR_ERROR;
     }
     g_gr_tcp_conn_timeout = timeout;
-    return CM_SUCCESS;
+    return GR_SUCCESS;
 }
 
 int gr_set_thread_conn_timeout(gr_conn_opt_t *thv_opts, int32_t timeout)
 {
-    if (timeout < 0 && timeout != GR_CONN_NEVER_TIMEOUT) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid timeout when set connection timeout");
-        return CM_ERROR;
+    if (validate_pointer_param(thv_opts, "thv_opts", "gr_set_thread_conn_timeout") != GR_SUCCESS ||
+        validate_timeout_param(timeout, "gr_set_thread_conn_timeout") != GR_SUCCESS) {
+        return GR_ERROR;
     }
     thv_opts->timeout = timeout;
-    return CM_SUCCESS;
+    return GR_SUCCESS;
 }
 
 int gr_set_conn_opts(gr_conn_opt_key_e key, void *value, const char *addr)
@@ -826,19 +876,15 @@ int gr_set_conn_opts(gr_conn_opt_key_e key, void *value, const char *addr)
             return gr_set_thread_conn_timeout(thv_opts, *(int32_t *)value);
         default:
             GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid key when set connection options");
-            return CM_ERROR;
+            return GR_ERROR;
     }
 }
 
 int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *value)
 {
-    if (name == NULL || value == NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid name or value when set cfg");
-        return GR_ERROR;
-    }
-
-    if (strlen(name) == 0 || strlen(value) == 0) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "name or value is empty");
+    if (validate_instance_handle(inst_handle, "gr_set_conf") != GR_SUCCESS ||
+        validate_string_param(name, "name", "gr_set_conf") != GR_SUCCESS ||
+        validate_string_param(value, "value", "gr_set_conf") != GR_SUCCESS) {
         return GR_ERROR;
     }
 
@@ -846,20 +892,12 @@ int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *va
         cm_strcmpi(name, "LOG_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_MAX_FILE_SIZE") != 0 &&
         cm_strcmpi(name, "AUDIT_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_LEVEL") != 0 && 
         cm_strcmpi(name, "DATA_FILE_PATH") != 0) {
+        LOG_RUN_ERR("gr_set_conf: invalid configuration name: %s", name);
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid name when set cfg");
         return GR_ERROR;
     }
 
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("setcfg get conn error.");
-        return GR_ERROR;
-    }
-
     /* both = memory + file */
     status_t ret = gr_setcfg_impl(hdl->conn, name, value, "both");
     return (int)ret;
@@ -867,20 +905,13 @@ int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *va
 
 int gr_get_conf(gr_instance_handle inst_handle, const char *name, char *value)
 {
-    if (name == NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid name when get cfg");
-        return GR_ERROR;
-    }
-    if (inst_handle == NULL) {
-        LOG_RUN_ERR("instance handle is NULL.");
-        return GR_ERROR;
-    }
-    st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("getcfg get conn error.");
+    if (validate_instance_handle(inst_handle, "gr_get_conf") != GR_SUCCESS ||
+        validate_string_param(name, "name", "gr_get_conf") != GR_SUCCESS ||
+        validate_pointer_param(value, "value", "gr_get_conf") != GR_SUCCESS) {
         return GR_ERROR;
     }
 
+    st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
     status_t ret = gr_getcfg_impl(hdl->conn, name, value, GR_PARAM_BUFFER_SIZE);
     return (int)ret;
 }

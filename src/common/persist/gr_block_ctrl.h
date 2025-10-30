@@ -29,7 +29,7 @@
 #include "gr_au.h"
 #include "cm_latch.h"
 #include "cm_bilist.h"
-#include "gr_shm.h"
+// #include "gr_shm.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,12 +68,12 @@ typedef struct st_gr_block_ctrl {
     latch_t latch;
     gr_block_type_t type;
     gr_block_id_t block_id;
-    sh_mem_p hash_next;
-    sh_mem_p hash_prev;
+    // sh_mem_p hash_next;
+    // sh_mem_p hash_prev;
     uint32_t hash;
     bool32 has_next;
     bool32 has_prev;
-    ga_obj_id_t my_obj_id;
+    uint32_t my_obj_id;
 
     // the follow data setted or unsetted by uplayer, not by meta buf
     // the follow info need not to make sure be seen by cli-api, such as point

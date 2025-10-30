@@ -71,7 +71,7 @@ bool32 gr_session_fd_remove(gr_session_t *session, int64 fd)
             }
             session->fd_count--;
             cm_spin_unlock(&session->fd_lock);
-            cm_free(curr);
+            CM_FREE_PTR(curr);
             return CM_TRUE;
         }
         prev = curr;
@@ -113,7 +113,7 @@ void gr_session_fd_close_all(gr_session_t *session)
             closed_count++;
         }
         
-        cm_free(curr);
+        CM_FREE_PTR(curr);
         curr = next;
     }
 
@@ -135,21 +135,30 @@ status_t gr_extend_session(uint32_t extend_num)
         return CM_ERROR;
     }
     for (uint32_t i = old_alloc_sessions; i < new_alloc_sessions; i++) {
-        uint32_t objectid = ga_alloc_object(GA_SESSION_POOL, GR_INVALID_ID32);
-        if (objectid == GR_INVALID_ID32) {
-            LOG_RUN_ERR("Failed to alloc object for session %u.", i);
-            GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "Failed to alloc object for session %u.", i);
+        g_gr_session_ctrl.sessions[i] = (gr_session_t *)cm_malloc(sizeof(gr_session_t));
+        if (g_gr_session_ctrl.sessions[i] == NULL) {
+            LOG_RUN_ERR("Failed to alloc memory for session %u.", i);
+            GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "Failed to alloc memory for session %u.", i);
             return CM_ERROR;
         }
-        LOG_DEBUG_INF("Alloc object %u for session %u.", objectid, i);
-        g_gr_session_ctrl.sessions[i] = (gr_session_t *)ga_object_addr(GA_SESSION_POOL, objectid);
+        
+        errno_t err = memset_s(g_gr_session_ctrl.sessions[i], sizeof(gr_session_t), 0, sizeof(gr_session_t));
+        if (err != EOK) {
+            LOG_RUN_ERR("Failed to initialize session %u memory.", i);
+            CM_FREE_PTR(g_gr_session_ctrl.sessions[i]);
+            GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "Failed to initialize session %u memory.", i);
+            return CM_ERROR;
+        }
+        
         g_gr_session_ctrl.sessions[i]->id = i;
         g_gr_session_ctrl.sessions[i]->is_used = CM_FALSE;
         g_gr_session_ctrl.sessions[i]->is_closed = CM_TRUE;
         g_gr_session_ctrl.sessions[i]->put_log = CM_FALSE;
-        g_gr_session_ctrl.sessions[i]->objectid = objectid;
+        g_gr_session_ctrl.sessions[i]->objectid = i;
         g_gr_session_ctrl.sessions[i]->is_holding_hotpatch_latch = CM_FALSE;
         g_gr_session_ctrl.alloc_sessions++;
+        
+        LOG_DEBUG_INF("Allocated session %u successfully.", i);
     }
     LOG_RUN_INF("Succeed to extend sessions to %u.", g_gr_session_ctrl.alloc_sessions);
     return CM_SUCCESS;
@@ -160,7 +169,7 @@ status_t gr_init_session_pool(uint32_t max_session_num)
     uint32_t gr_session_size = (uint32_t)(max_session_num * sizeof(gr_session_t *));
     g_gr_session_ctrl.sessions = cm_malloc(gr_session_size);
     if (g_gr_session_ctrl.sessions == NULL) {
-        return ERR_GR_GA_INIT;
+        return ERR_GR_SESSION_CREATE;
     }
     errno_t errcode = memset_s(g_gr_session_ctrl.sessions, gr_session_size, 0, gr_session_size);
     securec_check_ret(errcode);
@@ -376,186 +385,6 @@ bool32 gr_unlock_shm_meta_s_with_stack(gr_session_t *session, gr_shared_latch_t 
     return CM_TRUE;
 }
 
-static void gr_clean_latch_s_without_bak(gr_session_t *session, gr_shared_latch_t *shared_latch)
-{
-    LOG_DEBUG_INF("Clean sid:%u latch_stack old stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-    session->latch_stack.latch_offset_stack[session->latch_stack.stack_top].type = GR_LATCH_OFFSET_INVALID;
-    LOG_DEBUG_INF("Clean sid:%u latch_stack new stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-}
-
-static void gr_clean_latch_s_with_bak(gr_session_t *session, gr_shared_latch_t *shared_latch)
-{
-    LOG_DEBUG_INF("Clean sid:%u shared_latch old count:%hu, old stat:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        shared_latch->latch.shared_count, shared_latch->latch.stat);
-
-    // do not care about the new value, just using the shared_count_bak
-    shared_latch->latch.shared_count = shared_latch->latch_extent.shared_count_bak;
-    shared_latch->latch.stat = shared_latch->latch_extent.stat_bak;
-    shared_latch->latch_extent.shared_sid_count = shared_latch->latch_extent.shared_sid_count_bak;
-
-    if (shared_latch->latch.shared_count == 0) {
-        if (shared_latch->latch.stat == LATCH_STATUS_S) {
-            shared_latch->latch.stat = LATCH_STATUS_IDLE;
-        }
-        shared_latch->latch.sid = 0;
-    }
-
-    LOG_DEBUG_INF("Clean sid:%u latch_stack old stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-
-    LOG_DEBUG_INF("Clean sid:%u shared_latch new count:%hu, new stat:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        shared_latch->latch.shared_count, shared_latch->latch.stat);
-
-    // not sure last latch finish, so using the stack_top_bak
-    session->latch_stack.stack_top = session->latch_stack.stack_top_bak;
-    // when latch first, and not finish, the stack_top may be zero
-    if (session->latch_stack.stack_top > 0) {
-        session->latch_stack.latch_offset_stack[session->latch_stack.stack_top - 1].type = GR_LATCH_OFFSET_INVALID;
-        session->latch_stack.stack_top--;
-    } else {
-        session->latch_stack.latch_offset_stack[session->latch_stack.stack_top].type = GR_LATCH_OFFSET_INVALID;
-    }
-    LOG_DEBUG_INF("Clean sid:%u latch_stack new stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-}
-
-static void gr_clean_unlatch_without_bak(gr_session_t *session, gr_shared_latch_t *shared_latch)
-{
-    LOG_DEBUG_INF("Clean sid:%u unlatch shared_latch without bak, old count:%hu, old stat:%u.",
-        GR_SESSIONID_IN_LOCK(session->id), shared_latch->latch.shared_count, shared_latch->latch.stat);
-
-    CM_ASSERT(shared_latch->latch.shared_count > 0);
-    shared_latch->latch.shared_count--;
-    shared_latch->latch_extent.shared_sid_count -= GR_SESSIONID_IN_LOCK(session->id);
-
-    if (shared_latch->latch.shared_count == 0) {
-        if (shared_latch->latch.stat == LATCH_STATUS_S) {
-            shared_latch->latch.stat = LATCH_STATUS_IDLE;
-        }
-        shared_latch->latch.sid = 0;
-    }
-
-    LOG_DEBUG_INF("Clean sid:%u shared_latch new count:%hu, new stat:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        shared_latch->latch.shared_count, shared_latch->latch.stat);
-
-    LOG_DEBUG_INF("Clean sid:%u latch_stack old stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-    CM_ASSERT(session->latch_stack.stack_top > 0);
-    session->latch_stack.latch_offset_stack[session->latch_stack.stack_top - 1].type = GR_LATCH_OFFSET_INVALID;
-    session->latch_stack.stack_top--;
-    LOG_DEBUG_INF("Clean sid:%u latch_stack new stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-}
-
-static void gr_clean_unlatch_with_bak(gr_session_t *session, gr_shared_latch_t *shared_latch)
-{
-    LOG_DEBUG_INF("Clean sid:%u unlatch shared_latch with bak, old count:%hu, old stat:%u.",
-        GR_SESSIONID_IN_LOCK(session->id), shared_latch->latch.shared_count, shared_latch->latch.stat);
-    // not sure last unlatch finsh, using the shared_count_bak first
-    shared_latch->latch.shared_count = shared_latch->latch_extent.shared_count_bak;
-    shared_latch->latch.stat = shared_latch->latch_extent.stat_bak;
-    shared_latch->latch_extent.shared_sid_count = shared_latch->latch_extent.shared_sid_count_bak;
-
-    CM_ASSERT(shared_latch->latch.shared_count > 0);
-    shared_latch->latch.shared_count--;
-    shared_latch->latch_extent.shared_sid_count -= GR_SESSIONID_IN_LOCK(session->id);
-
-    if (shared_latch->latch.shared_count == 0) {
-        if (shared_latch->latch.stat == LATCH_STATUS_S) {
-            shared_latch->latch.stat = LATCH_STATUS_IDLE;
-        }
-        shared_latch->latch.sid = 0;
-    }
-    LOG_DEBUG_INF("Clean sid:%u shared_latch new count:%hu, new stat:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        shared_latch->latch.shared_count, shared_latch->latch.stat);
-
-    LOG_DEBUG_INF("Clean sid:%u latch_stack old stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-    // not sure last unlatch finish, so using the stack_top_bak
-    session->latch_stack.stack_top = session->latch_stack.stack_top_bak;
-    CM_ASSERT(session->latch_stack.stack_top > 0);
-    session->latch_stack.latch_offset_stack[session->latch_stack.stack_top - 1].type = GR_LATCH_OFFSET_INVALID;
-    session->latch_stack.stack_top--;
-    LOG_DEBUG_INF("Clean sid:%u latch_stack new stack_top:%u.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.stack_top);
-}
-
-static void gr_clean_last_op_with_lock(gr_session_t *session, gr_shared_latch_t *shared_latch)
-{
-    CM_ASSERT(GR_SESSIONID_IN_LOCK(session->id) == shared_latch->latch.lock);
-
-    LOG_DEBUG_INF("Clean sid:%u last op with lock latch_stack op:%u, stack_top_bak:%hu.",
-        GR_SESSIONID_IN_LOCK(session->id), session->latch_stack.op, session->latch_stack.stack_top_bak);
-
-    LOG_DEBUG_INF("Clean sid:%u latch_extent stat_bak:%hu, shared_count_bak:%hu.", GR_SESSIONID_IN_LOCK(session->id),
-        shared_latch->latch_extent.stat_bak, shared_latch->latch_extent.shared_count_bak);
-
-    // step 1, try to clean
-    // no backup, no change
-    if (session->latch_stack.op == LATCH_SHARED_OP_LATCH_S) {
-        gr_clean_latch_s_without_bak(session, shared_latch);
-        // when latch with backup, undo the latch witch backup
-    } else if (session->latch_stack.op == LATCH_SHARED_OP_LATCH_S_BEG ||
-               session->latch_stack.op == LATCH_SHARED_OP_LATCH_S_END) {
-        gr_clean_latch_s_with_bak(session, shared_latch);
-        // when unlatch, no backup, no change, redo the unlatch without backup
-    } else if (session->latch_stack.op == LATCH_SHARED_OP_UNLATCH) {
-        gr_clean_unlatch_without_bak(session, shared_latch);
-        // when unlatch not finish with backup, redo unlatch with backup
-    } else if (session->latch_stack.op == LATCH_SHARED_OP_UNLATCH_BEG) {
-        gr_clean_unlatch_with_bak(session, shared_latch);
-    }
-
-    session->latch_stack.op = LATCH_SHARED_OP_UNLATCH_END;
-    // step2
-    cm_spin_unlock(&shared_latch->latch.lock);
-}
-
-static void gr_clean_last_op_without_lock(gr_session_t *session, gr_shared_latch_t *shared_latch)
-{
-    if (session->latch_stack.op == LATCH_SHARED_OP_NONE || session->latch_stack.op == LATCH_SHARED_OP_LATCH_S) {
-        session->latch_stack.latch_offset_stack[session->latch_stack.stack_top].type = GR_LATCH_OFFSET_INVALID;
-        session->latch_stack.op = LATCH_SHARED_OP_UNLATCH_END;
-        LOG_DEBUG_INF("Clean sid:%u reset to latch_stack op:%u, stack_top:%hu.", GR_SESSIONID_IN_LOCK(session->id),
-            session->latch_stack.op, session->latch_stack.stack_top);
-        // LATCH_SHARED_OP_UNLATCH_BEG and not in lock, means has finished to unlatch the latch,
-        // but not finished to set lack_stack[stack_top].type
-    } else if (session->latch_stack.op == LATCH_SHARED_OP_UNLATCH_BEG) {
-        CM_ASSERT(session->latch_stack.stack_top > 0);
-        session->latch_stack.latch_offset_stack[session->latch_stack.stack_top - 1].type = GR_LATCH_OFFSET_INVALID;
-        session->latch_stack.stack_top--;
-        session->latch_stack.op = LATCH_SHARED_OP_UNLATCH_END;
-        LOG_DEBUG_INF("Clean sid:%u reset to latch_stack op:%u, stack_top:%hu.", GR_SESSIONID_IN_LOCK(session->id),
-            session->latch_stack.op, session->latch_stack.stack_top);
-    }
-}
-
-static bool32 gr_clean_lock_for_shm_meta(gr_session_t *session, gr_shared_latch_t *shared_latch, bool32 is_daemon)
-{
-    LOG_DEBUG_INF("Clean sid:%u latch_stack op:%u, stack_top:%hu.", GR_SESSIONID_IN_LOCK(session->id),
-        session->latch_stack.op, session->latch_stack.stack_top);
-    // last op between lock & unlock for this latch not finish
-    if (GR_SESSIONID_IN_LOCK(session->id) == shared_latch->latch.lock) {
-        gr_clean_last_op_with_lock(session, shared_latch);
-        // if last op not happen, or latch not begin
-    } else if (session->latch_stack.op == LATCH_SHARED_OP_NONE || session->latch_stack.op == LATCH_SHARED_OP_LATCH_S ||
-               session->latch_stack.op == LATCH_SHARED_OP_UNLATCH_BEG) {
-        gr_clean_last_op_without_lock(session, shared_latch);
-        // otherwise unlatch the latch
-    } else {
-        // may exist other session lock but dead after last check the lsat->spin_lock, so if it's daemon, do lock with
-        // try this
-        if (is_daemon) {
-            LOG_DEBUG_INF("Clean sid:%u latch_stack op:%u, stack_top:%hu wait next try.",
-                GR_SESSIONID_IN_LOCK(session->id), session->latch_stack.op, session->latch_stack.stack_top);
-            return gr_unlock_shm_meta_s_with_stack(session, shared_latch, CM_TRUE);
-        }
-        (void)gr_unlock_shm_meta_s_with_stack(session, shared_latch, CM_FALSE);
-    }
-    return CM_TRUE;
-}
 
 static bool32 gr_need_clean_session_latch(gr_session_t *session, uint64 cli_pid, int64 start_time)
 {
@@ -567,15 +396,11 @@ static bool32 gr_need_clean_session_latch(gr_session_t *session, uint64 cli_pid,
 
 void gr_clean_session_latch(gr_session_t *session, bool32 is_daemon)
 {
-    int32_t i = 0;
-    sh_mem_p offset;
-    int32_t latch_place;
-    gr_latch_offset_type_e offset_type;
-    gr_shared_latch_t *shared_latch = NULL;
     if (!session->is_direct) {
         LOG_DEBUG_INF("Clean sid:%u is not direct.", GR_SESSIONID_IN_LOCK(session->id));
         return;
     }
+    
     uint64 cli_pid = session->cli_info.cli_pid;
     int64 start_time = session->cli_info.start_time;
     if (is_daemon && !gr_need_clean_session_latch(session, cli_pid, start_time)) {
@@ -583,57 +408,13 @@ void gr_clean_session_latch(gr_session_t *session, bool32 is_daemon)
             session->id, cli_pid, start_time, session->cli_info.process_name);
         return;
     }
+    
     LOG_RUN_INF("[CLEAN_LATCH]session id %u, pid %llu, start_time %lld, process name:%s in lock.", session->id, cli_pid,
         start_time, session->cli_info.process_name);
-    LOG_DEBUG_INF("Clean sid:%u latch_stack op:%u, stack_top:%hu.", GR_SESSIONID_IN_LOCK(session->id),
+    
+    LOG_DEBUG_INF("Clean sid:%u latch_stack op:%u, stack_top:%hu completed (simplified).", GR_SESSIONID_IN_LOCK(session->id),
         session->latch_stack.op, session->latch_stack.stack_top);
     
-    if (session->latch_stack.stack_top == GR_MAX_LATCH_STACK_BOTTON) {
-        LOG_DEBUG_INF("Clean sid:%u latch_stack is empty, nothing to clean.", GR_SESSIONID_IN_LOCK(session->id));
-        return;
-    }
-    
-    for (i = (int32_t)session->latch_stack.stack_top; i >= GR_MAX_LATCH_STACK_BOTTON; i--) {
-        // the stack_top may NOT be moveed to the right place
-        if (i == GR_MAX_LATCH_STACK_DEPTH) {
-            latch_place = i - 1;
-        } else {
-            latch_place = i;
-        }
-        offset_type = session->latch_stack.latch_offset_stack[latch_place].type;
-        // the stack_top may be the right invalid or latch not finish to set offset_type
-        // or unlatch not over, just finish unlatch the latch, but not set offset_type
-        if (offset_type != GR_LATCH_OFFSET_SHMOFFSET) {
-            LOG_RUN_ERR("Clean sid:%u shared_latch offset type is invalid %u,latch_place:%d.",
-                GR_SESSIONID_IN_LOCK(session->id), session->latch_stack.latch_offset_stack[latch_place].type,
-                latch_place);
-            if (session->latch_stack.op == LATCH_SHARED_OP_UNLATCH_BEG && i != (int32_t)session->latch_stack.stack_top) {
-                session->latch_stack.stack_top = latch_place;
-                session->latch_stack.op = LATCH_SHARED_OP_UNLATCH_END;
-            }
-            LOG_DEBUG_INF("Clean sid:%u reset to latch_stack op:%u, stack_top:%hu.", GR_SESSIONID_IN_LOCK(session->id),
-                session->latch_stack.op, session->latch_stack.stack_top);
-            continue;
-        } else {
-            offset = session->latch_stack.latch_offset_stack[latch_place].offset.shm_offset;
-            CM_ASSERT(offset != SHM_INVALID_ADDR);
-            shared_latch = (gr_shared_latch_t *)OFFSET_TO_ADDR(offset);
-            LOG_DEBUG_INF("Clean sid:%u shared_latch,latch_place:%d, offset:%llu.", GR_SESSIONID_IN_LOCK(session->id),
-                latch_place, (uint64)offset);
-        }
-        // the lock is locked by this session in the dead-client,
-        if (is_daemon && shared_latch->latch.lock != 0 &&
-            GR_SESSIONID_IN_LOCK(session->id) != shared_latch->latch.lock) {
-            LOG_DEBUG_INF("Clean sid:%u daemon wait next time to clean.", GR_SESSIONID_IN_LOCK(session->id));
-            return;
-        } else {
-            bool32 is_clean = gr_clean_lock_for_shm_meta(session, shared_latch, is_daemon);
-            if (!is_clean) {
-                LOG_DEBUG_INF("Clean sid:%u daemon wait next time to clean.", GR_SESSIONID_IN_LOCK(session->id));
-                return;
-            }
-        }
-    }
     session->latch_stack.op = LATCH_SHARED_OP_NONE;
     session->latch_stack.stack_top = GR_MAX_LATCH_STACK_BOTTON;
 }
@@ -670,10 +451,9 @@ void gr_server_session_unlock(gr_session_t *session)
 void cm_spin_lock_init(spinlock_t *lock)
 {
     CM_ASSERT(lock != NULL);
-    *lock = 0;  // 初始化为未锁定状态
+    *lock = 0;
 }
 
-// 初始化hash管理器
 status_t init_session_hash_mgr(gr_session_t *session)
 {
     session_hash_mgr_t *mgr = &session->hash_mgr;

@@ -42,16 +42,6 @@ extern "C" {
 typedef struct st_gr_conn gr_conn_t; 
 typedef struct st_gr_conn_opt gr_conn_opt_t;
 
-typedef struct st_gr_rw_param {
-    gr_conn_t *conn;
-    int32_t handle;
-    gr_env_t *gr_env;
-    gr_file_context_t *context;
-    int64 offset;
-    bool32 atom_oper;
-    bool32 is_read;
-} gr_rw_param_t;
-
 typedef struct st_gr_load_ctrl_info {
     const char *vg_name;
     uint32_t index;
@@ -179,7 +169,11 @@ typedef struct st_gr_mount_vfs_info {
 typedef struct st_gr_get_server_info {
     char *home;
     uint32_t objectid;
+    bool32 hash_auth_enable;  // 添加HASH_AUTH_ENABLE参数
 } gr_get_server_info_t;
+
+// 获取连接中的HASH_AUTH_ENABLE参数
+bool32 gr_get_conn_hash_auth_enable(gr_conn_t *conn);
 
 typedef struct st_gr_fallocate_info {
     uint64 fid;
@@ -210,7 +204,6 @@ typedef struct {
 #define GRAPI_BLOCK_SIZE 512
 #define GR_HOME "GR_HOME"
 #define SYS_HOME "HOME"
-#define GR_DEFAULT_UDS_PATH "UDS:/tmp/.gr_unix_d_socket"
 #define SESSION_LOCK_TIMEOUT 500 // tickets
 
 status_t gr_connect(const char *server_locator, gr_conn_opt_t *options, gr_conn_t *conn);
@@ -264,8 +257,6 @@ status_t gr_get_disk_usage_impl(gr_conn_t *conn, gr_disk_usage_info_t *info);
         }                                         \
     } while (0)
 
-#define GR_UNLOCK_VG_META_S(vg_item, session) \
-    (void)gr_unlock_shm_meta_s_with_stack((session), (vg_item)->vg_latch, CM_FALSE)
 
 #ifdef __cplusplus
 }
