@@ -64,13 +64,6 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_OAMAP_INSERT] = "Failed to insert hash map ",
     [ERR_GR_OAMAP_INSERT_DUP_KEY] = "Hash map duplicated key",
     [ERR_GR_OAMAP_FETCH] = "Failed to fetch hash map",
-    [ERR_GR_SHM_CREATE] = "Failed to create shared memory, key=0x%08x, size=%llu",
-    [ERR_GR_SHM_CHECK] = "Failed to check shared memory ctrl, key=0x%08x, reason=%s",
-    [ERR_GR_SHM_LOCK] = "Failed to lock vg shared memory, reason=%s",
-    [ERR_GR_SHM_LOCK_TIMEOUT] = "Try to get shm lock timeout",
-    [ERR_GR_GA_INIT] = "GR ga init error, reason %s",
-    [ERR_GR_GA_GET_ADDR] = "GR ga get addr error, pool id %d, object id%u.",
-    [ERR_GR_GA_ALLOC_OBJECT] = "GR ga alloc object error, pool id %d.",
     [ERR_GR_SESSION_INVALID_ID] = "Invalid session %d",
     [ERR_GR_SESSION_CREATE] = "Create new GR session failed, no free sessions, %d sessions used.",
     [ERR_GR_SESSION_EXTEND] = "Extend GR session failed, reason : %s.",
@@ -85,8 +78,8 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_MES_ILL] = "GR message contact error, reason %s",
     [ERR_GR_STRING_TOO_LONG] = "The length(%u) of text can't be larger than %u, text = %s",
     [ERR_GR_TCP_TIMEOUT_REMAIN] = "Waiting for request head(size) timeout, %d bytes remained",
-    [ERR_GR_UDS_INVALID_URL] = "Invalid unix domain socket url:%s, length %d. \
-                                Eg:server_locator=\"UDS:UNIX_emserver.domain\"",
+    [ERR_GR_TCP_INVALID_URL] = "Invalid tcp url:%s, length %d. \
+                                Eg:server_locator=\"TCP:127.0.0.1:8080\"",
     [ERR_GR_RECV_MSG_FAILED] = "Recv msg failed, errcode:%d, inst:%u.",
     [ERR_GR_INIT_LOGGER_FAILED] = "Log init failed.",
     [ERR_GR_OUT_OF_MEM] = "Failed to apply for memory.",
@@ -103,9 +96,10 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_RECOVER_CAUSE_BREAK] = "Req break by recovery.",
     [ERR_GR_FILE_SYSTEM_ERROR] = "File system error, reason %m.",
     [ERR_GR_CONNECTION_CLOSED] = "GR connection is closed",
-    [ERR_GR_MEM_CMP_FAILED] = "failed to memcpy compare",
+    [ERR_GR_MEM_CMP_FAILED] = "pwrite failed to compare hash",
     [ERR_GR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s.",
-    [ERR_GR_WHITELIST_INVALID] = "GR handshake rejected: IP %s not in whitelist"
+    [ERR_GR_WHITELIST_INVALID] = "GR handshake rejected: IP %s not in whitelist",
+    [ERR_GR_CALL_SERVER_FAILED] = "gr client call server failed."
 };
 
 gr_log_def_t g_gr_cmd_log[] = {
@@ -261,6 +255,7 @@ static status_t gr_load_log_compressed(gr_config_t *inst_cfg, log_param_t *log_p
     LOG_RUN_INF("LOG_COMPRESSED = %u.", log_param->log_compressed);
     return CM_SUCCESS;
 }
+
 static status_t gr_init_loggers_inner(gr_config_t *inst_cfg, log_param_t *log_param)
 {
     uint32_t val_uint32;

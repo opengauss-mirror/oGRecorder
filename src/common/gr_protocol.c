@@ -275,6 +275,7 @@ status_t gr_call_ex(cs_pipe_t *pipe, gr_packet_t *req, gr_packet_t *ack)
     status_t ret = gr_call_base(pipe, req, ack);
     if (ret != CM_SUCCESS) {
         LOG_RUN_ERR("[GR] ABORT INFO: gr call server failed, ack command type:%d, application exit.", ack->head->cmd);
+        GR_THROW_ERROR(ERR_GR_CALL_SERVER_FAILED);
         cs_disconnect(pipe);
         cm_fync_logfile();
     }

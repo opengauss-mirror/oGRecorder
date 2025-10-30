@@ -76,8 +76,6 @@ static config_item_t g_gr_params[] = {
         NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"GR_CM_SO_NAME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"SHM_KEY", CM_TRUE, ATTR_READONLY, "1", NULL, NULL, "-", "[1,64]", "GS_TYPE_INTEGER",
-        NULL, 4, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Logging Configuration ====================
     {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
@@ -122,28 +120,40 @@ static config_item_t g_gr_params[] = {
         NULL, 22, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SSL_PERIOD_DETECTION", CM_TRUE, ATTR_READONLY, "7", NULL, NULL, "-", "[1,180]", "GS_TYPE_INTEGER",
         NULL, 23, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"HASH_AUTH_ENABLE", CM_TRUE, ATTR_NONE, "TRUE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
+        NULL, 24, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+
+    // ==================== Server SSL Configuration ====================
+    {"SER_SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 38, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SER_SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 39, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SER_SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 40, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"SER_SSL_CRL", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 41, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Network and Cluster Configuration ====================
     {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 24, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
+        NULL, 25, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
     {"INTERCONNECT_TYPE", CM_TRUE, ATTR_READONLY, "TCP", NULL, NULL, "-", "TCP,RDMA", "GS_TYPE_VARCHAR",
-        NULL, 25, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"INTERCONNECT_CHANNEL_NUM", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,32]", "GS_TYPE_INTEGER",
         NULL, 26, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"MES_WITH_IP", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
+    {"INTERCONNECT_CHANNEL_NUM", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,32]", "GS_TYPE_INTEGER",
         NULL, 27, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"MES_WITH_IP", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
+        NULL, 28, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"IP_WHITE_LIST", CM_TRUE, ATTR_NONE, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 28, EFFECT_IMMEDIATELY, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 29, EFFECT_IMMEDIATELY, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Performance and Thread Configuration ====================
     {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
-        NULL, 29, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"IO_THREADS", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,8]", "GS_TYPE_INTEGER",
         NULL, 30, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER",
+    {"IO_THREADS", CM_TRUE, ATTR_READONLY, "2", NULL, NULL, "-", "[1,8]", "GS_TYPE_INTEGER",
         NULL, 31, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"MES_WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER",
+    {"WORK_THREADS", CM_TRUE, ATTR_READONLY, "16", NULL, NULL, "-", "[16,128]", "GS_TYPE_INTEGER",
         NULL, 32, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"MES_WORK_THREAD_COUNT", CM_TRUE, ATTR_READONLY, "8", NULL, NULL, "-", "[2,64]", "GS_TYPE_INTEGER",
+        NULL, 33, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Message and Memory Configuration ====================
     {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER",
@@ -157,7 +167,6 @@ static config_item_t g_gr_params[] = {
 };
 
 static const char *g_gr_config_file = (const char *)"gr_inst.ini";
-static const char *g_gr_ser_config_file = (const char *)"gr_ser_inst.ini";
 static const char *g_gr_cli_config_file = (const char *)"gr_cli_inst.ini";
 #define GR_PARAM_COUNT (sizeof(g_gr_params) / sizeof(config_item_t))
 #define GR_CERT_PARAM_COUNT (sizeof(g_gr_ssl_params) / sizeof(config_item_t))
@@ -325,6 +334,20 @@ static status_t gr_load_data_file_path(gr_config_t *inst_cfg)
             CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "failed to load params, invalid DATA_FILE_PATH"));
     }
 
+    return CM_SUCCESS;
+}
+
+static status_t gr_load_hash_auth_enable(gr_config_t *inst_cfg)
+{
+    char *value = cm_get_config_value(&inst_cfg->config, "HASH_AUTH_ENABLE");
+    if (cm_str_equal_ins(value, "TRUE")) {
+        inst_cfg->params.hash_auth_enable = CM_TRUE;
+    } else if (cm_str_equal_ins(value, "FALSE")) {
+        inst_cfg->params.hash_auth_enable = CM_FALSE;
+    } else {
+        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "HASH_AUTH_ENABLE"));
+    }
+    LOG_DEBUG_INF("HASH_AUTH_ENABLE status: %u. (0: off, 1: on)", inst_cfg->params.hash_auth_enable);
     return CM_SUCCESS;
 }
 
@@ -524,9 +547,32 @@ static status_t gr_load_instance_id(gr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-// 白名单IP地址结构
 #define GR_MAX_WHITE_LIST_COUNT 64
 #define GR_MAX_IP_RANGE_LEN 32
+#define MAX_IPV4_PREFIX_LEN 32
+#define MIN_IPV4_PREFIX_LEN 0
+
+// 工具函数：去除字符串前后空格和制表符
+static void trim_whitespace(char *str) {
+    if (str == NULL) return;
+    
+    // 去除前导空格和制表符
+    char *start = str;
+    while (*start == ' ' || *start == '\t') {
+        start++;
+    }
+    
+    // 去除尾随空格和制表符
+    char *end = start + strlen(start) - 1;
+    while (end > start && (*end == ' ' || *end == '\t')) {
+        *end-- = '\0';
+    }
+    
+    // 如果字符串被移动，需要复制回来
+    if (start != str) {
+        memmove(str, start, strlen(start) + 1);
+    }
+}
 
 typedef struct st_ip_whitelist_entry {
     char ip_addr[CM_MAX_IP_LEN];
@@ -543,22 +589,20 @@ typedef struct st_ip_whitelist {
 
 static ip_whitelist_t g_ip_whitelist = {0};
 
-// 解析IP范围 (支持: 192.168.1.100, 192.168.1.0/24, 192.168.1.*)
 static status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
 {
     char temp_str[CM_MAX_IP_LEN];
     char *slash_pos, *star_pos;
     
-    if (strlen(ip_str) >= CM_MAX_IP_LEN) {
+    size_t ip_len = strlen(ip_str);
+    if (ip_len >= CM_MAX_IP_LEN) {
         return CM_ERROR;
     }
     
     strcpy_s(temp_str, CM_MAX_IP_LEN, ip_str);
     
-    // 检查通配符格式 (192.168.1.* 或 192.168.*.*)  
     star_pos = strchr(temp_str, '*');
     if (star_pos != NULL) {
-        // 将*替换为0，并根据*的位置确定掩码
         char *dot_count = temp_str;
         int dots = 0;
         while (*dot_count) {
@@ -566,7 +610,6 @@ static status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
             dot_count++;
         }
         
-        // 替换*为0来构建网络地址
         char network_ip[CM_MAX_IP_LEN];
         strcpy_s(network_ip, CM_MAX_IP_LEN, temp_str);
         char *p = network_ip;
@@ -577,7 +620,6 @@ static status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
         
         strcpy_s(entry->ip_addr, CM_MAX_IP_LEN, network_ip);
         
-        // 根据*的位置生成掩码
         if (strstr(temp_str, "*.*.*") != NULL) {
             // a.*.*.*  -> /8
             strcpy_s(entry->subnet_mask, CM_MAX_IP_LEN, "255.0.0.0");
@@ -593,18 +635,16 @@ static status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
         return CM_SUCCESS;
     }
     
-    // 检查CIDR格式 (192.168.1.0/24)
     slash_pos = strchr(temp_str, '/');
     if (slash_pos != NULL) {
         *slash_pos = '\0';
         strcpy_s(entry->ip_addr, CM_MAX_IP_LEN, temp_str);
         
         int prefix_len = atoi(slash_pos + 1);
-        if (prefix_len <= 0 || prefix_len > 32) {
+        if (prefix_len <= MIN_IPV4_PREFIX_LEN || prefix_len > MAX_IPV4_PREFIX_LEN) {
             return CM_ERROR;
         }
         
-        // 生成子网掩码
         uint32 mask = 0xFFFFFFFF << (32 - prefix_len);
         snprintf_s(entry->subnet_mask, CM_MAX_IP_LEN, CM_MAX_IP_LEN - 1, 
                   "%d.%d.%d.%d", 
@@ -616,13 +656,11 @@ static status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
         return CM_SUCCESS;
     }
     
-    // 单个IP地址
     strcpy_s(entry->ip_addr, CM_MAX_IP_LEN, temp_str);
     entry->is_range = CM_FALSE;
     return CM_SUCCESS;
 }
 
-// 检查IPv4地址是否在白名单中
 static bool32 is_ip_in_whitelist(const char *client_ip)
 {
     struct sockaddr_in client_addr;
@@ -662,7 +700,6 @@ static bool32 is_ip_in_whitelist(const char *client_ip)
     return CM_FALSE;
 }
 
-// 加载白名单IP地址列表
 static status_t gr_load_ip_white_list_addrs(gr_config_t *inst_cfg)
 {
     char *value = cm_get_config_value(&inst_cfg->config, "IP_WHITE_LIST");
@@ -672,12 +709,11 @@ static status_t gr_load_ip_white_list_addrs(gr_config_t *inst_cfg)
     char temp_value[1024];
     strcpy_s(temp_value, sizeof(temp_value), value);
     
+    // 解析IP白名单条目
     char *token = strtok(temp_value, ",;");
     while (token != NULL && g_ip_whitelist.count < GR_MAX_WHITE_LIST_COUNT) {
-        // 去除前后空格
-        while (*token == ' ' || *token == '\t') token++;
-        char *end = token + strlen(token) - 1;
-        while (end > token && (*end == ' ' || *end == '\t')) *end-- = '\0';
+        // 去除前后空格和制表符
+        trim_whitespace(token);
         
         if (strlen(token) > 0) {
             if (parse_ip_range(token, &g_ip_whitelist.entries[g_ip_whitelist.count]) == CM_SUCCESS) {
@@ -714,21 +750,6 @@ static status_t gr_load_mes_with_ip(gr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-static status_t gr_load_shm_key(gr_config_t *inst_cfg)
-{
-    char *value = cm_get_config_value(&inst_cfg->config, "SHM_KEY");
-    // 单个机器上最多允许(1<<GR_MAX_SHM_KEY_BITS)这么多个用户并发使用wr的范围的ipc key，这样是为了防止重叠
-    // key组成为: (((基础_SHM_KEY << GR_MAX_SHM_KEY_BITS)      + inst_id) << 16) | 实际的业务id，
-    // 实际的业务id具体范围现在分为[1,2][3,18],[19,20496]
-    status_t status = cm_str2uint32(value, &inst_cfg->params.shm_key);
-    GR_RETURN_IFERR2(status, LOG_RUN_ERR("invalid parameter value of 'SHM_KEY', value:%s.", value));
-
-    if (inst_cfg->params.shm_key < GR_MIN_SHM_KEY || inst_cfg->params.shm_key > GR_MAX_SHM_KEY) {
-        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "the value of 'SHM_KEY' is invalid"));
-    }
-    LOG_RUN_INF("SHM_KEY is %u.", inst_cfg->params.shm_key);
-    return CM_SUCCESS;
-}
 
 status_t gr_load_delay_clean_interval_core(char *value, gr_config_t *inst_cfg)
 {
@@ -753,19 +774,19 @@ static status_t gr_load_delay_clean_interval(gr_config_t *inst_cfg)
 
 status_t gr_load_ser_ssl_params(gr_config_t *inst_cfg)
 {
-    char *value = cm_get_config_value(&inst_cfg->ssl_ser_config, "SER_SSL_CA");
+    char *value = cm_get_config_value(&inst_cfg->config, "SER_SSL_CA");
     status_t status = gr_set_cert_param("SER_SSL_CA", value);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CA"));
 
-    value = cm_get_config_value(&inst_cfg->ssl_ser_config, "SER_SSL_KEY");
+    value = cm_get_config_value(&inst_cfg->config, "SER_SSL_KEY");
     status = gr_set_cert_param("SER_SSL_KEY", value);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_KEY"));
 
-    value = cm_get_config_value(&inst_cfg->ssl_ser_config, "SER_SSL_CERT");
+    value = cm_get_config_value(&inst_cfg->config, "SER_SSL_CERT");
     status = gr_set_cert_param("SER_SSL_CERT", value);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CERT"));
 
-    value = cm_get_config_value(&inst_cfg->ssl_ser_config, "SER_SSL_CRL");
+    value = cm_get_config_value(&inst_cfg->config, "SER_SSL_CRL");
     status = gr_set_cert_param("SER_SSL_CRL", value);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CRL"));
 
@@ -774,17 +795,7 @@ status_t gr_load_ser_ssl_params(gr_config_t *inst_cfg)
 
 status_t gr_load_ser_ssl_config(gr_config_t *inst_cfg)
 {
-    char file_name[GR_FILE_NAME_BUFFER_SIZE];
-    errno_t ret = snprintf_s(file_name, GR_FILE_NAME_BUFFER_SIZE, GR_FILE_NAME_BUFFER_SIZE - 1, "%s/cfg/%s",
-        inst_cfg->home, g_gr_ser_config_file);
-    if (ret == -1) {
-        GR_RETURN_IFERR2(
-            CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "failed to load ser params, invalid ser config file path"));
-    }
-
-    status_t status = 
-        cm_load_config(g_gr_ssl_params, GR_CERT_PARAM_COUNT, file_name, &inst_cfg->ssl_ser_config, CM_FALSE);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "failed to load seri config"));
+    // SSL参数现在已合并到主配置文件中，直接从主配置加载
     CM_RETURN_IFERR(gr_load_ser_ssl_params(inst_cfg));
     return CM_SUCCESS;
 }
@@ -854,13 +865,13 @@ status_t gr_load_config(gr_config_t *inst_cfg)
     CM_RETURN_IFERR(gr_load_instance_id(inst_cfg));
     CM_RETURN_IFERR(gr_load_session_cfg(inst_cfg));
     CM_RETURN_IFERR(gr_load_mes_params(inst_cfg));
-    CM_RETURN_IFERR(gr_load_shm_key(inst_cfg));
     CM_RETURN_IFERR(gr_load_mes_with_ip(inst_cfg));
     CM_RETURN_IFERR(gr_load_ip_white_list_addrs(inst_cfg));
     CM_RETURN_IFERR(gr_load_threadpool_cfg(inst_cfg));
     CM_RETURN_IFERR(gr_load_listen_addr(inst_cfg));
     CM_RETURN_IFERR(gr_load_delay_clean_interval(inst_cfg));
     CM_RETURN_IFERR(gr_load_data_file_path(inst_cfg));
+    CM_RETURN_IFERR(gr_load_hash_auth_enable(inst_cfg));
     return CM_SUCCESS;
 }
 
@@ -991,6 +1002,15 @@ status_t gr_set_cert_param(const char *param_name, const char *param_value)
     status_t status = ssl_set_md_param(param_type, &out_value);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, param_name));
     return CM_SUCCESS;
+}
+
+bool32 gr_get_hash_auth_enable(void)
+{
+    if (g_inst_cfg == NULL) {
+        LOG_RUN_ERR("GR config not initialized");
+        return CM_FALSE;
+    }
+    return g_inst_cfg->params.hash_auth_enable;
 }
 
 #ifdef __cplusplus

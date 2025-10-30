@@ -138,10 +138,6 @@ static void gr_proc_broadcast_req_inner(gr_session_t *session, gr_notify_req_msg
             LOG_RUN_ERR("invalid broadcast req type");
             return;
     }
-    if (cm_get_error_code() == ERR_GR_SHM_LOCK_TIMEOUT) {
-        LOG_RUN_ERR("broadcast is breaked by shm lock timeout.");
-        return;
-    }
     gr_config_t *inst_cfg = gr_get_inst_cfg();
     gr_params_t *param = &inst_cfg->params;
     gr_message_head_t *req_head = &req->gr_head;
@@ -538,9 +534,9 @@ static void gr_process_message(uint32_t work_idx, ruid_type ruid, mes_msg_t *msg
         }
         processor->proc(session, msg);
         cm_get_error(&error_code, &error_message);
-        if (error_code == ERR_GR_SHM_LOCK_TIMEOUT) {
+        if (error_code != CM_SUCCESS) {
             cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
-            LOG_RUN_INF("Try again if error is shm lock timeout.");
+            LOG_RUN_INF("Error processing message, code: %d", error_code);
             cm_reset_error();
             continue;
         }
@@ -722,10 +718,11 @@ status_t gr_startup_mes(void)
 
     status = gr_create_mes_session();
     GR_RETURN_IFERR2(status, LOG_RUN_ERR("gr_set_mes_profile failed."));
-
-    regist_invalidate_other_nodes_proc(gr_invalidate_other_nodes);
-    regist_broadcast_check_file_open_proc(gr_broadcast_check_file_open);
-    regist_meta_syn2other_nodes_proc(gr_syn_data2other_nodes);
+    /*
+    regist_invalidate_other_nodes_proc();
+    regist_broadcast_check_file_open_proc();
+    regist_meta_syn2other_nodes_proc();
+    */
     return mes_init(&profile);
 }
 
@@ -758,121 +755,6 @@ status_t gr_notify_sync_ex(char *buffer, uint32_t size, gr_recv_msg_t *recv_msg)
     uint32_t timeout = inst_cfg->params.mes_wait_timeout;
     status_t status = gr_broadcast_msg(buffer, size, recv_msg, timeout);
     return status;
-}
-
-status_t gr_notify_expect_bool_ack(gr_vg_info_item_t *vg_item, gr_bcast_req_cmd_t cmd, uint64 ftid, bool32 *cmd_ack)
-{
-    if (g_gr_instance.is_maintain) {
-        return CM_SUCCESS;
-    }
-    gr_recv_msg_t recv_msg = {CM_TRUE, *cmd_ack, GR_PROTO_VERSION, 0, 0, CM_FALSE, *cmd_ack};
-    recv_msg.broadcast_proto_ver = gr_get_broadcast_proto_ver(0);
-    gr_notify_req_msg_t req;
-    status_t ret;
-    gr_config_t *inst_cfg = gr_get_inst_cfg();
-    gr_params_t *param = &inst_cfg->params;
-    do {
-        req.ftid = ftid;
-        req.type = cmd;
-        errno_t err = strncpy_s(req.vg_name, GR_MAX_NAME_LEN, vg_item->vg_name, strlen(vg_item->vg_name));
-        if (err != EOK) {
-            GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
-            return CM_ERROR;
-        }
-        LOG_DEBUG_INF("[MES] notify other gr instance to do cmd %u, ftid:%llu in vg:%s.", cmd, ftid, vg_item->vg_name);
-        gr_init_mes_head(&req.gr_head, GR_CMD_REQ_BROADCAST, 0, (uint16)param->inst_id, CM_INVALID_ID16,
-            sizeof(gr_notify_req_msg_t), recv_msg.broadcast_proto_ver, 0);
-        ret = gr_notify_sync((char *)&req, req.gr_head.size, &recv_msg);
-        if (ret == ERR_GR_VERSION_NOT_MATCH) {
-            uint32_t new_proto_ver = gr_get_broadcast_proto_ver(recv_msg.succ_inst);
-            LOG_RUN_INF("[CHECK_PROTO]broadcast msg proto version has changed, old is %hhu, new is %hhu",
-                recv_msg.broadcast_proto_ver, new_proto_ver);
-            recv_msg.broadcast_proto_ver = new_proto_ver;
-            recv_msg.version_not_match_inst = 0;
-            // if msg has been changed, need rewrite req
-            continue;
-        } else {
-            break;
-        }
-    } while (CM_TRUE);
-    if (ret != CM_SUCCESS) {
-        LOG_RUN_ERR("[GR]: Failed to notify other gr instance, cmd: %u, file: %llu, vg: %s, errcode:%d, "
-                    "OS errno:%d, OS errmsg:%s.",
-            cmd, ftid, vg_item->vg_name, cm_get_error_code(), errno, strerror(errno));
-        return CM_ERROR;
-    }
-    *cmd_ack = recv_msg.cmd_ack;
-    return ret;
-}
-
-status_t gr_notify_data_expect_bool_ack(
-    gr_vg_info_item_t *vg_item, gr_bcast_req_cmd_t cmd, char *data, uint32_t size, bool32 *cmd_ack)
-{
-    if (g_gr_instance.is_maintain) {
-        return CM_SUCCESS;
-    }
-    gr_recv_msg_t recv_msg = {CM_TRUE, CM_TRUE, GR_PROTO_VERSION, 0, 0, CM_FALSE, CM_TRUE};
-    if (cmd_ack) {
-        recv_msg.cmd_ack = *cmd_ack;
-        recv_msg.default_ack = *cmd_ack;
-    } else {
-        recv_msg.ignore_ack = CM_TRUE;
-    }
-    recv_msg.broadcast_proto_ver = gr_get_broadcast_proto_ver(0);
-    gr_notify_req_msg_ex_t req;
-    status_t status;
-    gr_config_t *inst_cfg = gr_get_inst_cfg();
-    gr_params_t *param = &inst_cfg->params;
-    do {
-        req.type = cmd;
-        errno_t err = memcpy_s(req.data, sizeof(req.data), data, size);
-        if (err != EOK) {
-            GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
-            return CM_ERROR;
-        }
-        req.data_size = size;
-        LOG_DEBUG_INF("notify other gr instance to do cmd %u, in vg:%s.", cmd, vg_item->vg_name);
-        gr_init_mes_head(&req.gr_head, GR_CMD_REQ_BROADCAST, 0, (uint16)param->inst_id, CM_INVALID_ID16,
-            (OFFSET_OF(gr_notify_req_msg_ex_t, data) + size), recv_msg.broadcast_proto_ver, 0);
-        status = gr_notify_sync_ex((char *)&req, req.gr_head.size, &recv_msg);
-        if (status == ERR_GR_VERSION_NOT_MATCH) {
-            uint32_t new_proto_ver = gr_get_broadcast_proto_ver(recv_msg.succ_inst);
-            LOG_RUN_INF("[CHECK_PROTO]broadcast msg proto version has changed, old is %hhu, new is %hhu",
-                recv_msg.broadcast_proto_ver, new_proto_ver);
-            recv_msg.broadcast_proto_ver = new_proto_ver;
-            recv_msg.version_not_match_inst = 0;
-            // if msg need changed, need rewrite req
-            continue;
-        } else {
-            break;
-        }
-    } while (CM_TRUE);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("[GR] Failed to notify other gr instance, cmd: %u, vg%s, errcode:%d, "
-                    "OS errno:%d, OS errmsg:%s.",
-            cmd, vg_item->vg_name, cm_get_error_code(), errno, strerror(errno));
-        return CM_ERROR;
-    }
-    if (cmd_ack) {
-        *cmd_ack = recv_msg.cmd_ack;
-    }
-    return status;
-}
-
-status_t gr_invalidate_other_nodes(
-    gr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack)
-{
-    return gr_notify_data_expect_bool_ack(vg_item, BCAST_REQ_INVALIDATE_META, meta_info, meta_info_size, cmd_ack);
-}
-
-status_t gr_broadcast_check_file_open(gr_vg_info_item_t *vg_item, uint64 ftid, bool32 *cmd_ack)
-{
-    return gr_notify_expect_bool_ack(vg_item, BCAST_REQ_DEL_DIR_FILE, ftid, cmd_ack);
-}
-
-status_t gr_syn_data2other_nodes(gr_vg_info_item_t *vg_item, char *meta_syn, uint32_t meta_syn_size, bool32 *cmd_ack)
-{
-    return gr_notify_data_expect_bool_ack(vg_item, BCAST_REQ_META_SYN, meta_syn, meta_syn_size, cmd_ack);
 }
 
 static void gr_check_inst_conn(uint32_t id, uint64 old_inst_stat, uint64 cur_inst_stat)

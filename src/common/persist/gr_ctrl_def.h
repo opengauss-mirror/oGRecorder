@@ -28,22 +28,22 @@
 #include "gr_defs.h"
 #include "gr_au.h"
 #include "cm_spinlock.h"
-#include "gr_hashmap.h"
 #include "cm_latch.h"
-#include "gr_ga.h"
+// #include "gr_latch.h"
+// #include "gr_ga.h"
 #include "cm_date.h"
 #include "cm_bilist.h"
-#include "gr_shm_hashmap.h"
+// #include "gr_shm_hashmap.h"
 #include "gr_param.h"
 #include "gr_stack.h"
-#include "gr_shm.h"
+// #include "gr_shm.h"
 #include "gr_block_ctrl.h"
 
 #define GR_GET_ROOT_BLOCK(gr_ctrl_p) ((gr_root_ft_block_t *)((gr_ctrl_p)->root))
 #define GR_MAX_FT_AU_NUM 10
 #define GR_GET_FT_AU_LIST(ft_au_list_p) ((gr_ft_au_list_t *)(ft_au_list_p))
 #define GR_GET_FS_BLOCK_ROOT(gr_ctrl_p) ((gr_fs_block_root_t *)((gr_ctrl_p)->core.fs_block_root))
-#define GR_MAX_VOLUME_GROUP_NUM (CM_HASH_SHM_MAX_ID)
+#define GR_MAX_VOLUME_GROUP_NUM 64
 #define GR_VG_ITEM_CACHE_NODE_MAX 16
 #define GR_RECYLE_DIR_NAME ".recycle"
 
@@ -103,16 +103,6 @@ typedef int32_t volume_handle_t;
     ((((((GR_DISK_UNIT_SIZE) - (24)) - (GR_FS_BLOCK_ROOT_SIZE)) - (GR_AU_ROOT_SIZE)) - (GR_FS_AUX_ROOT_SIZE)))
 
 #pragma pack(8)
-typedef struct st_gr_volume_def {
-    uint64 id : 16;
-    uint64 flag : 3;
-    uint64 reserve : 45;
-    uint64 version;
-    char name[GR_MAX_VOLUME_PATH_LEN];
-    char code[GR_VOLUME_CODE_SIZE];
-    char resv[GR_VOLUME_DEF_RESVS];
-} gr_volume_def_t;  // CAUTION:If add/remove field ,please keep 256B total !!! Or modify rp_redo_add_or_remove_volume
-
 typedef enum en_volume_slot {
     VOLUME_FREE = 0,  // free
     VOLUME_OCCUPY = 1,
@@ -147,7 +137,6 @@ typedef struct st_gr_volume {
 } gr_volume_t;
 
 typedef struct st_gr_volume_disk {
-    gr_volume_def_t def;
     gr_volume_attr_t attr;
     uint32_t id;
 } gr_volume_disk_t;
@@ -223,7 +212,6 @@ typedef struct st_gr_volume_ctrl {
     uint32_t rsvd;
     uint64 version;
     char reserve[496];
-    gr_volume_def_t defs[GR_MAX_VOLUMES];
 } gr_volume_ctrl_t;
 
 // struct for volume refresh
@@ -337,36 +325,6 @@ typedef struct st_gr_log_file_ctrl {
     uint64 lsn;
 } gr_log_file_ctrl_t;
 
-typedef struct st_gr_vg_info_item_t {
-    uint32_t id;
-    char vg_name[GR_MAX_NAME_LEN];
-    char entry_path[GR_MAX_VOLUME_PATH_LEN];  // the manager volume path
-    gr_vg_status_e status;
-    cm_oamap_t au_map;  // UNUSED
-    gr_volume_t volume_handle[GR_MAX_VOLUMES];
-    gr_shared_latch_t *vg_latch;
-    gr_ctrl_t *gr_ctrl;
-    shm_hashmap_t *buffer_cache;
-    char *align_buf;
-    gr_stack stack;
-    latch_t open_file_latch;
-    bilist_t open_file_list;  // open file bilist.
-    latch_t disk_latch;       // just for lock vg to lock the local instance.
-    latch_t latch[LATCH_COUNT];
-    gr_from_type_e from_type;
-    gr_block_ctrl_task_desc_t syn_meta_desc;
-    gr_vg_cache_node_t vg_cache_node[GR_VG_ITEM_CACHE_NODE_MAX];
-    gr_log_file_ctrl_t log_file_ctrl;             // redo log ctrl
-    gr_block_ctrl_task_desc_t recycle_meta_desc;  // for recycle meta
-    uint32_t objectid;
-    uint32_t space_alarm;
-} gr_vg_info_item_t;
-
-typedef struct st_gr_vg_info_t {
-    gr_vg_info_item_t volume_group[GR_MAX_VOLUME_GROUP_NUM];
-    uint32_t group_num;
-} gr_vg_info_t;
-
 typedef struct st_gr_vol_handles_t {
     gr_simple_volume_t volume_handle[GR_MAX_VOLUMES];
 } gr_vol_handles_t;
@@ -382,8 +340,8 @@ typedef struct st_gr_vg_conf_t {
 } gr_vg_conf_t;
 
 typedef struct st_gr_share_vg_item_t {
-    gr_shared_latch_t vg_latch;
-    shm_hashmap_t buffer_cache;
+    // gr_shared_latch_t vg_latch;
+    // shm_hashmap_t buffer_cache;
     uint32_t objectid;
     uint32_t id;
     char reserve[412];  // align 512

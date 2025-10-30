@@ -25,7 +25,7 @@
 #ifndef __GR_META_BUF_H__
 #define __GR_META_BUF_H__
 
-#include "gr_ga.h"
+// #include "gr_ga.h"
 #include "gr_au.h"
 #include "gr_diskgroup.h"
 #include "gr_session.h"
@@ -64,11 +64,6 @@ typedef struct st_gr_recycle_meta {
     gr_recycle_meta_args_t recycle_meta_args;
     gr_bg_task_info_t recycle_meta_task[GR_RECYLE_META_TASK_NUM_MAX];
 } gr_recycle_meta_t;
-
-#define GR_LOCK_SHM_META_TIMEOUT 200
-
-char *gr_find_block_from_disk_and_refresh_shm(gr_session_t *session, gr_vg_info_item_t *vg_item,
-    gr_block_id_t block_id, gr_block_type_t type, ga_obj_id_t *out_obj_id);
 
 #ifdef __cplusplus
 }

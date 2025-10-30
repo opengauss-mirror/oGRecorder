@@ -40,7 +40,6 @@ extern "C" {
 #endif
 
 #define HANDLE_VALUE(handle) ((handle) - (GR_HANDLE_BASE))
-#define DB_GR_DEFAULT_UDS_PATH "UDS:/tmp/.gr_unix_d_socket"
 extern char g_gr_inst_path[CM_MAX_PATH_LEN];
 extern int32_t g_gr_tcp_conn_timeout;
 
@@ -57,6 +56,7 @@ typedef struct st_gr_conn {
     pid_t conn_pid;
 #endif
     gr_cli_info_t cli_info;
+    bool32 hash_auth_enable;  // 从服务器获取的HASH_AUTH_ENABLE参数
 } gr_conn_t;
 
 typedef struct st_gr_conn_opt {

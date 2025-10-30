@@ -64,7 +64,6 @@ typedef struct st_gr_alloc_fs_block_info {
 
 gr_env_t *gr_get_env(void);
 gr_config_t *gr_get_inst_cfg(void);
-status_t gr_get_root_version(gr_vg_info_item_t *vg_item, uint64 *version);
 status_t gr_check_str_not_null(const char *str, const char *desc);
 status_t gr_check_name(const char *name);
 status_t gr_check_attr_flag(uint64 attrFlag);
@@ -194,30 +193,7 @@ static inline void gr_unlatch_node(gft_node_t *node)
     gr_unlatch(&block_ctrl->latch);
 }
 
-static inline gr_file_context_t *gr_get_file_context_by_handle(gr_file_run_ctx_t *file_run_ctx, int32_t handle)
-{
-    return &file_run_ctx->files.files_group[handle / GR_FILE_CONTEXT_PER_GROUP][handle % GR_FILE_CONTEXT_PER_GROUP];
-}
-
-// 回调函数类型定义及注册
-typedef status_t (*gr_invalidate_other_nodes_proc_t)(
-    gr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
-
-void regist_invalidate_other_nodes_proc(gr_invalidate_other_nodes_proc_t proc);
-
-typedef status_t (*gr_broadcast_check_file_open_proc_t)(gr_vg_info_item_t *vg_item, uint64 ftid, bool32 *cmd_ack);
-void regist_broadcast_check_file_open_proc(gr_broadcast_check_file_open_proc_t proc);
-
 void gr_clean_all_sessions_latch(void);
-
-status_t gr_block_data_oper(char *op_desc, bool32 is_write, gr_vg_info_item_t *vg_item, gr_block_id_t block_id,
-    uint64 offset, char *data_buf, int32_t size);
-status_t gr_data_oper(char *op_desc, bool32 is_write, gr_vg_info_item_t *vg_item, auid_t auid, uint32_t au_offset,
-    char *data_buf, int32_t size);
-status_t gr_write_zero2au(char *op_desc, gr_vg_info_item_t *vg_item, uint64 fid, auid_t auid, uint32_t au_offset);
-status_t gr_try_write_zero_one_au(
-    char *desc, gr_session_t *session, gr_vg_info_item_t *vg_item, gft_node_t *node, int64 offset);
-
 void gr_get_disk_usage_info(gr_disk_usage_info_t *info);
 void gr_alarm_check_disk_usage();
 

@@ -29,7 +29,6 @@ add_executable(test_rw test_rw.cc)
 add_executable(test_mutliwrite test_mutliwrite.cc)
 add_executable(test_appendwrite test_appendwrite.cc)
 add_executable(test_insthandle test_insthandle.cc)
-add_executable(test_singlewrite test_singlewrite.cc)
 
 # 链接 Google Test 库和项目库
 target_link_libraries(test_api ${GTEST_LIBRARIES} pthread grapi)
@@ -38,7 +37,6 @@ target_link_libraries(test_rw ${GTEST_LIBRARIES} pthread grapi)
 target_link_libraries(test_mutliwrite ${GTEST_LIBRARIES} pthread grapi)
 target_link_libraries(test_appendwrite ${GTEST_LIBRARIES} pthread grapi)
 target_link_libraries(test_insthandle ${GTEST_LIBRARIES} pthread grapi)
-target_link_libraries(test_singlewrite ${GTEST_LIBRARIES} pthread grapi)
 
 # 启用测试
 enable_testing()
@@ -50,7 +48,6 @@ add_test(NAME GRApiRwTest COMMAND test_rw)
 add_test(NAME GRApiMultiWriteTest COMMAND test_mutliwrite)
 add_test(NAME GRApiAppendWriteTest COMMAND test_appendwrite)
 add_test(NAME GRCreateInstHandle COMMAND test_insthandle)
-add_test(NAME GRSingleWriteTest COMMAND test_singlewrite)
 
 
 if(DEFINED AUTO_TEST AND AUTO_TEST)

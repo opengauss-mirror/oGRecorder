@@ -23,7 +23,7 @@
  */
 
 #include "gr_latch.h"
-#include "gr_shm.h"
+// #include "gr_shm.h"
 #include "cm_utils.h"
 
 latch_statis_t g_latch_stat[LATCH_STAT_TYPE_COUNT] = {0};

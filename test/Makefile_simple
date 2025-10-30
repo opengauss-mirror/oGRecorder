@@ -1,0 +1,59 @@
+# Makefile for simple hash performance test
+# Copyright (c) 2022 Huawei Technologies Co.,Ltd.
+
+CC = gcc
+CFLAGS = -Wall -Wextra -O2 -g -std=c99
+INCLUDES = -I../src/common
+LIBS = -lssl -lcrypto
+
+# 源文件
+SRCDIR = ../src/common
+TESTDIR = .
+
+# 目标文件
+TARGET = test_hash_simple
+SOURCES = $(TESTDIR)/test_hash_simple.c \
+          $(SRCDIR)/gr_hash_optimized_simple.c
+
+# 对象文件
+OBJECTS = $(SOURCES:.c=.o)
+
+# 默认目标
+all: $(TARGET)
+
+# 编译目标
+$(TARGET): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $(TARGET) $(LIBS)
+
+# 编译对象文件
+%.o: %.c
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+# 清理
+clean:
+	rm -f $(OBJECTS) $(TARGET)
+
+# 运行测试
+test: $(TARGET)
+	./$(TARGET)
+
+# 安装依赖（Ubuntu/Debian）
+install-deps:
+	sudo apt-get update
+	sudo apt-get install -y libssl-dev
+
+# 安装依赖（CentOS/RHEL）
+install-deps-rhel:
+	sudo yum install -y openssl-devel
+
+# 帮助
+help:
+	@echo "可用的目标:"
+	@echo "  all          - 编译测试程序"
+	@echo "  clean        - 清理编译文件"
+	@echo "  test         - 编译并运行测试"
+	@echo "  install-deps - 安装依赖包 (Ubuntu/Debian)"
+	@echo "  install-deps-rhel - 安装依赖包 (CentOS/RHEL)"
+	@echo "  help         - 显示此帮助信息"
+
+.PHONY: all clean test install-deps install-deps-rhel help

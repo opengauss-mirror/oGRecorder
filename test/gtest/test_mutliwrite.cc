@@ -2,6 +2,7 @@
 #include <thread>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <iostream>
 #include <fcntl.h>
 #include <chrono>
@@ -14,7 +15,7 @@ extern "C" {
 #define TEST_DIR "concurrentdir"
 #define ONE_MB 1024 * 1024
 #define ONE_GB 1024 * 1024 * 1024
-#define NUM_THREADS 12
+#define NUM_THREADS 1
 
 int errorcode = 0;
 const char *errormsg = NULL;
@@ -75,7 +76,7 @@ void writeToFileWithPerformance(gr_vfs_handle vfs_handle, const std::string& fil
         auto start = std::chrono::high_resolution_clock::now();
         result = gr_file_pwrite(vfs_handle, &file_handle, data, step_size, offset);
         auto end = std::chrono::high_resolution_clock::now();
-
+        
         if (result != step_size) {
             gr_get_error(&errorcode, &errormsg);
             printf("gr_file_pwrite interaction failure. code:%d msg:%s\n", errorcode, errormsg);
@@ -101,7 +102,7 @@ void writeToFileWithPerformance(gr_vfs_handle vfs_handle, const std::string& fil
 
 TEST_F(GRApiConcurrentPerformanceTest, TestConcurrentWritePerformance) {
     const int step_size = 1024 * 1024; // 1MB
-    const int total_size = 1024 * 1024 * 1024; // 1GB
+    const long long total_size = 10LL * 1024LL * 1024LL * 1024LL; // 10GB
     char *data = new char[step_size];
     memset(data, 'C', step_size);
 

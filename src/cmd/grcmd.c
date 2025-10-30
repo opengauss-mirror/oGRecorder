@@ -145,7 +145,7 @@ static gr_args_set_t cmd_ts_args_set = {
 
 static void ts_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s ts [-U UDS:socket_domain]\n", prog_name);
+    (void)printf("\nUsage:%s ts\n", prog_name);
     (void)printf("[client command]Show current API invoking time\n");
     if (print_flag == GR_HELP_SIMPLE) {
         return;
@@ -530,8 +530,10 @@ static void create_client_certs(const char *certs_path, int days) {
 }
 
 static void create_server_conf(const char *conf_file, const char *ser_ca, const char *ser_key, const char *ser_cert, const char *ser_crl) {
-    FILE *fp = fopen(conf_file, "w");
+    FILE *fp = fopen(conf_file, "a");
     if (!fp) return;
+    fprintf(fp, "\n# ==================== Server SSL Configuration ====================\n");
+    fprintf(fp, "# 服务端SSL配置（自动生成）\n");
     fprintf(fp, "SER_SSL_CA=%s\n", ser_ca);
     fprintf(fp, "SER_SSL_KEY=%s\n", ser_key);
     fprintf(fp, "SER_SSL_CERT=%s\n", ser_cert);
@@ -637,7 +639,7 @@ static status_t gencert_proc(void)
         check_certs_expired(cli_ca, cli_cert);
         printf("Client certs generated and checked successfully.\n");
     } else if (strcmp(type, "server") == 0) {
-        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/gr_ser_inst.ini", gr_home) >= sizeof(conf_file)) {
+        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/gr_inst.ini", gr_home) >= sizeof(conf_file)) {
             printf("conf_file path too long!\n");
             return CM_ERROR;
         }
@@ -727,8 +729,6 @@ gr_admin_cmd_t g_gr_admin_cmd[] = {
 
 void clean_cmd()
 {
-    gr_free_vg_info();
-    ga_reset_app_pools();
 }
 
 // clang-format on
@@ -893,27 +893,9 @@ static bool32 is_log_necessary(int argc, char **argv)
     return false;
 }
 
-static status_t gr_check_user_permit()
-{
-#ifndef WIN32
-    // check root
-    if (geteuid() == 0 || getuid() != geteuid()) {
-        (void)printf("The root user is not permitted to execute the grcmd "
-                     "and the real uids must be the same as the effective uids.\n");
-        (void)fflush(stdout);
-        return CM_ERROR;
-    }
-    if (cm_regist_signal(SIGPIPE, SIG_IGN) != CM_SUCCESS) {
-        (void)printf("Can't assign function for SIGPIPE.\n");
-        return CM_ERROR;
-    }
-#endif
-    return CM_SUCCESS;
-}
 
 int main(int argc, char **argv)
 {
-    GR_RETURN_IF_ERROR(gr_check_user_permit());
     uint32_t idx = 0;
     bool8 go_ahead = CM_TRUE;
     bool8 is_interactive = cmd_check_run_interactive(argc, argv);

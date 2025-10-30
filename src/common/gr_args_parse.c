@@ -45,7 +45,7 @@ extern "C" {
 
 status_t cmd_parse_check(gr_args_t *cmd_args_set, int set_size)
 {
-    for (int i = 0; i < set_size; i++) {
+    for (size_t i = 0; i < (size_t)set_size; i++) {
         if (cmd_args_set[i].required && !cmd_args_set[i].inputed) {
             GR_PRINT_ERROR(
                 "args [-%c|--%s] needs input value.\n", cmd_args_set[i].short_name, cmd_args_set[i].long_name);

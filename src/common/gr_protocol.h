@@ -33,6 +33,7 @@
 #include "cs_packet.h"
 #include "cs_pipe.h"
 #include "gr_defs.h"
+#include "gr_hash_optimized.h"
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
@@ -336,33 +337,7 @@ static inline status_t calculate_data_hash(const void *data, size_t size, uint8_
         return CM_ERROR;
     }
 
-    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-    if (mdctx == NULL) {
-        LOG_RUN_ERR("[hash]: Failed to create EVP_MD_CTX.");
-        return CM_ERROR;
-    }
-
-    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
-        LOG_RUN_ERR("[hash]: Failed to init sha256.");
-        EVP_MD_CTX_free(mdctx);
-        return CM_ERROR;
-    }
-
-    if (EVP_DigestUpdate(mdctx, data, size) != 1) {
-        LOG_RUN_ERR("[hash]: Failed to update sha256.");
-        EVP_MD_CTX_free(mdctx);
-        return CM_ERROR;
-    }
-
-    unsigned int digest_len = SHA256_DIGEST_LENGTH;
-    if (EVP_DigestFinal_ex(mdctx, hash, &digest_len) != 1) {
-        LOG_RUN_ERR("[hash]: Failed to calculate sha256.");
-        EVP_MD_CTX_free(mdctx);
-        return CM_ERROR;
-    }
-
-    EVP_MD_CTX_free(mdctx);
-    return CM_SUCCESS;
+    return gr_calculate_hash_optimized_simple(data, size, hash);
 }
 
 // combine_hash = data_hash ^ pre_hash

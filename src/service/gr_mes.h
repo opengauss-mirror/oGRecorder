@@ -230,17 +230,7 @@ typedef struct st_get_ft_block_ack {
 uint32_t gr_get_broadcast_proto_ver(uint64 succ_inst);
 status_t gr_notify_sync(char *buffer, uint32_t size, gr_recv_msg_t *recv_msg);
 status_t gr_notify_sync_ex(char *buffer, uint32_t size, gr_recv_msg_t *recv_msg);
-
 status_t gr_exec_sync(gr_session_t *session, uint32_t remoteid, uint32_t currtid, status_t *remote_result);
-status_t gr_notify_expect_bool_ack(gr_vg_info_item_t *vg_item, gr_bcast_req_cmd_t cmd, uint64 ftid, bool32 *cmd_ack);
-status_t gr_notify_data_expect_bool_ack(
-    gr_vg_info_item_t *vg_item, gr_bcast_req_cmd_t cmd, char *data, uint32_t size, bool32 *cmd_ack);
-
-status_t gr_invalidate_other_nodes(
-    gr_vg_info_item_t *vg_item, char *meta_info, uint32_t meta_info_size, bool32 *cmd_ack);
-status_t gr_broadcast_check_file_open(gr_vg_info_item_t *vg_item, uint64 ftid, bool32 *cmd_ack);
-status_t gr_syn_data2other_nodes(gr_vg_info_item_t *vg_item, char *meta_syn, uint32_t meta_syn_size, bool32 *cmd_ack);
-
 void gr_check_mes_conn(uint64 cur_inst_map);
 status_t gr_startup_mes(void);
 void gr_stop_mes(void);

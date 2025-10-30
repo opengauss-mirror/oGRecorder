@@ -28,6 +28,7 @@
 extern "C" {
 #endif
 
+typedef status_t (*gr_meta_syn2other_nodes_proc_t)(); 
 gr_meta_syn2other_nodes_proc_t meta_syn2other_nodes_proc = NULL;
 void regist_meta_syn2other_nodes_proc(gr_meta_syn2other_nodes_proc_t proc)
 {

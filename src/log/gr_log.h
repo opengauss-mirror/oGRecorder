@@ -119,11 +119,16 @@ static inline void gr_print_detail_error()
 #define GR_THROW_ERROR(error_no, ...)                                                                                 \
     do {                                                                                                               \
         if (g_gr_error_desc[error_no] != NULL)                                                                        \
+        {                                                                                                            \
+            cm_reset_error();                                                                                         \
             cm_set_error((char *)__FILE_NAME__, (uint32_t)__LINE__, (cm_errno_t)error_no, g_gr_error_desc[error_no],    \
                 ##__VA_ARGS__);                                                                                        \
+        }                                                                                                            \
         else                                                                                                           \
-            cm_set_error(                                                                                              \
-                (char *)__FILE_NAME__, (uint32_t)__LINE__, (cm_errno_t)error_no, g_error_desc[error_no], ##__VA_ARGS__); \
+        {                                                                                                            \
+            cm_set_error((char *)__FILE_NAME__, (uint32_t)__LINE__, (cm_errno_t)error_no, g_error_desc[error_no],    \
+                ##__VA_ARGS__);                                                                                        \
+        }                                                                                                            \
     } while (0)
 
 #define GR_THROW_ERROR_EX(error_no, format, ...)                                                           \

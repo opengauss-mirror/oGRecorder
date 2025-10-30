@@ -25,31 +25,49 @@
 #include <stdint.h>
 #include <time.h>
 #include <utime.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#ifndef WIN32
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <unistd.h>
-#endif  // !WIN32
 #include "gr_file.h"
 #include "gr_thv.h"
 #include "gr_param.h"
+#include "gr_session.h"
+#include "gr_file_def.h"
 #include <pthread.h>
+#include <stdio.h>
+#include <dirent.h>
+#include "cm_defs.h"
+#include "cm_error.h"
+#include "cm_hash.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// 统一错误处理宏
+#define CHECK_FS_ERROR_RETURN(condition, error_code, error_msg, ...) \
+    do { \
+        if (!(condition)) { \
+            LOG_RUN_ERR("[FS] " error_msg, ##__VA_ARGS__); \
+            GR_THROW_ERROR(error_code, ##__VA_ARGS__); \
+            return CM_ERROR; \
+        } \
+    } while(0)
+
+#define CHECK_FS_NULL_RETURN(ptr, error_msg) \
+    CHECK_FS_ERROR_RETURN((ptr) != NULL, ERR_GR_FILE_SYSTEM_ERROR, error_msg)
+
 static void gr_get_fs_path(const char *name, char *buf, size_t buf_size)
 {
-    int ret = snprintf(buf, buf_size, "%s/%s", g_inst_cfg->params.data_file_path, name);
-    if (ret < 0 || (size_t)ret >= buf_size) {
-        LOG_RUN_ERR("[FS] gr_get_fs_path snprintf failed or truncated: %d", ret);
+    int ret = snprintf_s(buf, buf_size, buf_size - 1, "%s/%s", 
+                         g_inst_cfg->params.data_file_path, name);
+    if (ret < 0) {
+        LOG_RUN_ERR("[FS] gr_get_fs_path snprintf_s failed: %d", ret);
         if (buf_size > 0) {
             buf[0] = '\0';
         }
@@ -57,71 +75,262 @@ static void gr_get_fs_path(const char *name, char *buf, size_t buf_size)
 }
 
 typedef struct gr_dir_map_item {
+    hash_node_t node;
     uint64_t handle;
     DIR *dir;
-    struct gr_dir_map_item *next;
 } gr_dir_map_item_t;
 
-/* handle-DIR map */
-static gr_dir_map_item_t *g_dir_map_head = NULL;
+#define MAX_DIR_HANDLE_COUNT 10000  // 增加到10000个句柄
+#define DIR_MAP_LOCK_TIMEOUT_MS 500
+#define DIR_MAP_BUCKET_COUNT 256
+
+/* handle-DIR map using CBB hash table */
+static hash_map_t g_dir_map;
+static hash_funcs_t g_dir_map_funcs;
 static pthread_mutex_t g_dir_map_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint64_t g_next_dir_handle = 1;
+static uint64_t g_freed_handles[MAX_DIR_HANDLE_COUNT];
+static uint32_t g_freed_handle_count = 0;
+static bool g_dir_map_initialized = false;
+
+// Hash function for uint64_t keys using CBB hash
+static uint32 gr_dir_map_hash_func(void *key) {
+    uint64_t handle = *(uint64_t*)key;
+    return cm_hash_uint32_shard((uint32)(handle ^ (handle >> 32)));
+}
+
+// Compare function for uint64_t keys
+static bool32 gr_dir_map_compare_func(void *key1, void *key2) {
+    uint64_t handle1 = *(uint64_t*)key1;
+    uint64_t handle2 = *(uint64_t*)key2;
+    return (handle1 == handle2) ? CM_TRUE : CM_FALSE;
+}
+
+// Key extraction function
+static void* gr_dir_map_key_func(hash_node_t *node) {
+    gr_dir_map_item_t *item = (gr_dir_map_item_t*)node;
+    return &item->handle;
+}
+
+// Allocator functions for CBB hash map
+static status_t gr_dir_map_alloc(void *ctx, uint32 size, void **buf) {
+    (void)ctx; // unused
+    *buf = malloc(size);
+    return (*buf != NULL) ? CM_SUCCESS : CM_ERROR;
+}
+
+static void gr_dir_map_free(void *ctx, void *buf) {
+    (void)ctx; // unused
+    free(buf);
+}
+
+// Initialize directory map
+static int gr_dir_map_init(void) {
+    if (g_dir_map_initialized) {
+        return 0;
+    }
+    
+    // Initialize hash functions
+    g_dir_map_funcs.f_key = gr_dir_map_key_func;
+    g_dir_map_funcs.f_equal = gr_dir_map_compare_func;
+    g_dir_map_funcs.f_hash = gr_dir_map_hash_func;
+    
+    // Initialize hash map using CBB allocator
+    cm_allocator_t alloc = {0};
+    alloc.f_alloc = gr_dir_map_alloc;
+    alloc.f_free = gr_dir_map_free;
+    alloc.mem_ctx = NULL;
+    
+    if (cm_hmap_init(&g_dir_map, &alloc, DIR_MAP_BUCKET_COUNT) != CM_SUCCESS) {
+        printf("[FS] Failed to initialize directory map\n");
+        return -1;
+    }
+    
+    g_dir_map_initialized = true;
+    return 0;
+}
+
+// Cleanup directory map
+void gr_dir_map_cleanup(void) {
+    if (!g_dir_map_initialized) {
+        return;
+    }
+    
+    pthread_mutex_lock(&g_dir_map_lock);
+    
+    // Free all items using CBB hash iteration
+    hash_node_t *curr = NULL;
+    cm_hmap_begin(&g_dir_map, &curr);
+    while (curr) {
+        gr_dir_map_item_t *item = (gr_dir_map_item_t*)curr;
+        hash_node_t *next = curr;
+        cm_hmap_next(&g_dir_map, &g_dir_map_funcs, &next);
+        
+        if (item->dir) {
+            closedir(item->dir);
+        }
+        free(item);
+        curr = next;
+    }
+    
+    // Free buckets
+    if (g_dir_map.buckets) {
+        free(g_dir_map.buckets);
+        g_dir_map.buckets = NULL;
+    }
+    
+    g_dir_map_initialized = false;
+    pthread_mutex_unlock(&g_dir_map_lock);
+}
 
 uint64_t gr_dir_map_insert(DIR *dir) {
+    if (dir == NULL) {
+        return 0;
+    }
+    
     pthread_mutex_lock(&g_dir_map_lock);
-    uint64_t handle = g_next_dir_handle++;
-    gr_dir_map_item_t *item = malloc(sizeof(gr_dir_map_item_t));
+    
+    // Initialize map if not already done
+    if (!g_dir_map_initialized) {
+        if (gr_dir_map_init() != 0) {
+            pthread_mutex_unlock(&g_dir_map_lock);
+            return 0;
+        }
+    }
+    
+    uint64_t handle = 0;
+    
+    // 优先重用已释放的句柄
+    if (g_freed_handle_count > 0) {
+        handle = g_freed_handles[--g_freed_handle_count];
+    } else {
+        // 如果没有可重用的句柄，分配新的
+        if (g_next_dir_handle >= MAX_DIR_HANDLE_COUNT) {
+            pthread_mutex_unlock(&g_dir_map_lock);
+            printf("[FS] Directory handle limit exceeded: %lu (max: %d)\n", g_next_dir_handle, MAX_DIR_HANDLE_COUNT);
+            return 0;
+        }
+        handle = g_next_dir_handle++;
+    }
+    
+    gr_dir_map_item_t *item = calloc(1, sizeof(gr_dir_map_item_t));
+    if (item == NULL) {
+        // 如果分配失败，将句柄放回重用池
+        if (g_freed_handle_count < MAX_DIR_HANDLE_COUNT) {
+            g_freed_handles[g_freed_handle_count++] = handle;
+        }
+        pthread_mutex_unlock(&g_dir_map_lock);
+        printf("[FS] Failed to allocate memory for directory map item\n");
+        return 0;
+    }
+    
     item->handle = handle;
     item->dir = dir;
-    item->next = g_dir_map_head;
-    g_dir_map_head = item;
+    
+    // Insert into CBB hash map
+    if (cm_hmap_insert(&g_dir_map, &g_dir_map_funcs, (hash_node_t*)item) != CM_TRUE) {
+        free(item);
+        // 如果插入失败，将句柄放回重用池
+        if (g_freed_handle_count < MAX_DIR_HANDLE_COUNT) {
+            g_freed_handles[g_freed_handle_count++] = handle;
+        }
+        pthread_mutex_unlock(&g_dir_map_lock);
+        printf("[FS] Failed to insert directory map item\n");
+        return 0;
+    }
+    
     pthread_mutex_unlock(&g_dir_map_lock);
     return handle;
 }
 
 DIR *gr_dir_map_get(uint64_t handle) {
-    pthread_mutex_lock(&g_dir_map_lock);
-    gr_dir_map_item_t *item = g_dir_map_head;
-    while (item) {
-        if (item->handle == handle) {
-            pthread_mutex_unlock(&g_dir_map_lock);
-            return item->dir;
-        }
-        item = item->next;
+    if (handle == 0) {
+        return NULL;
     }
+    
+    pthread_mutex_lock(&g_dir_map_lock);
+    
+    if (!g_dir_map_initialized) {
+        pthread_mutex_unlock(&g_dir_map_lock);
+        return NULL;
+    }
+    
+    uint64_t key = handle;
+    hash_node_t *node = cm_hmap_find(&g_dir_map, &g_dir_map_funcs, &key);
+    gr_dir_map_item_t *item = (gr_dir_map_item_t*)node;
+    
     pthread_mutex_unlock(&g_dir_map_lock);
-    return NULL;
+    
+    return (item != NULL) ? item->dir : NULL;
 }
 
 void gr_dir_map_remove(uint64_t handle) {
-    pthread_mutex_lock(&g_dir_map_lock);
-    gr_dir_map_item_t **pp = &g_dir_map_head;
-    while (*pp) {
-        if ((*pp)->handle == handle) {
-            gr_dir_map_item_t *to_free = *pp;
-            *pp = to_free->next;
-            free(to_free);
-            break;
-        }
-        pp = &((*pp)->next);
+    if (handle == 0) {
+        return;
     }
+    
+    pthread_mutex_lock(&g_dir_map_lock);
+    
+    if (!g_dir_map_initialized) {
+        pthread_mutex_unlock(&g_dir_map_lock);
+        return;
+    }
+    
+    uint64_t key = handle;
+    hash_node_t *node = cm_hmap_delete(&g_dir_map, &g_dir_map_funcs, &key);
+    if (node != NULL) {
+        gr_dir_map_item_t *item = (gr_dir_map_item_t*)node;
+        free(item);
+        
+        // 将句柄放入重用池
+        if (g_freed_handle_count < MAX_DIR_HANDLE_COUNT) {
+            g_freed_handles[g_freed_handle_count++] = handle;
+        }
+    }
+    
+    pthread_mutex_unlock(&g_dir_map_lock);
+}
+
+void gr_dir_map_get_stats(uint32_t *current_count, uint32_t *max_count, uint32_t *freed_count) {
+    pthread_mutex_lock(&g_dir_map_lock);
+    
+    if (!g_dir_map_initialized) {
+        *current_count = 0;
+        *max_count = MAX_DIR_HANDLE_COUNT;
+        *freed_count = 0;
+        pthread_mutex_unlock(&g_dir_map_lock);
+        return;
+    }
+    
+    uint32_t count = 0;
+    hash_node_t *curr = NULL;
+    cm_hmap_begin(&g_dir_map, &curr);
+    while (curr) {
+        count++;
+        hash_node_t *next = curr;
+        cm_hmap_next(&g_dir_map, &g_dir_map_funcs, &next);
+        curr = next;
+    }
+    
+    *current_count = count;
+    *max_count = MAX_DIR_HANDLE_COUNT;
+    *freed_count = g_freed_handle_count;
+    
     pthread_mutex_unlock(&g_dir_map_lock);
 }
 
 status_t gr_filesystem_mkdir(const char *name, mode_t mode) {
+    CHECK_FS_NULL_RETURN(name, "Directory name is NULL");
+    
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(name, path, sizeof(path));
-    if (access(path, F_OK) == 0) {
-        LOG_RUN_ERR("[FS] Directory already exists: %s", name);
-        GR_THROW_ERROR(ERR_GR_DIR_CREATE_DUPLICATED, name);
-        return CM_ERROR;
-    }
-
-    if (mkdir(path, mode) != 0) {
-        LOG_RUN_ERR("[FS] Failed to create directory: %s, errno: %d", name, errno);
-        GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
-        return CM_ERROR;
-    }
+    
+    CHECK_FS_ERROR_RETURN(access(path, F_OK) != 0, ERR_GR_DIR_CREATE_DUPLICATED, 
+                          "Directory already exists: %s", name);
+    
+    CHECK_FS_ERROR_RETURN(mkdir(path, mode) == 0, ERR_GR_FILE_SYSTEM_ERROR,
+                          "Failed to create directory: %s, errno: %d", name, errno);
+    
     return CM_SUCCESS;
 }
 
@@ -172,19 +381,16 @@ status_t gr_filesystem_rmdir(const char *name, uint64_t flag) {
 
 status_t gr_filesystem_opendir(const char *name, uint64_t *out_handle)
 {
-    if (!name || !out_handle) {
-        LOG_RUN_ERR("[FS] Invalid parameters: name or out_handle is NULL");
-        GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
-        return CM_ERROR;
-    }
+    CHECK_FS_NULL_RETURN(name, "Directory name is NULL");
+    CHECK_FS_NULL_RETURN(out_handle, "Output handle is NULL");
+    
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(name, path, sizeof(path));
+    
     DIR *dir = opendir(path);
-    if (!dir) {
-        LOG_RUN_ERR("[FS] Failed to open directory: %s, errno: %d", name, errno);
-        GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
-        return CM_ERROR;
-    }
+    CHECK_FS_ERROR_RETURN(dir != NULL, ERR_GR_FILE_SYSTEM_ERROR,
+                          "Failed to open directory: %s, errno: %d", name, errno);
+    
     LOG_RUN_INF("[FS] Successfully opened directory: %s", name);
     *out_handle = gr_dir_map_insert(dir);
     return CM_SUCCESS;
@@ -452,6 +658,7 @@ status_t gr_filesystem_stat(const char *name, int64 *offset, int64 *size, gr_fil
     *size = file_stat.st_size;
     *atime = file_stat.st_atime;
     status_t status = gr_filesystem_mode(path, file_stat.st_atime, mode);
+    
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to get file %s mode, errno: %d", name, errno);
         return CM_ERROR;
@@ -506,6 +713,46 @@ status_t gr_filesystem_postpone(const char *file_path, const char *time)
         LOG_RUN_ERR("[FS] Failed to extend file %s expired time, errno: %d", file_path, errno);
         return CM_ERROR;
     }
+    return CM_SUCCESS;
+}
+
+status_t gr_filesystem_exist_item(const char *dir_path, bool32 *result, gft_item_type_t *output_type)
+{
+    if (dir_path == NULL || dir_path[0] == '\0') {
+        return CM_ERROR;
+    }
+
+    *result = false;
+    *output_type = -1;
+    struct stat st;
+
+    static char path[GR_FILE_PATH_MAX_LENGTH];
+    int err = snprintf_s(path, GR_FILE_PATH_MAX_LENGTH, GR_FILE_PATH_MAX_LENGTH - 1,
+                               "%s/%s", g_inst_cfg->params.data_file_path, (dir_path));
+    GR_SECUREC_SS_RETURN_IF_ERROR(err, CM_ERROR);
+
+    if (lstat(path, &st) != 0) {
+        LOG_RUN_ERR("failed to get stat for path %s, errno %d.\n", path, errno);
+        if (errno == ENOENT) {
+            *result = false;
+            return CM_SUCCESS;
+        }
+        return CM_ERROR;
+    }
+
+    if (S_ISREG(st.st_mode)) {
+        *output_type = GFT_FILE;
+    } else if (S_ISDIR(st.st_mode)) {
+        *output_type = GFT_PATH;
+    } else if (S_ISLNK(st.st_mode)) {
+        *output_type = GFT_LINK;
+    } else {
+        LOG_RUN_ERR("file %s type is %o, not supported", path, st.st_mode);
+        *output_type = -1;
+        return CM_ERROR;
+    }
+    *result = true;
+
     return CM_SUCCESS;
 }
 

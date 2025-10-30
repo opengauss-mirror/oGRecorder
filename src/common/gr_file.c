@@ -23,11 +23,8 @@
  */
 
 #include "cm_date.h"
-#include "gr_ga.h"
 #include "cm_hash.h"
 #include "gr_defs.h"
-#include "gr_hashmap.h"
-#include "gr_shm.h"
 #include "gr_malloc.h"
 #include "cm_system.h"
 #include "gr_latch.h"
@@ -39,6 +36,9 @@
 #include "gr_file.h"
 #include <pthread.h>
 #include <sys/statvfs.h>
+
+#define MAX_SESSION_CLEANUP_ATTEMPTS 3
+#define SESSION_CLEANUP_TIMEOUT_MS 1000
 
 static pthread_mutex_t g_gr_disk_usage_lock = PTHREAD_MUTEX_INITIALIZER;
 static gr_disk_usage_info_t g_gr_disk_usage_info = {0};
@@ -169,43 +169,6 @@ status_t gr_postpone_file(gr_session_t *session, const char *file, const char *t
     return CM_SUCCESS;
 }
 
-static status_t gr_exist_item_core(
-    gr_session_t *session, const char *dir_path, bool32 *result, gft_item_type_t *output_type)
-{
-    if (dir_path == NULL || dir_path[0] == '\0') {
-        return CM_ERROR;
-    }
-
-    *result = false;
-    *output_type = -1;
-    struct stat st;
-
-    static char path[GR_FILE_PATH_MAX_LENGTH];
-    int err = snprintf_s(path, GR_FILE_PATH_MAX_LENGTH, GR_FILE_PATH_MAX_LENGTH - 1,
-                               "%s/%s", g_inst_cfg->params.data_file_path, (dir_path));
-    GR_SECUREC_SS_RETURN_IF_ERROR(err, CM_ERROR);
-
-    if (lstat(path, &st) != 0) {
-        LOG_RUN_ERR("failed to get stat for path %s, errno %d.\n", path, errno);
-        return CM_ERROR;
-    }
-
-    if (S_ISREG(st.st_mode)) {
-        *output_type = GFT_FILE;
-    } else if (S_ISDIR(st.st_mode)) {
-        *output_type = GFT_PATH;
-    } else if (S_ISLNK(st.st_mode)) {
-        *output_type = GFT_LINK;
-    } else {
-        LOG_RUN_ERR("file %s type is %o, not supported", path, st.st_mode);
-        *output_type = -1;
-        return CM_ERROR;
-    }
-    *result = true;
-
-    return CM_SUCCESS;
-}
-
 status_t gr_exist_item(gr_session_t *session, const char *item, bool32 *result, gft_item_type_t *output_type)
 {
     CM_ASSERT(item != NULL);
@@ -214,14 +177,9 @@ status_t gr_exist_item(gr_session_t *session, const char *item, bool32 *result, 
 
     status = CM_ERROR;
     do {
-        status = gr_exist_item_core(session, item, result, output_type);
+        status = gr_filesystem_exist_item(item, result, output_type);
         if (status != CM_SUCCESS) {
-            if (status == ERR_GR_FILE_NOT_EXIST) {
-                LOG_DEBUG_INF("Reset error %d when check dir failed.", status);
-                cm_reset_error();
-            } else {
-                GR_BREAK_IFERR2(CM_ERROR, LOG_RUN_ERR("Failed to check item, errcode:%d.", status));
-            }
+            GR_BREAK_IFERR2(CM_ERROR, LOG_RUN_ERR("Failed to check item, errcode:%d.", status));
         }
         status = CM_SUCCESS;
     } while (0);
@@ -242,7 +200,10 @@ status_t gr_open_file(gr_session_t *session, const char *file, int32_t flag, int
     return CM_SUCCESS;
 }
 
+typedef status_t (*gr_invalidate_other_nodes_proc_t)();
 gr_invalidate_other_nodes_proc_t invalidate_other_nodes_proc = NULL;
+
+typedef status_t (*gr_broadcast_check_file_open_proc_t)();
 gr_broadcast_check_file_open_proc_t broadcast_check_file_open_proc = NULL;
 
 void regist_invalidate_other_nodes_proc(gr_invalidate_other_nodes_proc_t proc)
@@ -265,32 +226,41 @@ void gr_clean_all_sessions_latch()
     uint64 cli_pid = 0;
     int64 start_time = 0;
     bool32 cli_pid_alived = 0;
-    uint32_t sid = 0;
-    gr_session_t *session = NULL;
 
     // check all used && connected session may occopy latch by dead client
     gr_session_ctrl_t *session_ctrl = gr_get_session_ctrl();
     CM_ASSERT(session_ctrl != NULL);
-    while (sid < session_ctrl->alloc_sessions && sid < session_ctrl->total) {
-        session = gr_get_session(sid);
+    
+    for (uint32_t sid = 0; sid < session_ctrl->alloc_sessions && sid < session_ctrl->total; sid++) {
+        gr_session_t *session = gr_get_session(sid);
         CM_ASSERT(session != NULL);
-        // ready next session
-        sid++;
+        
         // connected make sure the cli_pid and start_time are valid
         if (!session->is_used || !session->connected) {
             continue;
         }
 
-        if (session->cli_info.cli_pid == 0 ||
-            (session->cli_info.cli_pid == cli_pid && start_time == session->cli_info.start_time && cli_pid_alived)) {
+        // 优化：避免重复的进程存活检查
+        uint64 current_pid = session->cli_info.cli_pid;
+        int64 current_start_time = session->cli_info.start_time; 
+        
+        if (current_pid == 0) {
             continue;
         }
-
-        cli_pid = session->cli_info.cli_pid;
-        start_time = session->cli_info.start_time;
-        cli_pid_alived = cm_sys_process_alived(cli_pid, start_time);
-        if (cli_pid_alived) {
-            continue;
+        
+        // 如果进程信息相同且已经检查过存活状态，直接使用之前的结果
+        if (current_pid == cli_pid && current_start_time == start_time) {
+            if (cli_pid_alived) {
+                continue;
+            }
+        } else {
+            // 新的进程，需要检查存活状态
+            cli_pid = current_pid;
+            start_time = current_start_time;
+            cli_pid_alived = cm_sys_process_alived(cli_pid, start_time);
+            if (cli_pid_alived) {
+                continue;
+            }
         }
         LOG_RUN_INF("[CLEAN_LATCH]session id %u, pid %llu, start_time %lld, process name:%s, objectid %u.", session->id,
             cli_pid, start_time, session->cli_info.process_name, session->objectid);

@@ -84,8 +84,6 @@ typedef struct st_tcp_link {
 
 typedef union un_cs_link {
     tcp_link_t tcp;
-    //ssl_link_t ssl;
-    //uds_link_t uds; // other links can be added later
 } cs_link_t;
 
 typedef struct st_cs_pipe {

@@ -33,7 +33,7 @@ extern "C" {
 status_t gr_reactor_set_oneshot(gr_session_t *session)
 {
     struct epoll_event ev;
-    int fd = (int)session->pipe.link.uds.sock;
+    int fd = (int)session->pipe.link.tcp.sock;
 
     ev.events = EPOLLIN | EPOLLONESHOT;
     ev.data.ptr = session;
@@ -341,7 +341,7 @@ status_t gr_reactors_add_session(gr_session_t *session)
     reactor_t *reactor = &pool->reactor_arr[reactor_idx];
     session->reactor = reactor;
     struct epoll_event ev;
-    int fd = (int)session->pipe.link.uds.sock;
+    int fd = (int)session->pipe.link.tcp.sock;
 
     (void)cm_atomic32_inc(&reactor->session_count);
     ev.events = EPOLLIN | EPOLLONESHOT;
@@ -361,7 +361,7 @@ status_t gr_reactors_add_session(gr_session_t *session)
 
 void gr_reactors_del_session(gr_session_t *session)
 {
-    int fd = (int)session->pipe.link.uds.sock;
+    int fd = (int)session->pipe.link.tcp.sock;
     reactor_t *reactor = (reactor_t *)session->reactor;
     (void)epoll_ctl(reactor->epollfd, EPOLL_CTL_DEL, fd, NULL);
 
