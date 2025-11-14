@@ -236,9 +236,6 @@ static status_t gr_init_session(gr_session_t *session, const cs_pipe_t *pipe)
     session->status = GR_SESSION_STATUS_IDLE;
     session->client_version = GR_PROTO_VERSION;
     session->proto_version = GR_PROTO_VERSION;
-    errcode = memset_s(
-        session->gr_session_stat, GR_EVT_COUNT * sizeof(gr_stat_item_t), 0, GR_EVT_COUNT * sizeof(gr_stat_item_t));
-    securec_check_ret(errcode);
     session->is_holding_hotpatch_latch = CM_FALSE;
     GR_RETURN_IF_ERROR(init_session_hash_mgr(session));
     // init session fd tracking

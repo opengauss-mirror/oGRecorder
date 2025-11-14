@@ -802,20 +802,54 @@ status_t gr_load_ser_ssl_config(gr_config_t *inst_cfg)
 
 status_t gr_load_cli_ssl_params()
 {
+    const char *gr_home = getenv("GR_HOME");
+    if (gr_home == NULL) {
+        GR_RETURN_IFERR2(CM_ERROR, GR_PRINT_ERROR("Environment variant GR_HOME not found!\n"));
+    }
+    char default_path[CM_MAX_PATH_LEN];
+
     char *value = cm_get_config_value(&cli_ssl_cfg, "CLI_SSL_CA");
-    status_t status = gr_set_cert_param("CLI_SSL_CA", value);
+    const char *ca_val = value;
+    if (ca_val == NULL || ca_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/cacert.pem", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_CA"));
+        }
+        ca_val = default_path;
+    }
+    status_t status = gr_set_cert_param("CLI_SSL_CA", ca_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_CA"));
 
     value = cm_get_config_value(&cli_ssl_cfg, "CLI_SSL_KEY");
-    status = gr_set_cert_param("CLI_SSL_KEY", value);
+    const char *key_val = value;
+    if (key_val == NULL || key_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/client.key", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_KEY"));
+        }
+        key_val = default_path;
+    }
+    status = gr_set_cert_param("CLI_SSL_KEY", key_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_KEY"));
 
     value = cm_get_config_value(&cli_ssl_cfg, "CLI_SSL_CERT");
-    status = gr_set_cert_param("CLI_SSL_CERT", value);
+    const char *cert_val = value;
+    if (cert_val == NULL || cert_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/client.crt", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_CERT"));
+        }
+        cert_val = default_path;
+    }
+    status = gr_set_cert_param("CLI_SSL_CERT", cert_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_CERT"));
 
     value = cm_get_config_value(&cli_ssl_cfg, "CLI_SSL_CRL");
-    status = gr_set_cert_param("CLI_SSL_CRL", value);
+    const char *crl_val = value;
+    if (crl_val == NULL || crl_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/client.crl", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_CRL"));
+        }
+        crl_val = default_path;
+    }
+    status = gr_set_cert_param("CLI_SSL_CRL", crl_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "CLI_SSL_CRL"));
 
     return CM_SUCCESS;
@@ -833,7 +867,9 @@ status_t gr_load_cli_ssl(gr_config_t *inst_cfg)
 
     status_t status =
         cm_load_config(g_gr_ssl_params, GR_CERT_PARAM_COUNT, file_name, &cli_ssl_cfg, CM_FALSE);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "failed to load cli config"));
+    if (status != CM_SUCCESS) {
+        LOG_RUN_WAR("failed to load cli config, will fallback to GR_HOME defaults");
+    }
     CM_RETURN_IFERR(gr_load_cli_ssl_params());
     return CM_SUCCESS;
 }
@@ -861,17 +897,19 @@ status_t gr_load_config(gr_config_t *inst_cfg)
         GR_RETURN_IFERR2(status, (void)printf("%s\nGR init loggers failed!\n", cm_get_errormsg(cm_get_error_code())));
         log_param_t *log_param = cm_log_param_instance();
         log_param->log_instance_starting = CM_TRUE;
+        CM_RETURN_IFERR(gr_load_data_file_path(inst_cfg));
+        CM_RETURN_IFERR(gr_load_hash_auth_enable(inst_cfg));
+        CM_RETURN_IFERR(gr_load_mes_params(inst_cfg));
+        CM_RETURN_IFERR(gr_load_mes_with_ip(inst_cfg));
+        CM_RETURN_IFERR(gr_load_ip_white_list_addrs(inst_cfg));
+        CM_RETURN_IFERR(gr_load_instance_id(inst_cfg));
     }
-    CM_RETURN_IFERR(gr_load_instance_id(inst_cfg));
+
     CM_RETURN_IFERR(gr_load_session_cfg(inst_cfg));
-    CM_RETURN_IFERR(gr_load_mes_params(inst_cfg));
-    CM_RETURN_IFERR(gr_load_mes_with_ip(inst_cfg));
-    CM_RETURN_IFERR(gr_load_ip_white_list_addrs(inst_cfg));
     CM_RETURN_IFERR(gr_load_threadpool_cfg(inst_cfg));
     CM_RETURN_IFERR(gr_load_listen_addr(inst_cfg));
     CM_RETURN_IFERR(gr_load_delay_clean_interval(inst_cfg));
-    CM_RETURN_IFERR(gr_load_data_file_path(inst_cfg));
-    CM_RETURN_IFERR(gr_load_hash_auth_enable(inst_cfg));
+
     return CM_SUCCESS;
 }
 

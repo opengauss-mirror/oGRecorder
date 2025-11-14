@@ -4472,14 +4472,10 @@ class dbClusterInfo():
         
         # 在主节点生成配置文件
         main_config_path = f"{parent_dir}/gr_inst.ini"
+        cli_config_path = f"{parent_dir}/gr_cli_inst.ini"
         with open(main_config_path, 'w') as f:
             f.write(main_config_content)
-        
-        # 复制为gr_cli_inst.ini
-        cli_config_path = f"{parent_dir}/gr_cli_inst.ini"
-        with open(cli_config_path, 'w') as f:
-            f.write(main_config_content)
-        
+
         self.logger.log("Successfully create initial config file on main node.")
 
         # 生成证书（grcmd会在配置文件中添加证书相关配置）
@@ -4951,10 +4947,11 @@ EOF
                 logger.log(f"Skipping local node: {node_name}")
         logger.log("Successfully distribute gr certs.")
 
-        # Restore read-only permissions after distribution
+        # Restore permissions for top-level files under CA path (skip demoCA directory)
         for node in nodes:
             node_name = node.get('ip', node.get('name', ''))
-            perm_cmd = f"chmod 400 {ca_path}/*"
+            # only chmod files directly under CA dir, do not touch demoCA subtree
+            perm_cmd = f"find {ca_path} -maxdepth 1 -type f -exec chmod 400 {{}} +"
             if node_name != GetHostIpOrName():
                 cmd = f"ssh -q -o ConnectTimeout=5 {node_name} '{perm_cmd}'"
             else:

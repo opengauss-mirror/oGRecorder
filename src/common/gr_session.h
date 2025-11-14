@@ -135,7 +135,6 @@ typedef struct st_gr_session {
     gr_session_status_t status;
     void *reactor;
     void *workthread_ctx;
-    gr_stat_item_t gr_session_stat[GR_EVT_COUNT];
     uint32_t client_version; /* client version */
     uint32_t proto_version;  /* client and server negotiated version */
     uint32_t objectid;
@@ -158,9 +157,8 @@ static inline char *gr_init_sendinfo_buf(char *input)
 
 static inline void gr_session_end_stat(gr_session_t *session, timeval_t *begin_tv, gr_wait_event_e event)
 {
-    if (session != NULL) {
-        gr_end_stat_base(&session->gr_session_stat[event], begin_tv);
-    }
+    (void)session;  // 保留参数以避免接口变更
+    gr_end_instance_stat(begin_tv, event);
 }
 
 typedef struct st_gr_session_ctrl {

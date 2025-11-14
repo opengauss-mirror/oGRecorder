@@ -31,6 +31,7 @@
 #include "gr_api.h"
 #include "gr_thv.h"
 #include "gr_param.h"
+#include "gr_stats.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -516,7 +517,7 @@ static status_t gr_process_write_file(gr_session_t *session)
         LOG_RUN_ERR("Failed to write to handle: %d, offset: %lld, size: %lld", handle, offset, file_size);
         return CM_ERROR;
     }
-    gr_end_stat_base(&session->gr_session_stat[GR_PWRITE_DISK], &begin_tv_disk);
+    gr_end_stat_base(&g_gr_instance.gr_instance_stat[GR_PWRITE_DISK], &begin_tv_disk);
     if (gr_get_hash_auth_enable()) {
         status = update_file_hash(session, handle, combine_hash);
         if (status != CM_SUCCESS) {
@@ -704,6 +705,14 @@ static status_t gr_process_get_inst_status(gr_session_t *session)
     GR_LOG_DEBUG_OP("Server status is %s.", gr_status->instance_status);
     return CM_SUCCESS;
 }
+// Instance级别的统计函数实现
+void gr_end_instance_stat(timeval_t *begin_tv, gr_wait_event_e event)
+{
+    if (begin_tv != NULL && event < GR_EVT_COUNT) {
+        gr_end_stat_base(&g_gr_instance.gr_instance_stat[event], begin_tv);
+    }
+}
+
 static status_t gr_process_get_time_stat(gr_session_t *session)
 {
     uint64 size = sizeof(gr_stat_item_t) * GR_EVT_COUNT;
@@ -712,28 +721,22 @@ static status_t gr_process_get_time_stat(gr_session_t *session)
 
     errno_t errcode = memset_s(time_stat, (size_t)size, 0, (size_t)size);
     securec_check_ret(errcode);
-    gr_session_ctrl_t *session_ctrl = gr_get_session_ctrl();
-    gr_session_t *tmp_session = NULL;
-    cm_spin_lock(&session_ctrl->lock, NULL);
-    for (uint32_t i = 0; i < session_ctrl->alloc_sessions; i++) {
-        tmp_session = session_ctrl->sessions[i];
-        if (tmp_session->is_used && !tmp_session->is_closed) {
-            for (uint32_t j = 0; j < GR_EVT_COUNT; j++) {
-                int64 count = (int64)tmp_session->gr_session_stat[j].wait_count;
-                int64 total_time = (int64)tmp_session->gr_session_stat[j].total_wait_time;
-                int64 max_sgl_time = (int64)tmp_session->gr_session_stat[j].max_single_time;
+    
+    // 从instance获取统计信息，而不是从session
+    for (uint32_t j = 0; j < GR_EVT_COUNT; j++) {
+        int64 count = (int64)g_gr_instance.gr_instance_stat[j].wait_count;
+        int64 total_time = (int64)g_gr_instance.gr_instance_stat[j].total_wait_time;
+        int64 max_sgl_time = (int64)g_gr_instance.gr_instance_stat[j].max_single_time;
 
-                time_stat[j].wait_count += count;
-                time_stat[j].total_wait_time += total_time;
-                time_stat[j].max_single_time = (atomic_t)MAX((int64)time_stat[j].max_single_time, max_sgl_time);
+        time_stat[j].wait_count = count;
+        time_stat[j].total_wait_time = total_time;
+        time_stat[j].max_single_time = max_sgl_time;
 
-                (void)cm_atomic_add(&tmp_session->gr_session_stat[j].wait_count, -count);
-                (void)cm_atomic_add(&tmp_session->gr_session_stat[j].total_wait_time, -total_time);
-                (void)cm_atomic_cas(&tmp_session->gr_session_stat[j].max_single_time, max_sgl_time, 0);
-            }
-        }
+        // 重置instance统计（可选，根据需求决定是否清零）
+        (void)cm_atomic_set(&g_gr_instance.gr_instance_stat[j].wait_count, 0);
+        (void)cm_atomic_set(&g_gr_instance.gr_instance_stat[j].total_wait_time, 0);
+        (void)cm_atomic_set(&g_gr_instance.gr_instance_stat[j].max_single_time, 0);
     }
-    cm_spin_unlock(&session_ctrl->lock);
 
     return CM_SUCCESS;
 }
