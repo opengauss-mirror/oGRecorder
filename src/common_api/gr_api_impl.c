@@ -314,7 +314,10 @@ status_t gr_open_file_impl(gr_conn_t *conn, const char *file_path, int flag, gr_
     LOG_DEBUG_INF("gr begin to open file, file path:%s, flag:%d", file_path, flag);
     GR_RETURN_IF_ERROR(gr_check_device_path(file_path));
     GR_RETURN_IF_ERROR(gr_check_file_flag(flag));
-    GR_RETURN_IF_ERROR(gr_open_file_on_server(conn, file_path, flag, file_handle));
+    if (gr_open_file_on_server(conn, file_path, flag, file_handle) != CM_SUCCESS) {
+        LOG_RUN_ERR("Failed to open file on server, file path:%s, flag:%d", file_path, flag);
+        return CM_ERROR;
+    }
     LOG_DEBUG_INF("gr open file successfully, file_path:%s, flag:%d, handle:%d", file_path, flag, file_handle->fd);
     return CM_SUCCESS;
 }
@@ -385,10 +388,13 @@ status_t gr_check_file_exist(gr_conn_t *conn, const char *path, bool *is_exist)
     
     bool32 exist = false;
     gft_item_type_t type;
+    status_t status = gr_exist_impl(conn, path, &exist, &type);
+    if (status != CM_SUCCESS) {
+        GR_THROW_ERROR(ERR_GR_FILE_NOT_EXIST, "Failed to check the path %s exists.", path);
+        LOG_RUN_ERR("Failed to check the path %s exists.", path);
+        return status;
+    }
 
-    GR_RETURN_IFERR2(gr_exist_impl(conn, path, &exist, &type),
-        GR_THROW_ERROR_EX(ERR_GR_FILE_NOT_EXIST, "Failed to check the path %s exists.\n", path));
-    
     *is_exist = (exist && type == GFT_FILE);
     return CM_SUCCESS;
 }
@@ -616,7 +622,7 @@ status_t gr_init_client(uint32_t max_open_files, char *home)
         return gr_init_err_proc(gr_env, "Environment variant GR_HOME not found", status);
     }
 
-    status = gr_load_config(&gr_env->inst_cfg); 
+    status = gr_load_config(&gr_env->inst_cfg);
     if (status != CM_SUCCESS) {
         return gr_init_err_proc(gr_env, "load config failed", status);
     }

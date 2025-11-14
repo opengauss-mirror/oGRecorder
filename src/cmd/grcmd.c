@@ -475,11 +475,12 @@ static void prepare_certs_path(const char *certs_path) {
     char cmd[GR_CMD_LEN];
     snprintf(cmd, sizeof(cmd),
         "mkdir -p %s && "
-        "cp /etc/pki/tls/openssl.cnf %s/. && "
+        "[ -f %s/openssl.cnf ] || cp /etc/pki/tls/openssl.cnf %s/. && "
         "cd %s && mkdir -p demoCA demoCA/newcerts demoCA/private && "
-        "touch demoCA/index.txt && echo '01'>demoCA/serial && chmod 700 demoCA/private && "
+        "touch demoCA/index.txt && echo '01'>demoCA/serial && "
+        "if [ ! -d demoCA/private ] || [ ! -e demoCA/index.txt ]; then chmod 700 demoCA/private; fi && "
         "sed -i 's/^.*default_md.*$/default_md      = sha256/' openssl.cnf",
-        certs_path, certs_path, certs_path);
+        certs_path, certs_path, certs_path, certs_path);
     system(cmd);
 }
 
@@ -530,24 +531,61 @@ static void create_client_certs(const char *certs_path, int days) {
 }
 
 static void create_server_conf(const char *conf_file, const char *ser_ca, const char *ser_key, const char *ser_cert, const char *ser_crl) {
+    // 如果配置文件中已存在相关键，则不重复写入
+    FILE *rf = fopen(conf_file, "r");
+    int has_ca = 0, has_key = 0, has_cert = 0, has_crl = 0, has_header = 0;
+    if (rf) {
+        char line[1024];
+        while (fgets(line, sizeof(line), rf) != NULL) {
+            if (strstr(line, "# ==================== Server SSL Configuration ====================") != NULL) {
+                has_header = 1;
+            }
+            if (strncmp(line, "SER_SSL_CA=", 11) == 0)   has_ca = 1;
+            if (strncmp(line, "SER_SSL_KEY=", 12) == 0)  has_key = 1;
+            if (strncmp(line, "SER_SSL_CERT=", 13) == 0) has_cert = 1;
+            if (strncmp(line, "SER_SSL_CRL=", 12) == 0)  has_crl = 1;
+        }
+        fclose(rf);
+    }
+    if (has_ca && has_key && has_cert && has_crl) {
+        return; // 已存在全部条目，不再写入
+    }
     FILE *fp = fopen(conf_file, "a");
     if (!fp) return;
-    fprintf(fp, "\n# ==================== Server SSL Configuration ====================\n");
-    fprintf(fp, "# 服务端SSL配置（自动生成）\n");
-    fprintf(fp, "SER_SSL_CA=%s\n", ser_ca);
-    fprintf(fp, "SER_SSL_KEY=%s\n", ser_key);
-    fprintf(fp, "SER_SSL_CERT=%s\n", ser_cert);
-    fprintf(fp, "SER_SSL_CRL=%s\n", ser_crl);
+    if (!has_header) {
+        fprintf(fp, "\n# ==================== Server SSL Configuration ====================\n");
+        fprintf(fp, "# 服务端SSL配置（自动生成）\n");
+    }
+    if (!has_ca)   fprintf(fp, "SER_SSL_CA=%s\n", ser_ca);
+    if (!has_key)  fprintf(fp, "SER_SSL_KEY=%s\n", ser_key);
+    if (!has_cert) fprintf(fp, "SER_SSL_CERT=%s\n", ser_cert);
+    if (!has_crl)  fprintf(fp, "SER_SSL_CRL=%s\n", ser_crl);
     fclose(fp);
 }
 
 static void create_client_conf(const char *conf_file, const char *cli_ca, const char *cli_key, const char *cli_cert, const char *cli_crl) {
-    FILE *fp = fopen(conf_file, "w");
+    // 若配置文件已有证书相关键，则不重复写入；否则按需追加缺失项
+    int has_ca = 0, has_key = 0, has_cert = 0, has_crl = 0;
+    FILE *rf = fopen(conf_file, "r");
+    if (rf) {
+        char line[1024];
+        while (fgets(line, sizeof(line), rf) != NULL) {
+            if (strncmp(line, "CLI_SSL_CA=", 11) == 0)   has_ca = 1;
+            if (strncmp(line, "CLI_SSL_KEY=", 12) == 0)  has_key = 1;
+            if (strncmp(line, "CLI_SSL_CERT=", 13) == 0) has_cert = 1;
+            if (strncmp(line, "CLI_SSL_CRL=", 12) == 0)  has_crl = 1;
+        }
+        fclose(rf);
+    }
+    if (has_ca && has_key && has_cert) {
+        return; // 已存在主要条目，不再写入
+    }
+    FILE *fp = fopen(conf_file, "a");
     if (!fp) return;
-    fprintf(fp, "CLI_SSL_CA=%s\n", cli_ca);
-    fprintf(fp, "CLI_SSL_KEY=%s\n", cli_key);
-    fprintf(fp, "CLI_SSL_CERT=%s\n", cli_cert);
-    fprintf(fp, "CLI_SSL_CRL=%s\n", cli_crl);
+    if (!has_ca)   fprintf(fp, "CLI_SSL_CA=%s\n", cli_ca);
+    if (!has_key)  fprintf(fp, "CLI_SSL_KEY=%s\n", cli_key);
+    if (!has_cert) fprintf(fp, "CLI_SSL_CERT=%s\n", cli_cert);
+    if (!has_crl)  fprintf(fp, "CLI_SSL_CRL=%s\n", cli_crl);
     fclose(fp);
 }
 
@@ -651,7 +689,15 @@ static status_t gencert_proc(void)
             printf("certs_path too long, path buffer overflow!\n");
             return CM_ERROR;
         }
-        prepare_certs_path(certs_path);
+        // 若已存在demoCA目录，认为已初始化，不再改变其权限或内容
+        char demoCA_path[CM_MAX_PATH_LEN];
+        if (snprintf_s(demoCA_path, sizeof(demoCA_path), sizeof(demoCA_path) - 1, "%s/demoCA", certs_path) == -1) {
+            printf("demoCA_path too long!\n");
+            return CM_ERROR;
+        }
+        if (!file_exists(demoCA_path)) {
+            prepare_certs_path(certs_path);
+        }
         generate_root_cert(certs_path, days);
         create_server_conf(conf_file, ser_ca, ser_key, ser_cert, ser_crl);
         create_server_certs(certs_path, days);

@@ -91,6 +91,8 @@ static inline void gr_unset_stat(gr_stat_ctx_t *stat_ctx)
 
 const char *gr_get_stat_event(gr_wait_event_e event);
 
+void gr_end_instance_stat(timeval_t *begin_tv, gr_wait_event_e event);
+
 #ifdef __cplusplus
 }
 #endif

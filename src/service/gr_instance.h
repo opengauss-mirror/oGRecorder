@@ -35,6 +35,7 @@
 #include "cm_res_mgr.h"  // for cm_res_mgr_t
 #include "gr_reactor.h"
 #include "ssl_func.h"
+#include "gr_stats.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -93,6 +94,7 @@ typedef struct st_gr_instance {
     bool32 is_join_cluster;
     gr_session_t *handle_session;
     gr_bg_task_info_t syn_meta_task[GR_META_SYN_BG_TASK_NUM_MAX];
+    gr_stat_item_t gr_instance_stat[GR_EVT_COUNT];  // 实例级别的时延统计
 
 #if defined(_DEBUG) || defined(DEBUG) || defined(DB_DEBUG_VERSION)
     void *fi_run_ctx;
