@@ -688,6 +688,7 @@ static status_t gr_create_mes_session(void)
             LOG_RUN_ERR("gr_create_mes_session failed, mes must occupy first %u sessions.", mes_sess_cnt),
             cm_spin_unlock(&session_ctrl->lock));
     }
+    
     for (uint32_t i = 0; i < mes_sess_cnt; i++) {
         gr_session_t *session = session_ctrl->sessions[i];
         session->is_direct = CM_TRUE;

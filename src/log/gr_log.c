@@ -147,45 +147,15 @@ uint32_t gr_get_cmd_log_def_count()
 
 static status_t gr_init_log_file(log_param_t *log_param, gr_config_t *inst_cfg)
 {
-    int64 val_int64;
-    uint16 val_uint16;
+    log_param->max_log_file_size = LOG_MAX_FILE_SIZE;
+    log_param->max_audit_file_size = AUDIT_MAX_FILE_SIZE;
 
-    char *value = cm_get_config_value(&inst_cfg->config, "LOG_MAX_FILE_SIZE");
-    status_t status = cm_str2size(value, &val_int64);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_MAX_FILE_SIZE"));
-    if (val_int64 < CM_MIN_LOG_FILE_SIZE || val_int64 > CM_MAX_LOG_FILE_SIZE) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_MAX_FILE_SIZE");
-        return CM_ERROR;
-    }
-    log_param->max_log_file_size = (uint64)val_int64;
-
-    value = cm_get_config_value(&inst_cfg->config, "AUDIT_MAX_FILE_SIZE");
-    status = cm_str2size(value, &val_int64);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_MAX_FILE_SIZE"));
-    if (val_int64 < CM_MIN_LOG_FILE_SIZE || val_int64 > CM_MAX_LOG_FILE_SIZE) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "AUDIT_MAX_FILE_SIZE");
-        return CM_ERROR;
-    }
-    log_param->max_audit_file_size = (uint64)val_int64;
-
-    value = cm_get_config_value(&inst_cfg->config, "LOG_FILE_PERMISSIONS");
-    status = cm_str2uint16(value, &val_uint16);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_FILE_PERMISSIONS"));
-    if (val_uint16 < CM_DEF_LOG_FILE_PERMISSIONS || val_uint16 > CM_MAX_LOG_PERMISSIONS) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_FILE_PERMISSIONS");
-        return CM_ERROR;
-    }
-    cm_log_set_file_permissions(val_uint16);
-
-    value = cm_get_config_value(&inst_cfg->config, "LOG_PATH_PERMISSIONS");
-    status = cm_str2uint16(value, &val_uint16);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_PATH_PERMISSIONS"));
-    if (val_uint16 < CM_DEF_LOG_PATH_PERMISSIONS || val_uint16 > CM_MAX_LOG_PERMISSIONS) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_PATH_PERMISSIONS");
-        return CM_ERROR;
-    }
-    cm_log_set_path_permissions(val_uint16);
-
+    cm_log_set_file_permissions(LOG_FILE_PERMISSIONS);
+    cm_log_set_path_permissions(LOG_PATH_PERMISSIONS);
+    LOG_RUN_INF("LOG MAX FILE SIZE: %llu", log_param->max_log_file_size);
+    LOG_RUN_INF("AUDIT LOG MAX FILE SIZE: %llu", log_param->max_audit_file_size);
+    LOG_RUN_INF("LOG FILE PERMISSIONS: %u", LOG_FILE_PERMISSIONS);
+    LOG_RUN_INF("LOG PATH PERMISSIONS: %u", LOG_PATH_PERMISSIONS);
     return CM_SUCCESS;
 }
 
@@ -227,7 +197,7 @@ static status_t gr_init_log_home(gr_config_t *inst_cfg, log_param_t *log_param, 
     if (status != CM_SUCCESS) {
         return CM_ERROR;
     }
-    status = gr_init_log_home_ex(inst_cfg, alarm_dir, "LOG_ALARM_HOME", "log/alarm");
+    status = gr_init_log_home_ex(inst_cfg, alarm_dir, "LOG_HOME", "log/alarm");
     if (status != CM_SUCCESS) {
         return CM_ERROR;
     }
@@ -273,20 +243,6 @@ static status_t gr_init_loggers_inner(gr_config_t *inst_cfg, log_param_t *log_pa
         return CM_ERROR;
     } else {
         log_param->log_backup_file_count = val_uint32;
-    }
-
-    value = cm_get_config_value(&inst_cfg->config, "AUDIT_BACKUP_FILE_COUNT");
-    if (cm_str2uint32(value, &val_uint32) != CM_SUCCESS) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_BACKUP_FILE_COUNT");
-        return CM_ERROR;
-#ifdef OPENGAUSS
-    } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT_LARGER) {
-#else
-    } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT) {
-#endif
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_BACKUP_FILE_COUNT");
-        return CM_ERROR;
-    } else {
         log_param->audit_backup_file_count = val_uint32;
     }
 
@@ -301,7 +257,6 @@ static status_t gr_init_loggers_inner(gr_config_t *inst_cfg, log_param_t *log_pa
         return CM_ERROR;
     }
 
-    value = cm_get_config_value(&inst_cfg->config, "AUDIT_LEVEL");
     if (cm_str2uint32(value, (uint32_t *)&log_param->audit_level) != CM_SUCCESS) {
         CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_LEVEL");
         return CM_ERROR;

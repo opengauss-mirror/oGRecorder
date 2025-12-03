@@ -801,11 +801,7 @@ static status_t gr_process_getcfg(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_QUERY, "%s", name));
 
     GR_RETURN_IF_ERROR(gr_get_cfg_param(name, &value));
-    if (strlen(value) != 0 && cm_str_equal_ins(name, "SSL_PWD_CIPHERTEXT")) {
-        GR_LOG_DEBUG_OP("Server value is ***, when get cfg.");
-    } else {
-        GR_LOG_DEBUG_OP("Server value is %s, when get cfg.", value);
-    }
+    GR_LOG_DEBUG_OP("Server value is %s, when get cfg.", value);
     text_t data;
     cm_str2text(value, &data);
     // SSL default value is NULL
