@@ -44,6 +44,7 @@ extern "C" {
 #define GR_MAX_INSTANCE_OPEN_FILES 1
 #define GR_LOGFILE_SIZE 10000
 #define GR_LOG_LEVEL 0xffffffff
+#define GR_CM_SO_NAME "libclient.so"
 
 typedef enum {
     CM_RES_SUCCESS = 0,

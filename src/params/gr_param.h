@@ -39,8 +39,6 @@
 extern "C" {
 #endif
 
-#define GR_MIN_MES_WORK_THREAD_COUNT (2)
-#define GR_MAX_MES_WORK_THREAD_COUNT (64)
 // for most time, standby nodes rerad meta from primary
 #define GR_WORK_THREAD_LOAD_DATA_PERCENT 0.5
 
@@ -50,6 +48,12 @@ extern "C" {
 #define GR_MIN_RECV_MSG_BUFF_SIZE (uint64) SIZE_M(9)
 #define GR_MAX_RECV_MSG_BUFF_SIZE (uint64) SIZE_G(1)
 
+#define DELAY_CLEAN_INTERVAL 5
+#define MES_WAIT_TIMEOUT 10000
+#define WORK_THREADS_COUNT 16
+#define IO_THREADS_COUNT 2
+#define MES_WORK_THREAD_COUNT 8
+#define INTERCONNECT_CHANNEL_NUM 2
 typedef enum en_gr_mode {
     GR_MODE_UNKNOWN = 0,
     GR_MODE_CLUSTER_RAID = 1,  // MULTI DATANODE's RAID
@@ -110,8 +114,7 @@ extern gr_config_t *g_inst_cfg;
 gr_config_t *gr_get_g_inst_cfg();
 
 #define GR_UNIX_DOMAIN_SOCKET_NAME ".gr_unix_d_socket"
-#define GR_MAX_SSL_PERIOD_DETECTION 180
-#define GR_MIN_SSL_PERIOD_DETECTION 1
+
 
 status_t gr_load_config(gr_config_t *inst_cfg);
 status_t gr_set_cfg_dir(const char *home, gr_config_t *inst_cfg);
@@ -162,7 +165,6 @@ void gr_ssl_ca_cert_expire(void);
 
 status_t gr_set_cfg_param(char *name, char *value, char *scope);
 status_t gr_get_cfg_param(const char *name, char **value);
-status_t gr_load_delay_clean_interval_core(char *value, gr_config_t *inst_cfg);
 status_t gr_set_cert_param(const char *param_name, const char *param_value);
 
 /*

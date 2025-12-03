@@ -295,22 +295,9 @@ static status_t getcfg_proc(void)
     char value[GR_PARAM_BUFFER_SIZE] = {0};
     status_t status = gr_getcfg_impl(conn, name, value, GR_PARAM_BUFFER_SIZE);
     if (status != CM_SUCCESS) {
-        if (strlen(value) != 0 && cm_str_equal_ins(name, "SSL_PWD_CIPHERTEXT")) {
-            LOG_RUN_ERR("Failed to get cfg, name is %s, value is ***.\n", name);
-            (void)printf("Failed to get cfg, name is %s, value is %s.\n", name, value);
-            (void)fflush(stdout);
-            gr_print_detail_error();
-        } else {
-            GR_PRINT_ERROR("Failed to get cfg, name is %s, value is %s.\n", name, (strlen(value) == 0) ? NULL : value);
-        }
+        GR_PRINT_ERROR("Failed to get cfg, name is %s, value is %s.\n", name, (strlen(value) == 0) ? NULL : value);
     } else {
-        if (strlen(value) != 0 && cm_str_equal_ins(name, "SSL_PWD_CIPHERTEXT")) {
-            LOG_DEBUG_INF("Succeed to get cfg, name is %s, value is ***.\n", name);
-            (void)printf("Succeed to get cfg, name is %s, value is %s.\n", name, value);
-            (void)fflush(stdout);
-        } else {
-            GR_PRINT_INF("Succeed to get cfg, name is %s, value is %s.\n", name, (strlen(value) == 0) ? NULL : value);
-        }
+        GR_PRINT_INF("Succeed to get cfg, name is %s, value is %s.\n", name, (strlen(value) == 0) ? NULL : value);
     }
     gr_disconnect_ex(conn);
     return status;

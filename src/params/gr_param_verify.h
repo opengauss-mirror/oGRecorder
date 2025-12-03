@@ -42,20 +42,8 @@ status_t gr_notify_log_level(void *se, void *item, char *value);
 status_t gr_verify_lock_file_path(char *path);
 status_t gr_verify_log_file_dir_name(char *log_home);
 status_t gr_verify_log_file_real_path(char *log_home);
-status_t gr_verify_log_file_size(void *lex, void *def);
-status_t gr_notify_log_file_size(void *se, void *item, char *value);
 status_t gr_verify_log_backup_file_count(void *lex, void *def);
 status_t gr_notify_log_backup_file_count(void *se, void *item, char *value);
-status_t gr_verify_audit_backup_file_count(void *lex, void *def);
-status_t gr_notify_audit_backup_file_count(void *se, void *item, char *value);
-status_t gr_verify_audit_file_size(void *lex, void *def);
-status_t gr_notify_audit_file_size(void *se, void *item, char *value);
-status_t gr_verify_audit_level(void *lex, void *def);
-status_t gr_notify_audit_level(void *se, void *item, char *value);
-status_t gr_verify_delay_clean_interval(void *lex, void *def);
-status_t gr_notify_delay_clean_interval(void *se, void *item, char *value);
-status_t gr_verify_mes_wait_timeout(void *lex, void *def);
-status_t gr_notify_mes_wait_timeout(void *se, void *item, char *value);
 
 #ifdef __cplusplus
 }

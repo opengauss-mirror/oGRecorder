@@ -299,21 +299,10 @@ status_t gr_init_cm(gr_instance_t *inst)
 {
     inst->cm_res.is_valid = CM_FALSE;
     inst->inst_work_status_map = 0;
-    gr_config_t *inst_cfg = gr_get_inst_cfg();
-    char *value = cm_get_config_value(&inst_cfg->config, "GR_CM_SO_NAME");
-    if (value == NULL || strlen(value) == 0) {
-        LOG_RUN_INF("gr cm config of GR_CM_SO_NAME is empty.");
-        return CM_SUCCESS;
-    }
-
-    if (strlen(value) >= GR_MAX_NAME_LEN) {
-        LOG_RUN_ERR("gr cm config of GR_CM_SO_NAME is exceeds the max len %u.", GR_MAX_NAME_LEN - 1);
-        return CM_ERROR;
-    }
 #ifdef ENABLE_GRTEST
-    GR_RETURN_IF_ERROR(gr_simulation_cm_res_mgr_init(value, &inst->cm_res.mgr, NULL));
+    GR_RETURN_IF_ERROR(gr_simulation_cm_res_mgr_init(GR_CM_SO_NAME, &inst->cm_res.mgr, NULL));
 #else
-    GR_RETURN_IF_ERROR(cm_res_mgr_init(value, &inst->cm_res.mgr, NULL));
+    GR_RETURN_IF_ERROR(cm_res_mgr_init(GR_CM_SO_NAME, &inst->cm_res.mgr, NULL));
 #endif
     status_t status =
         (status_t)cm_res_init(&inst->cm_res.mgr, (unsigned int)inst->inst_cfg.params.inst_id, GR_CMS_RES_TYPE, NULL);

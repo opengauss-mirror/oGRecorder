@@ -39,6 +39,11 @@ typedef struct st_gr_config gr_config_t;
 #define GR_AUDIT_MODIFY 0x00000001
 #define GR_AUDIT_QUERY 0x00000002
 
+#define LOG_MAX_FILE_SIZE SIZE_M(1)*256
+#define AUDIT_MAX_FILE_SIZE SIZE_M(1)*256
+#define LOG_FILE_PERMISSIONS 600
+#define LOG_PATH_PERMISSIONS 700
+
 typedef struct st_gr_log_def_t {
     log_type_t log_id;
     char log_filename[GR_MAX_NAME_LEN];
