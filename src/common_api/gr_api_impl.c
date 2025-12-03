@@ -690,7 +690,7 @@ status_t gr_getcfg_impl(gr_conn_t *conn, const char *name, char *out_str, size_t
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "value of str_len is not large enough when getcfg.");
         return CM_ERROR;
     }
-    LOG_DEBUG_INF("Client get cfg is %s.", (strlen(out_str) == 0) ? NULL : out_str);
+    LOG_DEBUG_INF("Client get cfg is %s.", (strlen(out_str) == 0) ? "NULL" : out_str);
     return CM_SUCCESS;
 }
 
