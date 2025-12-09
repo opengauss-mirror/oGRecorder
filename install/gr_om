@@ -4386,7 +4386,6 @@ class dbClusterInfo():
                 f"LISTEN_ADDR={dbNode.listen_addr}\n"
                 f"IP_WHITE_LIST={dbNode.sshIps[0]},127.0.0.1\n"
                 f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
-                f"GR_CM_SO_NAME=libclient.so\n"
             )
             cmd = f"printf \"%s\" \"{config_content}\" > {cfg_path}"
             status, output = self.execute_on_node(
@@ -4460,14 +4459,22 @@ class dbClusterInfo():
 
         # 只在主节点生成配置文件
         main_node = clusterInfo.dbNodes[0]  # 使用第一个节点作为主节点
+
+        # 构造包含所有节点 IP 的白名单（每个节点的 sshIps[0] + 127.0.0.1）
+        all_ips = []
+        for node in clusterInfo.dbNodes:
+            if node.sshIps and node.sshIps[0]:
+                all_ips.append(node.sshIps[0])
+        all_ips.append("127.0.0.1")
+        ip_white_list = ",".join(all_ips)
+
         main_config_content = (
             f"INST_ID=0\n"
             f"LOG_LEVEL=255\n"
             f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
             f"LISTEN_ADDR={main_node.listen_addr}\n"
-            f"IP_WHITE_LIST={main_node.sshIps[0]},127.0.0.1\n"
+            f"IP_WHITE_LIST={ip_white_list}\n"
             f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
-            f"GR_CM_SO_NAME=libclient.so\n"
         )
         
         # 在主节点生成配置文件
@@ -4498,10 +4505,9 @@ class dbClusterInfo():
             with open(main_config_path, 'r') as f:
                 config_content = f.read()
             
-            # 修改INST_ID和LISTEN_ADDR
+            # 修改INST_ID和LISTEN_ADDR（IP_WHITE_LIST 对所有节点保持一致，允许所有节点互访）
             config_content = config_content.replace(f"INST_ID=0", f"INST_ID={i}")
             config_content = config_content.replace(f"LISTEN_ADDR={main_node.listen_addr}", f"LISTEN_ADDR={dbNode.listen_addr}")
-            config_content = config_content.replace(f"IP_WHITE_LIST={main_node.sshIps[0]},127.0.0.1", f"IP_WHITE_LIST={dbNode.sshIps[0]},127.0.0.1")
             
             # 在本地生成节点特定的gr_inst.ini配置文件
             local_config_path = f"{parent_dir}/gr_inst_{dbNode.name}.ini"

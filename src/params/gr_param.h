@@ -166,6 +166,7 @@ void gr_ssl_ca_cert_expire(void);
 status_t gr_set_cfg_param(char *name, char *value, char *scope);
 status_t gr_get_cfg_param(const char *name, char **value);
 status_t gr_set_cert_param(const char *param_name, const char *param_value);
+void gr_get_param_items(config_item_t **items, uint32 *count);
 
 /*
  * @brief 获取hash认证开关状态

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2022 Huawei Technologies Co.,Ltd.
  *
  * GR is licensed under Mulan PSL v2.
@@ -45,6 +45,7 @@
 #endif
 #include "gr_fault_injection.h"
 #include "gr_nodes_list.h"
+#include "gr_param_sync.h"
 
 #define GR_MAINTAIN_ENV "GR_MAINTAIN"
 gr_instance_t g_gr_instance;
@@ -221,6 +222,9 @@ status_t gr_startup(gr_instance_t *inst, gr_srv_args_t gr_args)
     GR_RETURN_IFERR2(status, GR_PRINT_RUN_ERROR("Failed to load server parameters!\n"));
     status = gr_save_process_pid(&inst->inst_cfg);
     GR_RETURN_IFERR2(status, GR_PRINT_RUN_ERROR("Save grserver pid failed!\n"));
+    // At initialization, the master_id has not been observed from CM yet, use GR_INVALID_ID32 as a marker
+    inst->last_cm_master_id = GR_INVALID_ID32;
+
     gr_init_maintain(inst, gr_args);
     LOG_RUN_INF("GR instance begin to initialize.");
 
@@ -553,6 +557,42 @@ void gr_recovery_when_primary(gr_session_t *session, gr_instance_t *inst, uint32
     // when primary, no need to check result
     g_gr_instance.is_join_cluster = CM_TRUE;
     inst->status = GR_STATUS_OPEN;
+
+    /*
+     * Two scenarios:
+     * 1. first_start == CM_TRUE: Primary instance starts for the first time and obtains the CM lock.
+     *    Action: Write WORM, then broadcast to notify all standby nodes to read from WORM.
+     * 2. !first_start && old_status == GR_STATUS_OPEN: Standby is promoted to primary (switchover/failover).
+     *    Action: Synchronize config from WORM, apply to memory, rebuild WORM, and broadcast to other standby nodes.
+     */
+    if (first_start) {
+        (void)gr_delete_worm_file(&g_gr_instance.inst_cfg);
+        if (gr_write_config_to_worm(&inst->inst_cfg) != CM_SUCCESS) {
+            LOG_RUN_ERR("[RECOVERY] primary %u write WORM on first start failed.", curr_id);
+            return;
+        }
+        (void)gr_trigger_param_broadcast();
+        return;
+    }
+
+    if (old_status != GR_STATUS_OPEN) {
+        return;
+    }
+
+    if (gr_standby_node_worm_write(&inst->inst_cfg) != CM_SUCCESS) {
+        LOG_RUN_ERR("[RECOVERY] new primary %u sync config from WORM failed.", curr_id);
+        return;
+    }
+
+    if (gr_apply_cfg_to_memory(&inst->inst_cfg, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
+        LOG_RUN_ERR("[RECOVERY] new primary %u apply local cfg to memory failed.", curr_id);
+    }
+
+    if (gr_rebuild_worm_file(&inst->inst_cfg) != CM_SUCCESS) {
+        LOG_RUN_ERR("[RECOVERY] new primary %u rebuild WORM file failed.", curr_id);
+    }
+
+    (void)gr_trigger_param_broadcast();
 }
 
 void gr_recovery_when_standby(gr_session_t *session, gr_instance_t *inst, uint32_t curr_id, uint32_t master_id)
@@ -571,6 +611,21 @@ void gr_recovery_when_standby(gr_session_t *session, gr_instance_t *inst, uint32
             old_master_id);
         return;
     }
+
+    /*
+     * When standby successfully joins the cluster, use the WORM file to overwrite local config,
+     * ensuring the new standby node's params are consistent with the primary.
+     * Config overwrite failure does not prevent node from entering OPEN state,
+     * but an error will be logged for troubleshooting.
+     */
+    if (gr_standby_node_worm_write(&inst->inst_cfg) != CM_SUCCESS) {
+        LOG_RUN_ERR("[RECOVERY] standby %u failed to sync config from WORM on join cluster.", curr_id);
+    } else {
+        if (gr_apply_cfg_to_memory(&inst->inst_cfg, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
+            LOG_RUN_ERR("[RECOVERY] standby %u failed to apply local config to memory.", curr_id);
+        }
+    }
+
     inst->status = GR_STATUS_OPEN;
 }
 /*
@@ -580,7 +635,7 @@ void gr_recovery_when_standby(gr_session_t *session, gr_instance_t *inst, uint32
 void gr_get_cm_lock_and_recover_inner(gr_session_t *session, gr_instance_t *inst)
 {
     cm_latch_x(&g_gr_instance.switch_latch, GR_DEFAULT_SESSIONID, LATCH_STAT(LATCH_SWITCH));
-    uint32_t old_master_id = gr_get_master_id();
+    uint32_t old_master_id = inst->last_cm_master_id;
     bool32 grab_lock = CM_FALSE;
     uint32_t master_id = GR_INVALID_ID32;
     status_t status = gr_get_cm_lock_owner(inst, &grab_lock, CM_TRUE, &master_id);
@@ -588,6 +643,13 @@ void gr_get_cm_lock_and_recover_inner(gr_session_t *session, gr_instance_t *inst
         cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
         return;
     }
+
+    // Log recovery information for CM lock: old_master_id, master_id, current_id, lock status, and instance status.
+    gr_config_t *inst_cfg_dbg = gr_get_inst_cfg();
+    uint32_t curr_id_dbg = (inst_cfg_dbg != NULL) ? (uint32_t)inst_cfg_dbg->params.inst_id : GR_INVALID_ID32;
+    LOG_RUN_INF("[RECOVERY] gr_get_cm_lock_and_recover_inner: old_master_id=%u, master_id=%u, curr_id=%u, grab_lock=%u, inst_status=%d",
+        old_master_id, master_id, curr_id_dbg, (uint32)grab_lock, inst->status);
+
     if (master_id == GR_INVALID_ID32) {
         LOG_RUN_WAR("[RECOVERY]cm is not init, just try again.");
         cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
@@ -595,28 +657,39 @@ void gr_get_cm_lock_and_recover_inner(gr_session_t *session, gr_instance_t *inst
     }
     gr_config_t *inst_cfg = gr_get_inst_cfg();
     uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
-    // master no change
-    if (old_master_id == master_id) {
-        // primary, no need check
-        if (master_id == curr_id) {
+    bool32 master_changed = (old_master_id != master_id);
+
+    // Fast return if the master has not changed:
+    // 1. If current node is already primary and last_cm_master_id == curr_id, just return.
+    // 2. If current node is standby and has already joined the cluster, just return.
+    if (!master_changed) {
+        if (master_id == curr_id && old_master_id == curr_id) {
+            LOG_DEBUG_INF("[RECOVERY] No master change: already handled as primary, no action needed.");
             cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
             return;
         }
-        if (inst->is_join_cluster) {
+        if (master_id != curr_id && inst->is_join_cluster) {
+            LOG_DEBUG_INF("[RECOVERY] No master change: standby already joined cluster, no action needed.");
             cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
             return;
         }
     }
-    // standby is started or masterid has been changed
+
+    // Master changed or this is the first time becoming standby/primary
+
+    // Master changed or this is the first time becoming standby/primary
     if (master_id != curr_id) {
+        LOG_RUN_INF("[RECOVERY] Enter standby recovery: curr_id=%u, master_id=%u", curr_id, master_id);
         gr_recovery_when_standby(session, inst, curr_id, master_id);
-        cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
-        return;
+    } else {
+        LOG_RUN_INF("[RECOVERY] Enter primary recovery: curr_id=%u, grab_lock=%u", curr_id, (uint32)grab_lock);
+        gr_set_recover_thread_id(gr_get_current_thread_id());
+        gr_recovery_when_primary(session, inst, curr_id, grab_lock);
+        gr_set_recover_thread_id(0);
     }
-    /*1、grab lock success 2、set main,other switch lock 3、restart, lock no transfer*/
-    gr_set_recover_thread_id(gr_get_current_thread_id());
-    gr_recovery_when_primary(session, inst, curr_id, grab_lock);
-    gr_set_recover_thread_id(0);
+
+    // Update last_cm_master_id as observed in the recovery thread
+    inst->last_cm_master_id = master_id;
     cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));
 }
 
