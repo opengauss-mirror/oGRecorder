@@ -94,7 +94,8 @@ typedef struct st_gr_instance {
     bool8 is_checking;
     bool8 reserve[3];
     bool32 is_join_cluster;
-    uint32_t last_cm_master_id;        // The most recently observed CM master_id in the recovery thread, used to detect master node switches
+    // The most recently observed CM master_id in the recovery thread, used to detect master node switches
+    uint32_t last_cm_master_id;
     gr_session_t *handle_session;
     gr_bg_task_info_t syn_meta_task[GR_META_SYN_BG_TASK_NUM_MAX];
     gr_stat_item_t gr_instance_stat[GR_EVT_COUNT];  // 实例级别的时延统计

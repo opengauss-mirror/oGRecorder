@@ -135,7 +135,7 @@ static void handle_main_wait(void)
                 continue;
             }
             LOG_RUN_INF("apply reserved local cfg to memory");
-            gr_apply_cfg_to_memory(inst_cfg, CM_FALSE, CM_TRUE);
+            gr_apply_cfg_to_memory(inst_cfg, CM_FALSE, CM_FALSE, CM_FALSE);
             // Step 2: Only master node performs periodic sync.
             uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
             uint32_t master_id = gr_get_master_id();
@@ -146,10 +146,12 @@ static void handle_main_wait(void)
 
             // Step 4: Apply WORM config to memory, log error if fail, info if success.
             LOG_RUN_INF("apply synced local cfg to memory");
-            if (gr_apply_cfg_to_memory(inst_cfg, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
-                LOG_RUN_ERR("[PERIODIC SYNC] master %u failed to apply parameters to memory (period=%lld)", curr_id, periods);
+            if (gr_apply_cfg_to_memory(inst_cfg, CM_FALSE, CM_FALSE, CM_TRUE) != CM_SUCCESS) {
+                LOG_RUN_ERR("[PERIODIC SYNC] master %u failed to apply parameters"
+                    "to memory (period=%lld)", curr_id, periods);
             } else {
-                LOG_RUN_INF("[PERIODIC SYNC] master %u applied parameters to memory, broadcasting (period=%lld)", curr_id, periods);
+                LOG_RUN_INF("[PERIODIC SYNC] master %u applied parameters to memory,"
+                    "broadcasting (period=%lld)", curr_id, periods);
             }
 
             // Step 3: Write config to WORM, skip this period on failure.
@@ -208,7 +210,7 @@ static status_t gr_init_background_tasks(void)
     // Initialize parameter synchronization context and create a broadcast thread
     status_t status = gr_init_config_sync_context();
     if (status != CM_SUCCESS) {
-        // Broadcast thread initialization failed, but it does not affect the main process  
+        // Broadcast thread initialization failed, but it does not affect the main process
         LOG_RUN_ERR("Create config sync background task failed.");
     }
 

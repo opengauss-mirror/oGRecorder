@@ -230,16 +230,16 @@ static status_t gr_init_loggers_inner(gr_config_t *inst_cfg, log_param_t *log_pa
 {
     uint32_t val_uint32;
 
-    char *value = cm_get_config_value(&inst_cfg->config, "LOG_BACKUP_FILE_COUNT");
+    char *value = cm_get_config_value(&inst_cfg->config, "LOG_FILE_COUNT");
     if (cm_str2uint32(value, &val_uint32) != CM_SUCCESS) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_FILE_COUNT");
         return CM_ERROR;
 #ifdef OPENGAUSS
     } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT_LARGER) {
 #else
     } else if (val_uint32 > CM_MAX_LOG_FILE_COUNT) {
 #endif
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT");
+        CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_FILE_COUNT");
         return CM_ERROR;
     } else {
         log_param->log_backup_file_count = val_uint32;

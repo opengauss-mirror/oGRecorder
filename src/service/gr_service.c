@@ -794,7 +794,6 @@ static status_t gr_process_setcfg(gr_session_t *session)
     gr_config_t *inst_cfg = gr_get_inst_cfg();
     uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
     uint32_t master_id = gr_get_master_id();
-
     if (curr_id != master_id && gr_is_sync_param(name)) {
         return gr_process_remote(session);
     }
@@ -1030,7 +1029,7 @@ static status_t gr_process_set_main_inst(gr_session_t *session)
     if (inst_cfg != NULL) {
         if (gr_standby_node_worm_write(inst_cfg) == CM_SUCCESS) {
             // Apply synchronized configuration to memory.
-            if (gr_apply_cfg_to_memory(inst_cfg, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
+            if (gr_apply_cfg_to_memory(inst_cfg, CM_TRUE, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
                 LOG_RUN_ERR("[SWITCH] new primary %u: failed to apply local config to memory.", curr_id);
             }
             // Rebuild WORM file in case of changes.

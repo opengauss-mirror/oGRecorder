@@ -33,9 +33,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-extern const char *gr_sync_param[];      /**< list of synchronizable parameters */
-extern const char *gr_reserve_param[];   /**< list of reserved parameters to keep locally */
-
 typedef struct st_gr_config_sync_context {
     thread_t broadcast_thread;        /**< broadcast thread handle */
     volatile bool8 broadcast_thread_running;  /**< broadcast thread state */
@@ -51,7 +48,7 @@ status_t gr_init_config_worm();
 status_t gr_init_config_sync_context(void);
 status_t gr_write_config_to_worm(gr_config_t *inst_cfg);
 status_t gr_trigger_param_broadcast(void);
-status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_memory);
+status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_memory, bool8 is_sync);
 status_t gr_standby_node_worm_write(gr_config_t *inst_cfg);
 status_t gr_rebuild_worm_file(gr_config_t *inst_cfg);
 status_t gr_delete_worm_file(gr_config_t *inst_cfg);

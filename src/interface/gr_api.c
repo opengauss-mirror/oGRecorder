@@ -839,7 +839,7 @@ void gr_refresh_logger(char *log_field, unsigned long long *value)
     } else if (strcmp(log_field, "LOG_MAX_FILE_SIZE") == 0) {
         cm_log_param_instance()->max_log_file_size = (uint64)(*value);
         cm_log_param_instance()->max_audit_file_size = (uint64)(*value);
-    } else if (strcmp(log_field, "LOG_BACKUP_FILE_COUNT") == 0) {
+    } else if (strcmp(log_field, "LOG_FILE_COUNT") == 0) {
         cm_log_param_instance()->log_backup_file_count = (uint32_t)(*value);
         cm_log_param_instance()->audit_backup_file_count = (uint32_t)(*value);
     }
@@ -889,7 +889,7 @@ int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *va
     }
 
     if (cm_strcmpi(name, "LOG_LEVEL") != 0 && cm_strcmpi(name, "LOG_MAX_FILE_SIZE") != 0 &&
-        cm_strcmpi(name, "LOG_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_MAX_FILE_SIZE") != 0 &&
+        cm_strcmpi(name, "LOG_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_MAX_FILE_SIZE") != 0 &&
         cm_strcmpi(name, "AUDIT_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_LEVEL") != 0 && 
         cm_strcmpi(name, "DATA_FILE_PATH") != 0) {
         LOG_RUN_ERR("gr_set_conf: invalid configuration name: %s", name);

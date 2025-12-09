@@ -584,7 +584,7 @@ void gr_recovery_when_primary(gr_session_t *session, gr_instance_t *inst, uint32
         return;
     }
 
-    if (gr_apply_cfg_to_memory(&inst->inst_cfg, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
+    if (gr_apply_cfg_to_memory(&inst->inst_cfg, CM_TRUE, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
         LOG_RUN_ERR("[RECOVERY] new primary %u apply local cfg to memory failed.", curr_id);
     }
 
@@ -621,7 +621,7 @@ void gr_recovery_when_standby(gr_session_t *session, gr_instance_t *inst, uint32
     if (gr_standby_node_worm_write(&inst->inst_cfg) != CM_SUCCESS) {
         LOG_RUN_ERR("[RECOVERY] standby %u failed to sync config from WORM on join cluster.", curr_id);
     } else {
-        if (gr_apply_cfg_to_memory(&inst->inst_cfg, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
+        if (gr_apply_cfg_to_memory(&inst->inst_cfg, CM_TRUE, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
             LOG_RUN_ERR("[RECOVERY] standby %u failed to apply local config to memory.", curr_id);
         }
     }
@@ -647,7 +647,8 @@ void gr_get_cm_lock_and_recover_inner(gr_session_t *session, gr_instance_t *inst
     // Log recovery information for CM lock: old_master_id, master_id, current_id, lock status, and instance status.
     gr_config_t *inst_cfg_dbg = gr_get_inst_cfg();
     uint32_t curr_id_dbg = (inst_cfg_dbg != NULL) ? (uint32_t)inst_cfg_dbg->params.inst_id : GR_INVALID_ID32;
-    LOG_RUN_INF("[RECOVERY] gr_get_cm_lock_and_recover_inner: old_master_id=%u, master_id=%u, curr_id=%u, grab_lock=%u, inst_status=%d",
+    LOG_RUN_INF("[RECOVERY] gr_get_cm_lock_and_recover_inner: "
+        "old_master_id=%u, master_id=%u, curr_id=%u, grab_lock=%u, inst_status=%d",
         old_master_id, master_id, curr_id_dbg, (uint32)grab_lock, inst->status);
 
     if (master_id == GR_INVALID_ID32) {

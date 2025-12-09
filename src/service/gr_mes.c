@@ -161,7 +161,7 @@ static void gr_proc_broadcast_req_inner(gr_session_t *session, gr_notify_req_msg
             }
             LOG_RUN_INF("Standby %u synced config from WORM on broadcast.", current_inst_id);
             // Align the in-memory config with the updated local config file
-            status = gr_apply_cfg_to_memory(inst_cfg, CM_TRUE, CM_TRUE);
+            status = gr_apply_cfg_to_memory(inst_cfg, CM_TRUE, CM_TRUE, CM_TRUE);
             if (status == CM_SUCCESS) {
                 LOG_RUN_INF("Standby %u applied sync parameters to memory from local file.", current_inst_id);
             } else {

@@ -23,6 +23,8 @@
  */
 
 #include "gr_param_sync.h"
+#include <stdint.h>
+#include <sys/stat.h>
 #include "gr_log.h"
 #include "gr_errno.h"
 #include "cm_log.h"
@@ -34,8 +36,6 @@
 #include "gr_param.h"
 #include "gr_param_verify.h"
 #include "../common/persist/gr_diskgroup.h"
-#include <stdint.h>
-#include <sys/stat.h>
 // Only grserver needs broadcast message headers
 #ifndef GR_CMD_BUILD
 #include "../service/gr_mes.h" // broadcast message types and declarations
@@ -66,6 +66,7 @@ const char *gr_reserve_param[] = {
 #define GR_RESERVE_PARAM_COUNT (sizeof(gr_reserve_param) / sizeof(char *))
 #define GR_WORM_MEMORY_CFG_NAME "gr_memory_sync.ini"  // 主节点内存参数快照
 #define GR_WORM_PFILE_CFG_NAME  "gr_pfile_sync.ini"   // 主节点 pfile 参数快照
+#define GR_WORM_FILE_PERMISSION 0644
 // Sync context
 gr_config_sync_context_t g_config_sync_ctx = {0};
 
@@ -92,7 +93,7 @@ static status_t gr_build_cfg_path(const gr_config_t *cfg, char *buf, size_t len,
         return CM_ERROR;
     }
 
-    if(is_worm) {
+    if (is_worm) {
         ret = snprintf_s(buf, len, len - 1, "%s/%s", dir, file_name);
     } else {
         ret = snprintf_s(buf, len, len - 1, "%s/cfg/%s", dir, file_name);
@@ -132,7 +133,7 @@ status_t gr_init_config_worm()
     return CM_SUCCESS;
 }
 
-status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_memory)
+status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_memory, bool8 is_sync)
 {
     config_item_t *base_items = NULL;
     config_item_t *apply_items = NULL;
@@ -186,8 +187,8 @@ status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_m
         return CM_ERROR;
     }
 
-    for (uint32_t i = 0; i < (is_worm ? GR_SYNC_PARAM_COUNT : GR_RESERVE_PARAM_COUNT); i++) {
-        const char *param_name = is_worm ? gr_sync_param[i] : gr_reserve_param[i];
+    for (uint32_t i = 0; i < (is_sync ? GR_SYNC_PARAM_COUNT : GR_RESERVE_PARAM_COUNT); i++) {
+        const char *param_name = is_sync ? gr_sync_param[i] : gr_reserve_param[i];
         char name_buf[CM_PARAM_BUFFER_SIZE];
         if (strncpy_s(name_buf, CM_PARAM_BUFFER_SIZE, param_name, CM_PARAM_BUFFER_SIZE - 1) != EOK) {
             LOG_RUN_ERR("copy param name failed: %s", param_name);
@@ -207,8 +208,8 @@ status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_m
             continue;
         }
 
-        LOG_RUN_INF("apply reserved param %s from local: %s -> %s", param_name,
-            cur_val ? cur_val : "NULL", apply_val);
+        LOG_RUN_INF("apply_cfg_to_memory: param %s memory change %s -> %s",
+            param_name, cur_val ? cur_val : "NULL", apply_val);
         if (gr_set_cfg_param(name_buf, apply_val, "memory") != CM_SUCCESS) {
             res = CM_ERROR;
         }
@@ -219,7 +220,7 @@ status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_m
 }
 
 
-//Master node parameter broadcast function.
+// Master node parameter broadcast function.
 static status_t gr_master_node_param_broadcast(gr_config_t *inst_cfg)
 {
     uint32_t current_inst_id = (uint32_t)inst_cfg->params.inst_id;
@@ -239,19 +240,19 @@ static status_t gr_master_node_param_broadcast(gr_config_t *inst_cfg)
     req.gr_head.src_inst = src_inst;
     req.gr_head.dst_inst = 0;
     req.gr_head.flags = 0;
-    req.gr_head.ruid = 0;  
+    req.gr_head.ruid = 0;
     req.type = BCAST_REQ_PARAM_SYNC;    // Set broadcast type to param sync
-
-
+    
     // Send broadcast and wait for ACK; retry policy in MES layer (gr_broadcast_msg_with_try)
     (void)memset_s(&recv_msg, sizeof(recv_msg), 0, sizeof(recv_msg));
     recv_msg.ignore_ack = CM_FALSE;  // wait for ACK
     recv_msg.default_ack = CM_TRUE;  // expect all nodes cmd_ack = TRUE
 
     if (gr_notify_sync_ex((char *)&req, sizeof(gr_notify_req_msg_t), &recv_msg) != CM_SUCCESS) {
-        LOG_RUN_ERR("Broadcast parameter sync message failed, succ_inst=0x%llx", (unsigned long long)recv_msg.succ_inst);
+        LOG_RUN_ERR("Broadcast parameter sync message failed, succ_inst=0x%llx",
+            (unsigned long long)recv_msg.succ_inst);
         return CM_ERROR;
-    } 
+    }
     LOG_RUN_INF("Successfully broadcast parameter sync message with full ACK.");
 #else
     LOG_RUN_INF("Skipping parameter broadcast (GR_CMD_BUILD mode).");
@@ -259,7 +260,7 @@ static status_t gr_master_node_param_broadcast(gr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-//Standby writes WORM content into local config file.
+// Standby writes WORM content into local config file.
 status_t gr_standby_node_worm_write(gr_config_t *inst_cfg)
 {
     char worm_file[GR_UNIX_PATH_MAX];
@@ -284,7 +285,7 @@ status_t gr_standby_node_worm_write(gr_config_t *inst_cfg)
     return CM_SUCCESS;
 }
 
-//Parameter broadcast thread
+// Parameter broadcast thread
 void gr_param_broadcast_thread(thread_t *thread)
 {
     (void)thread;
@@ -293,7 +294,6 @@ void gr_param_broadcast_thread(thread_t *thread)
     while (g_config_sync_ctx.broadcast_thread_running) {
         // Wait for broadcast event
         int32 ret = cm_event_timedwait(&g_config_sync_ctx.broadcast_event, 0xFFFFFFFF);
-
         if (ret != CM_SUCCESS) {
             LOG_RUN_INF("Broadcast event wait returned %d, skip this round.", ret);
             continue;
@@ -312,7 +312,7 @@ void gr_param_broadcast_thread(thread_t *thread)
         }
         
         uint32_t current_inst_id = (uint32_t)inst_cfg->params.inst_id;
-        uint32_t master_inst_id = gr_get_master_id(); 
+        uint32_t master_inst_id = gr_get_master_id();
         LOG_RUN_INF("Current inst id is %u, master inst id is %u.", current_inst_id, master_inst_id);
 
         if (current_inst_id == master_inst_id) {
@@ -326,7 +326,7 @@ void gr_param_broadcast_thread(thread_t *thread)
     LOG_RUN_INF("Parameter broadcast thread exited.");
 }
 
-//Trigger parameter broadcast
+// Trigger parameter broadcast
 status_t gr_trigger_param_broadcast(void)
 {
     if (!g_config_sync_ctx.broadcast_thread_running) {
@@ -342,7 +342,6 @@ status_t gr_trigger_param_broadcast(void)
 /* Initialize config sync context. */
 status_t gr_init_config_sync_context(void)
 {
-
     cm_init_thread_lock(&g_config_sync_ctx.lock);
     if (cm_event_init(&g_config_sync_ctx.broadcast_event) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to initialize broadcast event.");
@@ -458,7 +457,6 @@ status_t gr_write_config_to_worm(gr_config_t *inst_cfg)
         }
     }
 
-
     if (pfile_file != NULL && fclose(pfile_file) != 0) {
         LOG_RUN_ERR("failed to close worm pfile: %s, errno=%d", worm_pfile_file, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
@@ -473,14 +471,13 @@ status_t gr_write_config_to_worm(gr_config_t *inst_cfg)
     }
 
     if (ret_code == CM_SUCCESS &&
-        (chmod(worm_pfile_file, 0644) != 0 || chmod(worm_mem_file, 0644) != 0)) {
+        (chmod(worm_pfile_file, GR_WORM_FILE_PERMISSION) != 0 || chmod(worm_mem_file, GR_WORM_FILE_PERMISSION) != 0)) {
         LOG_RUN_ERR("Failed to set permissions for WORM files: pfile=%s, memory=%s, errno=%d",
             worm_pfile_file, worm_mem_file, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         gr_free_config_items(&local_config, local_items);
         return CM_ERROR;
     }
-
 
     LOG_RUN_INF("successfully wrote sync params to WORM storage from local file: %s -> [%s, %s]",
         local_file, worm_pfile_file, worm_mem_file);
@@ -531,7 +528,8 @@ static status_t gr_rebuild_single_worm(const gr_config_t *inst_cfg, bool8 is_mem
     FILE *in = NULL;
     FILE *out = NULL;
     char buf[4096];
-    size_t nread, nwrite;
+    size_t nread;
+    size_t nwrite;
 
     ret = gr_build_cfg_path(inst_cfg, worm_file, sizeof(worm_file), CM_TRUE, is_memory);
     if (ret != CM_SUCCESS) {
@@ -598,7 +596,7 @@ static status_t gr_rebuild_single_worm(const gr_config_t *inst_cfg, bool8 is_mem
         return CM_ERROR;
     }
 
-    if (chmod(new_file, 0644) != 0) {
+    if (chmod(new_file, GR_WORM_FILE_PERMISSION) != 0) {
         LOG_RUN_ERR("Failed to set permissions for new WORM file: %s, errno: %d", new_file, errno);
         (void)remove(new_file);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
@@ -673,11 +671,9 @@ static status_t gr_copy_worm_to_local_safe(const char *worm_file, const char *lo
     char *local_value = NULL;
     config_item_t *item = NULL;
     
-
     LOG_RUN_INF("start copy params from worm to local, worm_file=%s, local_file=%s", worm_file, local_file);
 
     gr_get_param_items(&base_items, &param_count);
-
     worm_items = (config_item_t *)malloc(sizeof(config_item_t) * param_count);
     local_items = (config_item_t *)malloc(sizeof(config_item_t) * param_count);
     if (worm_items == NULL || local_items == NULL) {
