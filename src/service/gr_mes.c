@@ -28,6 +28,7 @@
 #include "gr_session.h"
 #include "gr_file.h"
 #include "gr_service.h"
+#include "../params/gr_param_sync.h"
 #include "gr_instance.h"
 #include "gr_api.h"
 #include "gr_mes.h"
@@ -109,6 +110,8 @@ static gr_bcast_ack_cmd_t gr_get_bcast_ack_cmd(gr_bcast_req_cmd_t bcast_op)
             return BCAST_ACK_INVALIDATE_META;
         case BCAST_REQ_META_SYN:
             return BCAST_ACK_META_SYN;
+        case BCAST_REQ_PARAM_SYNC:
+            return BCAST_ACK_PARAM_SYNC;
         default:
             LOG_RUN_ERR("Invalid broadcast request type");
             break;
@@ -134,6 +137,39 @@ static void gr_proc_broadcast_req_inner(gr_session_t *session, gr_notify_req_msg
             req_ex = (gr_notify_req_msg_ex_t *)req;
             status = gr_meta_syn_remote(session, (gr_meta_syn_t *)req_ex->data, req_ex->data_size, &cmd_ack);
             return;
+        case BCAST_REQ_PARAM_SYNC:
+            /*
+             * Handle parameter synchronization broadcast request.
+             * On standby nodes, fetch the latest config from WORM and update in-memory parameters.
+             */
+            LOG_RUN_INF("Processing parameter sync broadcast request.");
+            gr_config_t *inst_cfg = gr_get_g_inst_cfg();
+            if (inst_cfg == NULL) {
+                LOG_RUN_ERR("Failed to get instance config for parameter sync.");
+                status = CM_ERROR;
+                cmd_ack = CM_TRUE;
+                break;
+            }
+            uint32_t current_inst_id = (uint32_t)inst_cfg->params.inst_id;
+            LOG_RUN_INF("Current standby node (ID: %u) writing WORM file to local configuration.", current_inst_id);
+
+            // Write latest config from WORM storage to local config file
+            status = gr_standby_node_worm_write(inst_cfg);
+            if (status != CM_SUCCESS) {
+                LOG_RUN_ERR("Standby %u failed to sync config from WORM on broadcast.", current_inst_id);
+                break;
+            }
+            LOG_RUN_INF("Standby %u synced config from WORM on broadcast.", current_inst_id);
+            // Align the in-memory config with the updated local config file
+            status = gr_apply_cfg_to_memory(inst_cfg, CM_TRUE, CM_TRUE, CM_TRUE);
+            if (status == CM_SUCCESS) {
+                LOG_RUN_INF("Standby %u applied sync parameters to memory from local file.", current_inst_id);
+            } else {
+                LOG_RUN_ERR("Standby %u failed to apply sync parameters to memory from local file.", current_inst_id);
+            }
+            // Always send ACK for parameter sync broadcast for easier master-side aggregation
+            cmd_ack = CM_TRUE;
+            break;
         default:
             LOG_RUN_ERR("invalid broadcast req type");
             return;
@@ -168,6 +204,7 @@ int32_t gr_process_broadcast_ack(gr_notify_ack_msg_t *ack, gr_recv_msg_t *recv_m
         case BCAST_ACK_DEL_FILE:
         case BCAST_ACK_INVALIDATE_META:
         case BCAST_ACK_META_SYN:
+        case BCAST_ACK_PARAM_SYNC:
             ret = ack->result;
             // recv_msg_output->cmd_ack init-ed with the deault, if some node not the same with the default, let's cover
             // the default value

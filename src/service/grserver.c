@@ -35,6 +35,7 @@
 // #include "gr_shm.h"
 #include "gr_instance.h"
 #include "gr_mes.h"
+#include "gr_param_sync.h"
 #include "gr_zero.h"
 #include "cm_utils.h"
 #include "gr_meta_buf.h"
@@ -51,6 +52,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// params sync period, 10 minutes
+#define SYNC_INTERVAL_MS (10*60*1000)
 
 static void gr_close_background_task(gr_instance_t *inst)
 {
@@ -110,7 +114,9 @@ static void gr_clean_server()
 static void handle_main_wait(void)
 {
     int64 periods = 0;
-    uint32_t interval = 500;
+    uint32_t interval = 500;           // 500mstes
+    const int64 sync_periods = SYNC_INTERVAL_MS / interval;
+
     do {
         if (g_gr_instance.abort_status == CM_TRUE) {
             break;
@@ -118,6 +124,48 @@ static void handle_main_wait(void)
         if (!g_gr_instance.is_maintain) {
             gr_check_peer_inst(&g_gr_instance, GR_INVALID_ID64);
         }
+
+        // Periodic parameter synchronization, executed only by master node.
+        // Guard clause: if not at sync interval, skip sync logic.
+        if (sync_periods > 0 && (periods % sync_periods) == 0) {
+            // Step 1: Retrieve current config instance.
+            gr_config_t *inst_cfg = gr_get_inst_cfg();
+            if (inst_cfg == NULL) {
+                periods++; // Always increment periods to avoid dead loop.
+                continue;
+            }
+            LOG_RUN_INF("apply reserved local cfg to memory");
+            gr_apply_cfg_to_memory(inst_cfg, CM_FALSE, CM_FALSE, CM_FALSE);
+            // Step 2: Only master node performs periodic sync.
+            uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
+            uint32_t master_id = gr_get_master_id();
+            if (curr_id != master_id) {
+                periods++;
+                continue;
+            }
+
+            // Step 4: Apply WORM config to memory, log error if fail, info if success.
+            LOG_RUN_INF("apply synced local cfg to memory");
+            if (gr_apply_cfg_to_memory(inst_cfg, CM_FALSE, CM_FALSE, CM_TRUE) != CM_SUCCESS) {
+                LOG_RUN_ERR("[PERIODIC SYNC] master %u failed to apply parameters"
+                    "to memory (period=%lld)", curr_id, periods);
+            } else {
+                LOG_RUN_INF("[PERIODIC SYNC] master %u applied parameters to memory,"
+                    "broadcasting (period=%lld)", curr_id, periods);
+            }
+
+            // Step 3: Write config to WORM, skip this period on failure.
+            LOG_RUN_INF("write config to worm");
+            if (gr_write_config_to_worm(inst_cfg) != CM_SUCCESS) {
+                LOG_RUN_ERR("[PERIODIC SYNC] master %u failed to write WORM (period=%lld)", curr_id, periods);
+                periods++;
+                continue;
+            }
+
+            // Step 5: Always trigger parameter broadcast, ensures timely config distribution.
+            (void)gr_trigger_param_broadcast();
+        }
+
         if (periods == MILLISECS_PER_SECOND * SECONDS_PER_DAY / interval) {
             periods = 0;
             gr_ssl_ca_cert_expire();
@@ -159,7 +207,14 @@ static status_t gr_alarm_check_background_task(gr_instance_t *inst)
 
 static status_t gr_init_background_tasks(void)
 {
-    status_t status = gr_recovery_background_task(&g_gr_instance);
+    // Initialize parameter synchronization context and create a broadcast thread
+    status_t status = gr_init_config_sync_context();
+    if (status != CM_SUCCESS) {
+        // Broadcast thread initialization failed, but it does not affect the main process
+        LOG_RUN_ERR("Create config sync background task failed.");
+    }
+
+    status = gr_recovery_background_task(&g_gr_instance);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Create gr recovery background task failed.");
         return status;
@@ -175,6 +230,7 @@ static status_t gr_init_background_tasks(void)
         LOG_RUN_ERR("Create gr disk usage alarm background task failed.");
         return status;
     }
+
     return status;
 }
 

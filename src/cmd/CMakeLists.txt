@@ -36,6 +36,9 @@ set(COMMON_ALL_SRC
 
 ADD_EXECUTABLE(grcmd ${COMMON_ALL_SRC})
 
+# Add GR_CMD_BUILD macro definition to distinguish between grcmd and grserver targets
+target_compile_definitions(grcmd PRIVATE GR_CMD_BUILD)
+
 if (ENABLE_FUZZASAN)
     target_link_libraries(grcmd grapi pthread dl rt -Wl,--whole-archive ${vpp_libsecurec} ${libz} ${lz4} ${3rd_libssl} ${3rd_libccb} ${vpp_libipsi_crypto} ${fuzz_lib} -Wl,--no-whole-archive)
 else()

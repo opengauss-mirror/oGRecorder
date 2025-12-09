@@ -150,13 +150,13 @@ status_t gr_verify_log_backup_file_count(void *lex, void *def)
     text_t text = {.str = value, .len = (uint32_t)strlen(value)};
     cm_trim_text(&text);
     status_t status = cm_text2uint32(&text, &num);
-    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT"));
+    GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_FILE_COUNT"));
 #ifdef OPENGAUSS
     if (num > CM_MAX_LOG_FILE_COUNT_LARGER) {
 #else
     if (num > CM_MAX_LOG_FILE_COUNT) {
 #endif
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_BACKUP_FILE_COUNT");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LOG_FILE_COUNT");
         return CM_ERROR;
     }
 

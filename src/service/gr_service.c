@@ -31,6 +31,7 @@
 #include "gr_api.h"
 #include "gr_thv.h"
 #include "gr_param.h"
+#include "gr_param_sync.h"
 #include "gr_stats.h"
 #include <stdint.h>
 
@@ -789,7 +790,40 @@ static status_t gr_process_setcfg(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &scope));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%s", name));
 
-    return gr_set_cfg_param(name, value, scope);
+    // Forward sync parameters to master on standby node, non-sync parameters are processed locally
+    gr_config_t *inst_cfg = gr_get_inst_cfg();
+    uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
+    uint32_t master_id = gr_get_master_id();
+    if (curr_id != master_id && gr_is_sync_param(name)) {
+        return gr_process_remote(session);
+    }
+
+    // Set configuration parameter (memory/file/both)
+    status_t status = gr_set_cfg_param(name, value, scope);
+    if (status != GR_SUCCESS) {
+        LOG_RUN_ERR("set cfg param failed, name=%s, value=%s, scope=%s, ret=%d.", name, value, scope, status);
+        return status;
+    }
+
+    // If scope is memory, only take effect in memory, skip WORM write and parameter broadcast
+    // Only sync-controlled parameters go through WORM and broadcast, others only take effect locally/pfile
+    if (gr_is_sync_param(name)) {
+        // Write to WORM storage for sync param when scope involves disk (pfile/both)
+        status = gr_write_config_to_worm(inst_cfg);
+        if (status != GR_SUCCESS) {
+            // WORM write failure does not affect current instance, but return error to notify the caller
+            LOG_RUN_ERR("write config to WORM failed after setcfg, name=%s, value=%s, ret=%d.", name, value, status);
+            return status;
+        }
+
+        // Trigger parameter broadcast for sync param after setcfg
+        status = gr_trigger_param_broadcast();
+        if (status != GR_SUCCESS) {
+            // Broadcast failure does not affect local config and WORM write
+            LOG_RUN_ERR("Failed to trigger parameter broadcast after setcfg, ret: %d", status);
+        }
+    }
+    return status;
 }
 
 static status_t gr_process_getcfg(gr_session_t *session)
@@ -989,6 +1023,25 @@ static status_t gr_process_set_main_inst(gr_session_t *session)
         break;
     }
     session->recv_pack.head->cmd = GR_CMD_SET_MAIN_INST;
+
+    // Apply configuration synchronization after switching primary instance.
+    gr_config_t *inst_cfg = gr_get_inst_cfg();
+    if (inst_cfg != NULL) {
+        if (gr_standby_node_worm_write(inst_cfg) == CM_SUCCESS) {
+            // Apply synchronized configuration to memory.
+            if (gr_apply_cfg_to_memory(inst_cfg, CM_TRUE, CM_TRUE, CM_TRUE) != CM_SUCCESS) {
+                LOG_RUN_ERR("[SWITCH] new primary %u: failed to apply local config to memory.", curr_id);
+            }
+            // Rebuild WORM file in case of changes.
+            if (gr_rebuild_worm_file(inst_cfg) != CM_SUCCESS) {
+                LOG_RUN_ERR("[SWITCH] new primary %u: failed to rebuild WORM file.", curr_id);
+            }
+            (void)gr_trigger_param_broadcast();
+        } else {
+            LOG_RUN_ERR("[SWITCH] new primary %u: failed to sync config from WORM.", curr_id);
+        }
+    }
+
     gr_set_recover_thread_id(gr_get_current_thread_id());
     g_gr_instance.status = GR_STATUS_RECOVERY;
     gr_set_master_id(curr_id);

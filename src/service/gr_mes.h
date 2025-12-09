@@ -101,6 +101,7 @@ typedef enum st_gr_bcast_req_cmd {
     BCAST_REQ_DEL_DIR_FILE = 0,
     BCAST_REQ_INVALIDATE_META,
     BCAST_REQ_META_SYN,
+    BCAST_REQ_PARAM_SYNC,
     BCAST_REQ_END
 } gr_bcast_req_cmd_t;
 
@@ -108,6 +109,7 @@ typedef enum st_gr_bcast_ack_cmd {
     BCAST_ACK_DEL_FILE = 0,
     BCAST_ACK_INVALIDATE_META,
     BCAST_ACK_META_SYN,
+    BCAST_ACK_PARAM_SYNC,
     BCAST_ACK_END
 } gr_bcast_ack_cmd_t;
 

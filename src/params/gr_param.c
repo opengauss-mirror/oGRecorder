@@ -42,7 +42,13 @@ gr_config_t *g_inst_cfg = NULL;
 static gr_config_t g_inst_cfg_inner = {0};
 gr_config_t *gr_get_g_inst_cfg()
 {
-    return &g_inst_cfg_inner;
+    if (g_inst_cfg != NULL) {
+        // Return current global config
+        return g_inst_cfg;
+    } else {
+        // Return internal config when global is not initialized
+        return &g_inst_cfg_inner;
+    }
 }
 
 config_t cli_ssl_cfg;
@@ -74,52 +80,61 @@ static config_item_t g_gr_params[] = {
         NULL, 1, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"GR_CM_SO_NAME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Logging Configuration ====================
     {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 4, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER",
-        NULL, 5, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
-    {"LOG_BACKUP_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
-        NULL, 6, EFFECT_REBOOT, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
+        NULL, 4, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
+    {"LOG_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
+        NULL, 5, EFFECT_REBOOT, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
     {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
-        NULL, 7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 6, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== SSL Security Configuration ====================
     {"HASH_AUTH_ENABLE", CM_TRUE, ATTR_NONE, "TRUE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
-        NULL, 8, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Server SSL Configuration ====================
     {"SER_SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 13, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 12, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SER_SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 14, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 13, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SER_SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 15, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 14, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SER_SSL_CRL", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 16, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 15, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Network and Cluster Configuration ====================
     {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 9, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
+        NULL, 8, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
     {"IP_WHITE_LIST", CM_TRUE, ATTR_NONE, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 10, EFFECT_IMMEDIATELY, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 9, EFFECT_IMMEDIATELY, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Performance and Thread Configuration ====================
     {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
-        NULL, 11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 10, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Message and Memory Configuration ====================
     {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER",
-        NULL, 12, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL}
+        NULL, 11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL}
 };
 
 static const char *g_gr_config_file = (const char *)"gr_inst.ini";
 static const char *g_gr_cli_config_file = (const char *)"gr_cli_inst.ini";
 #define GR_PARAM_COUNT (sizeof(g_gr_params) / sizeof(config_item_t))
 #define GR_CERT_PARAM_COUNT (sizeof(g_gr_ssl_params) / sizeof(config_item_t))
+
+// Retrieve parameter config items and their count
+void gr_get_param_items(config_item_t **items, uint32 *count)
+{
+    if (items != NULL) {
+        *items = g_gr_params;
+    }
+    if (count != NULL) {
+        *count = (uint32)GR_PARAM_COUNT;
+    }
+}
 
 static status_t gr_load_threadpool_cfg(gr_config_t *inst_cfg)
 {
@@ -697,6 +712,16 @@ static status_t gr_set_cfg_param_core(text_t *text, char *value, gr_def_t *def)
         GR_RETURN_IFERR2(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, def->name));
     }
 
+    // Log parameter modification: record which instance modified which parameter and its values
+    uint32 inst_id_dbg = (uint32)g_inst_cfg->params.inst_id;
+    LOG_RUN_INF("[SETCFG_CORE] inst_id=%u, name=%s, scope=%d, old_value=%s, old_pfile=%s, new_value=%s",
+        inst_id_dbg,
+        def->name,
+        (int)def->scope,
+        (item->value != NULL) ? item->value : "NULL",
+        (item->pfile_value != NULL) ? item->pfile_value : "NULL",
+        (value != NULL) ? value : "NULL");
+
     if ((item->verify) && (item->verify((void *)value, (void *)def) != CM_SUCCESS)) {
         return CM_ERROR;
     }
@@ -719,9 +744,15 @@ static status_t gr_set_cfg_param_core(text_t *text, char *value, gr_def_t *def)
 #endif
     }
     if (cm_alter_config(&g_inst_cfg->config, def->name, def->value, def->scope, force) != CM_SUCCESS) {
+        // Log error if configuration alteration fails
+        LOG_RUN_ERR("[SETCFG_CORE] cm_alter_config failed, name=%s, scope=%d",
+            def->name, (int)def->scope);
         return CM_ERROR;
     }
-    LOG_RUN_INF("parameter %s has been changed successfully, new value is %s", def->name, value);
+
+    // Log success after parameter changed
+    LOG_RUN_INF("[SETCFG_CORE] parameter %s changed successfully, new value: %s",
+        def->name, value);
     return CM_SUCCESS;
 }
 
