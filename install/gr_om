@@ -4332,7 +4332,7 @@ class dbClusterInfo():
             ssh_cmd = f"ssh -q -o ConnectTimeout=5 {ssh_target} '{cmd}'"
             return subprocess.getstatusoutput(ssh_cmd)
 
-    def gr_install(self, xmlFile, PkgPath):
+    def gr_install(self, xmlFile, PkgPath, RestPkgPath):
         user = getpass.getuser()
         gaussHome = self.__getEnvironmentParameterValue("GAUSSHOME", user)
         if (gaussHome == ""):
@@ -4438,8 +4438,30 @@ class dbClusterInfo():
                 gr_path=clusterInfo.grPath
             )
             edit_cmds.append(edit_cmd)
-
+        
+        if RestPkgPath:
+            add_rest_cmd = ('cm_ctl res --add --res_name="CM-RestAPI" '
+                            '--res_attr="resources_type=APP,'
+                            'script={app_path}/bin/rest_contrl.sh,'
+                            'check_interval=1,'
+                            'timeout=120,'
+                            'restart_times=10000,'
+                            'restart_delay=1,'
+                            'restart_period=1"'
+                            ).format(app_path=clusterInfo.appPath)
+            edit_rest_cmds = []
+            for i, dbNode in enumerate(clusterInfo.dbNodes):
+                edit_rest_cmd = (
+                    'cm_ctl res --edit --res_name="CM-RestAPI" '
+                    '--add_inst="node_id={node_id},'
+                    'res_instance_id={instance_id},'
+                    'res_args={rest_path}"'
+                ).format(node_id=dbNode.id, instance_id=i, rest_path=clusterInfo.appPath)
+                edit_rest_cmds.append(edit_rest_cmd)
         all_cmds = [add_cmd] + edit_cmds
+        if RestPkgPath:
+            all_cmds.append(add_rest_cmd)
+            all_cmds.extend(edit_rest_cmds)
         for dbNode in clusterInfo.dbNodes:
             # 清理旧的 gr_res.sh
             cmd = 'rm -rf %s/gr_res.sh %s/*' % (clusterInfo.toolPath, dbNode.cmDataDir)
@@ -4584,6 +4606,70 @@ class dbClusterInfo():
                 raise Exception(f"failed to distribute gr_contrl.sh, Error output:\n{output}")
         self.logger.log("Successfully distribute gr_contrl.sh.")
 
+        if RestPkgPath:
+            RestPkg = os.path.basename(RestPkgPath)
+            # 分发restapi包，也就是RestPkgPath
+            for dbNode in clusterInfo.dbNodes:
+                if dbNode.name != GetHostIpOrName():
+                    cmd = "scp -r %s %s:%s/bin" % (RestPkgPath, dbNode.sshIps[0], clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+                    if status == 0:
+                        # Set execute permissions for gr_contrl.sh
+                        cmd = 'chmod +x %s/bin/%s' % (clusterInfo.appPath, RestPkg)
+                        status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = 'cp -r %s %s/bin' % (RestPkgPath, clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+                    if status == 0:
+                        # Set execute permissions for gr_contrl.sh
+                        cmd = 'chmod +x %s/bin/%s' % (clusterInfo.appPath, RestPkg)
+                        status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise Exception(f"failed to distribute restapi package, Error output:\n{output}")
+            self.logger.log("Successfully distribute restapi package.")
+
+            # 分发rest_contrl.sh脚本
+            for dbNode in clusterInfo.dbNodes:
+                if dbNode.name != GetHostIpOrName():
+                    cmd = "scp rest_contrl.sh %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+                    if status == 0:
+                        # Set execute permissions for rest_contrl.sh
+                        cmd = "ssh -q -o ConnectTimeout=5 %s 'chmod +x %s/bin/rest_contrl.sh'" % (dbNode.sshIps[0], clusterInfo.appPath)
+                        status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = 'cp rest_contrl.sh %s/bin' % (clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+                    if status == 0:
+                        cmd = 'chmod +x %s/bin/rest_contrl.sh' % (clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise Exception(f"failed to distribute rest_contrl.sh, Error output:\n{output}")
+            self.logger.log("Successfully distribute rest_contrl.sh.")
+
+            # 分发白名单restWhiteList
+            for dbNode in clusterInfo.dbNodes:
+                if dbNode.name != GetHostIpOrName():
+                    cmd = "scp -r restWhiteList %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = 'cp -r restWhiteList %s/bin' % (clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise Exception(f"failed to distribute restWhiteList, Error output:\n{output}")
+            self.logger.log("Successfully distribute restWhiteList.")
+            
+            # 分发SSL配置文件rest_ssl.properties
+            for dbNode in clusterInfo.dbNodes:
+                if dbNode.name != GetHostIpOrName():
+                    cmd = "scp rest_ssl.properties %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = 'cp rest_ssl.properties %s/bin' % (clusterInfo.appPath)
+                    status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise Exception(f"failed to distribute rest_ssl.properties, Error output:\n{output}")
+            self.logger.log("Successfully distribute rest_ssl.properties.")
         # py_pstree.py脚本
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
@@ -4830,7 +4916,34 @@ EOF
         if (envfile == ""):
             raise Exception(ErrorCode.GAUSS_502["GAUSS_50201"] % \
                             ("installation path of designated user [%s]" % user))
-        
+
+        # stop cluster
+        stop_cmd = "cm_ctl stop"
+        status, output = subprocess.getstatusoutput(stop_cmd)
+        if status != 0:
+            error_msg = f"failed to stop oGRecorder cluster. Error output:\n{output}"
+            print(f"{RED}{error_msg}{NC}")
+            raise Exception(error_msg)
+        print(f"{GREEN}Successfully stop cluster{NC}")
+
+        # kill cmrestapi
+        for node in nodes:
+            node_name = node['name']
+            node_ip = node['ip']
+
+            print(f"{GREEN}[{node_name}] Starting to stop restapi...{NC}")
+
+            # Build command - $2 in single quotes won't be interpreted by shell
+            cmd = f"ps aux | grep 'cmrestapi-7.0.0-RC2-RELEASE.jar' | grep -v grep | awk '{{print $2}}' | xargs kill -9 2>/dev/null"
+            if node_ip == socket.gethostbyname(socket.gethostname()):
+                # Local node
+                status, output = subprocess.getstatusoutput(cmd)
+            else:
+                # Remote node - escape single quotes for SSH
+                escaped_cmd = cmd.replace("'", "'\\''")
+                ssh_cmd = f"ssh -q -o ConnectTimeout=5 {user}@{node_ip} '{escaped_cmd}'"
+                status, output = subprocess.getstatusoutput(ssh_cmd)
+
         # Clean directories on each node
         for node in nodes:
             node_name = node['name']
@@ -5350,6 +5463,7 @@ class InstallImpl:
         self.logger = install.logger
         self.clusterStopped = install.clusterStopped
         self.primaryTermAbnormal = install.primaryTermAbnormal
+        self.restpkg = install.restpkg
         # 初始化 clusterInfo 用于主机名到 IP 的映射
         self.clusterInfo = None
         try:
@@ -5860,6 +5974,151 @@ class InstallImpl:
 
         self._cleanUselessFile()
 
+    # 创建restapi证书
+    def _createRestCALocal(self):
+        if not self.restpkg:
+            return
+        self.logger.debug("Creating rest ca files locally.")
+
+        if 'OPENSSL_CONF' in os.environ:
+            del os.environ['OPENSSL_CONF']
+        #os.environ['OPENSSL_CONF'] = '/etc/pki/tls/openssl.cnf'
+        cmCertPath = os.path.join(self.gaussHome, "share/sslcert/cm")
+        certPath = os.path.join(self.gaussHome, "share/sslcert/restapi")
+        mkdirCmd = f"rm -rf {certPath}; mkdir -p {certPath}"
+        status, output = subprocess.getstatusoutput(mkdirCmd)
+        if status != 0:
+            self.logger.debug(f"Command: {mkdirCmd}\nStatus: {status}\nOutput: {output}")
+            self.logger.logExit("Failed to create cert path.")
+        # self._createCMSslConf(certPath)
+        passwd = self._getPassword()
+
+        activePeriod = "10950"
+
+        # 生成 cakey.pem
+        cmd = f"cp {cmCertPath}/*.key {certPath}; cp {cmCertPath}/*.crt {certPath}; cp {cmCertPath}/*.pem {certPath};"
+        status, output = subprocess.getstatusoutput(cmd)
+        if status != 0:
+            self.logger.debug(f"Command: {cmd}\nStatus: {status}\nOutput: {output}")
+            self.logger.logExit("Failed to copy rest cert.")
+
+        # 转换服务端证书为 PKCS12 格式
+        # 解密服务端私钥
+        decrypt_server_key_cmd = f'openssl rsa -in {certPath}/server.key -passin pass:{passwd} -out {certPath}/server-decrypted.key'
+        status, output = subprocess.getstatusoutput(decrypt_server_key_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to decrypt server.key.\n" + output)
+        
+        # 转换为 PKCS8 格式
+        pkcs8_server_key_cmd = f'openssl pkcs8 -topk8 -in {certPath}/server-decrypted.key -out {certPath}/server-pkcs8.key -nocrypt'
+        status, output = subprocess.getstatusoutput(pkcs8_server_key_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to convert server key to PKCS8 format.\n" + output)
+        
+        # 创建 PKCS12 文件（别名设为 rest-server）
+        # pkcs12_server_cmd = f'openssl pkcs12 -export -in {certPath}/server.crt -inkey {certPath}/server-pkcs8.key -name "rest-server" -out {certPath}/server.p12 -passout pass:'
+        pkcs12_server_cmd = f'openssl pkcs12 -export -in {certPath}/server.crt -inkey {certPath}/server-pkcs8.key -certfile {certPath}/cacert.pem -name "rest-server" -out {certPath}/server.p12 -passout pass:'
+        status, output = subprocess.getstatusoutput(pkcs12_server_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to create server.p12.\n" + output)
+        
+        # 清理临时文件
+        rm_temp_cmd = f'rm -f {certPath}/server-decrypted.key {certPath}/server-pkcs8.key'
+        subprocess.getstatusoutput(rm_temp_cmd)
+
+        # 转换客户端证书为 PKCS12 格式
+        # 解密客户端私钥
+        decrypt_client_key_cmd = f'openssl rsa -in {certPath}/client.key -passin pass:{passwd} -out {certPath}/client-decrypted.key'
+        status, output = subprocess.getstatusoutput(decrypt_client_key_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to decrypt client.key.\n" + output)
+        
+        # 转换为 PKCS8 格式
+        pkcs8_client_key_cmd = f'openssl pkcs8 -topk8 -in {certPath}/client-decrypted.key -out {certPath}/client-pkcs8.key -nocrypt'
+        status, output = subprocess.getstatusoutput(pkcs8_client_key_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to convert client key to PKCS8 format.\n" + output)
+        
+        # 创建 PKCS12 文件（别名设为 rest-client）
+        # pkcs12_client_cmd = f'openssl pkcs12 -export -in {certPath}/client.crt -inkey {certPath}/client-pkcs8.key -name "rest-client" -out {certPath}/client.p12 -passout pass:'
+        pkcs12_client_cmd = f'openssl pkcs12 -export -in {certPath}/client.crt -inkey {certPath}/client-pkcs8.key -certfile {certPath}/cacert.pem -name "rest-client" -out {certPath}/client.p12 -passout pass:'
+        status, output = subprocess.getstatusoutput(pkcs12_client_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to create client.p12.\n" + output)
+        
+        # 清理临时文件
+        rm_temp_cmd = f'rm -f {certPath}/client-decrypted.key {certPath}/client-pkcs8.key'
+        subprocess.getstatusoutput(rm_temp_cmd)
+
+        # 创建JKS格式信任库
+        truststore_cmd = f'keytool -import -trustcacerts -alias ca -file {certPath}/cacert.pem -keystore {certPath}/truststore.jks -storepass {passwd} -noprompt'
+        status, output = subprocess.getstatusoutput(truststore_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to create truststore.jks.\n" + output)
+
+        # 创建或更新rest_ssl.properties配置文件
+        rest_ssl_conf = os.path.join(self.gaussHome, "bin/rest_ssl.properties")
+        rest_ssl_template = os.path.join(os.path.dirname(__file__), "rest_ssl.properties")
+        
+        # 如果模板文件存在，读取模板；否则创建默认配置
+        if os.path.exists(rest_ssl_template):
+            with open(rest_ssl_template, 'r', encoding='utf-8') as f:
+                ssl_config_content = f.read()
+        else:
+            # 创建默认配置内容
+            ssl_config_content = """# SSL Configuration for CM-RestAPI
+# This file contains SSL/TLS configuration parameters
+
+# Server port
+server.port=8443
+
+# SSL enabled
+server.ssl.enabled=true
+
+# Keystore configuration (server certificate)
+server.ssl.key-store=${GAUSSHOME}/share/sslcert/restapi/server.p12
+server.ssl.key-store-password=
+server.ssl.key-store-type=PKCS12
+server.ssl.key-alias=rest-server
+
+# Truststore configuration (client certificate verification)
+server.ssl.client-auth=need
+server.ssl.trust-store=${GAUSSHOME}/share/sslcert/restapi/truststore.jks
+server.ssl.trust-store-password=
+server.ssl.trust-store-type=JKS
+"""
+        
+        # 替换信任库密码
+        ssl_config_content = ssl_config_content.replace(
+            'server.ssl.trust-store-password=',
+            f'server.ssl.trust-store-password={passwd}'
+        )
+        
+        # 确保目录存在
+        os.makedirs(os.path.dirname(rest_ssl_conf), exist_ok=True)
+        
+        # 写入配置文件
+        with open(rest_ssl_conf, 'w', encoding='utf-8') as f:
+            f.write(ssl_config_content)
+        
+        self.logger.log(f"Successfully created/updated {rest_ssl_conf} with truststore password.")
+        
+        # 设置配置文件权限（只读）
+        chmod_conf_cmd = f'chmod 600 {rest_ssl_conf}'
+        status, output = subprocess.getstatusoutput(chmod_conf_cmd)
+        if status != 0:
+            self.logger.logExit(f"Failed to set permissions for {rest_ssl_conf}.\n" + output)
+
+        # 密码置空
+        passwd = ""
+        del passwd
+
+        # 设置只读权限
+        chmod_cmd = f'chmod 600 {certPath}/server.p12 {certPath}/client.p12 {certPath}/truststore.jks && chmod 644 {certPath}/server.crt {certPath}/client.crt {certPath}/cacert.pem'
+        status, output = subprocess.getstatusoutput(chmod_cmd)
+        if status != 0:
+            self.logger.logExit("Failed to change cert files permission.\n" + output)
+
     def _distributeCA(self):
         self.logger.debug("Distributing CM ca files to other hosts.")
         certPath = os.path.join(self.gaussHome, "share/sslcert/cm")
@@ -5898,10 +6157,89 @@ class InstallImpl:
                 self.logger.debug(errorDetail)
                 self.logger.logExit("Failed to create CA for CM.")
 
+    def _distributeRestCA(self):
+        self.logger.debug("Distributing Rest ca files to other hosts.")
+        certPath = os.path.join(self.gaussHome, "share/sslcert/restapi")
+        createCertPathCmd = "rm {certPath} -rf; mkdir -p {certPath}; chmod 700 {certPath}".format(
+            certPath=certPath)
+        for host in self.hostnames:
+            if host == self.localhostName:
+                continue
+            status, output = self.executeCmdOnHost(host, createCertPathCmd)
+            if status != 0:
+                errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (createCertPathCmd, status, output)
+                self.logger.debug(errorDetail)
+                self.logger.logExit("Failed to create path of CA for CM on host %s." % host)
+
+            ssh_ip = host
+            try:
+                if hasattr(self, 'clusterInfo') and self.clusterInfo:
+                    for dbNode in self.clusterInfo.dbNodes:
+                        if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                            ssh_ip = dbNode.sshIps[0]
+                            break
+            except:
+                pass
+            
+            # Determine if the host is an IPv6 address and format accordingly
+            if ":" in ssh_ip:
+                formatted_host = "[{}]".format(ssh_ip)
+            else:
+                formatted_host = ssh_ip
+        
+            # Create the scp command with the formatted host
+            scpCmd = "scp {certPath}/* {host}:{certPath}".format(certPath=certPath, host=formatted_host)
+            status, output = subprocess.getstatusoutput(scpCmd)
+            if status != 0:
+                errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (scpCmd, status, output)
+                self.logger.debug(errorDetail)
+                self.logger.logExit("Failed to create CA for RestAPI.")
+        
+        # 分发rest_ssl.properties配置文件到各个节点
+        rest_ssl_conf = os.path.join(self.gaussHome, "bin/rest_ssl.properties")
+        if os.path.exists(rest_ssl_conf):
+            for host in self.hostnames:
+                if host == self.localhostName:
+                    continue
+                
+                ssh_ip = host
+                try:
+                    if hasattr(self, 'clusterInfo') and self.clusterInfo:
+                        for dbNode in self.clusterInfo.dbNodes:
+                            if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                                ssh_ip = dbNode.sshIps[0]
+                                break
+                except:
+                    pass
+                
+                # Determine if the host is an IPv6 address and format accordingly
+                if ":" in ssh_ip:
+                    formatted_host = "[{}]".format(ssh_ip)
+                else:
+                    formatted_host = ssh_ip
+                
+                # 分发配置文件到目标节点的 bin 目录
+                target_path = os.path.join(self.gaussHome, "bin")
+                scpCmd = "scp {config_file} {host}:{target_path}/rest_ssl.properties".format(
+                    config_file=rest_ssl_conf, host=formatted_host, target_path=target_path)
+                status, output = subprocess.getstatusoutput(scpCmd)
+                if status != 0:
+                    errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (scpCmd, status, output)
+                    self.logger.debug(errorDetail)
+                    self.logger.logExit("Failed to distribute rest_ssl.properties to %s." % host)
+            
+            self.logger.log("Successfully distribute rest_ssl.properties to all nodes.")
+
     def createCMCA(self):
         self.logger.log("Creating CM ca files.")
         self._createCMCALocal()
         self._distributeCA()
+
+    def createRestCA(self):
+        if not self.restpkg:
+            return
+        self._createRestCALocal()
+        self._distributeRestCA()
 
     def run(self):
         self.logger.log("Start to install cm tool.")
@@ -5911,6 +6249,7 @@ class InstallImpl:
         self.initCMServer()
         self.initCMAgent()
         self.createCMCA()
+        self.createRestCA()
         self.setMonitorCrontab()
         self.AddGrResource()
         self.startCluster()
@@ -5935,6 +6274,7 @@ class Install:
         self.maxTerm = 0
         self.primaryTermAbnormal = False
         self.primary = ""
+        self.restpkg = ""
 
     def getLocalhostName(self):
         self.localhostName = socket.gethostname()
@@ -6788,6 +7128,7 @@ def main():
     install_all_parser.add_argument('-X', dest='xmlFile', required=True, help='XML configuration file (or JSON file)')
     install_all_parser.add_argument('--grpkg', dest='gr_package', required=True, help='Path to GR installation package')
     install_all_parser.add_argument('--cmpkg', dest='cm_package', required=True, help='Path to CM package')
+    install_all_parser.add_argument('--restpkg', dest='rest_package', required=False, help='Path to CM-RESTAPI package')
 
     # GR uninstall command
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall cluster')
@@ -6832,11 +7173,12 @@ def main():
             clusterInfo.initFromXml(args.xmlFile)
             clusterInfo.doRebuildConf(args.xmlFile)
         elif args.command == 'install':
-            clusterInfo.gr_install(args.xmlFile, args.gr_package)
+            clusterInfo.gr_install(args.xmlFile, args.gr_package, args.rest_package)
             install = Install()
             install.xmlFile = args.xmlFile
             install.envFile = args.envFile
             install.cmpkg = args.cm_package
+            install.restpkg = args.rest_package
             install.run()
         elif args.command == 'preinstall':
             clusterInfo.preinstall(args.config_file, args.user, args.envFile)

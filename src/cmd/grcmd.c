@@ -135,7 +135,9 @@ static status_t cmd_check_cfg_scope(const char *scope)
     return CM_SUCCESS;
 }
 
-static gr_args_t cmd_ts_args[] = {};
+static gr_args_t cmd_ts_args[] = {
+    {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
+};
 
 static gr_args_set_t cmd_ts_args_set = {
     cmd_ts_args,
@@ -150,12 +152,24 @@ static void ts_help(const char *prog_name, int print_flag)
     if (print_flag == GR_HELP_SIMPLE) {
         return;
     }
+    (void)printf("-i/--addr <addr>, the value of ip:port\n");
 }
 
 static status_t ts_proc(void)
 {
     status_t status = CM_SUCCESS;
-    gr_conn_t *conn = gr_get_connection_for_cmd();
+    const char *addr = cmd_ts_args[GR_ARG_IDX_0].input_args;
+
+    gr_conn_t *conn;
+    if (addr == NULL) {
+        conn = gr_get_connection_for_cmd();
+    } else {
+        status = gr_enter_api(&conn, addr);
+        if (status != CM_SUCCESS) {
+            GR_PRINT_ERROR("Failed to get conn.\n");
+            return CM_ERROR;
+        }
+    }
     if (conn == NULL) {
         return CM_ERROR;
     }
@@ -221,6 +235,7 @@ static gr_args_t cmd_setcfg_args[] = {
     {'n', "name", CM_TRUE, CM_TRUE, cmd_check_cfg_name, NULL, NULL, 0, NULL, NULL, 0},
     {'v', "value", CM_TRUE, CM_TRUE, cmd_check_cfg_value, NULL, NULL, 0, NULL, NULL, 0},
     {'s', "scope", CM_FALSE, CM_TRUE, cmd_check_cfg_scope, NULL, NULL, 0, NULL, NULL, 0},
+    {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
 };
 static gr_args_set_t cmd_setcfg_args_set = {
     cmd_setcfg_args,
@@ -230,7 +245,7 @@ static gr_args_set_t cmd_setcfg_args_set = {
 
 static void setcfg_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s setcfg <-n name> <-v value> [-s scope]\n", prog_name);
+    (void)printf("\nUsage:%s setcfg <-n name> <-v value> [-s scope] [-i addr]\n", prog_name);
     (void)printf("[client command] set config value by name\n");
     if (print_flag == GR_HELP_SIMPLE) {
         return;
@@ -242,6 +257,7 @@ static void setcfg_help(const char *prog_name, int print_flag)
                  "Memory indicates that the modification is made in memory and takes effect immediately;\n"
                  "Pfile indicates that the modification is performed in the pfile. \n"
                  "The database must be restarted for the modification to take effect.\n");
+    (void)printf("-i/--addr <addr>, the value of ip:port\n");
 }
 
 static status_t setcfg_proc(void)
@@ -250,13 +266,24 @@ static status_t setcfg_proc(void)
     char *value = cmd_setcfg_args[GR_ARG_IDX_1].input_args;
     char *scope = cmd_setcfg_args[GR_ARG_IDX_2].input_args != NULL ?
                   cmd_setcfg_args[GR_ARG_IDX_2].input_args : "both";
+    const char *addr = cmd_setcfg_args[GR_ARG_IDX_3].input_args;
 
-    gr_conn_t *conn = gr_get_connection_for_cmd();
+    status_t status = CM_SUCCESS;
+    gr_conn_t *conn;
+    if (addr == NULL) {
+        conn = gr_get_connection_for_cmd();
+    } else {
+        status = gr_enter_api(&conn, addr);
+        if (status != CM_SUCCESS) {
+            GR_PRINT_ERROR("Failed to get conn.\n");
+            return CM_ERROR;
+        }
+    }
     if (conn == NULL) {
         return CM_ERROR;
     }
 
-    status_t status = gr_setcfg_impl(conn, name, value, scope);
+    status = gr_setcfg_impl(conn, name, value, scope);
     if (status != CM_SUCCESS) {
         GR_PRINT_ERROR("Failed to set cfg, name is %s, value is %s.\n", name, value);
     } else {
@@ -268,6 +295,7 @@ static status_t setcfg_proc(void)
 
 static gr_args_t cmd_getcfg_args[] = {
     {'n', "name", CM_TRUE, CM_TRUE, cmd_check_cfg_name, NULL, NULL, 0, NULL, NULL, 0},
+    {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
 };
 static gr_args_set_t cmd_getcfg_args_set = {
     cmd_getcfg_args,
@@ -277,23 +305,35 @@ static gr_args_set_t cmd_getcfg_args_set = {
 
 static void getcfg_help(const char *prog_name, int print_flag)
 {
-    (void)printf("\nUsage:%s getcfg <-n name> \n", prog_name);
+    (void)printf("\nUsage:%s getcfg <-n name> [-i addr]\n", prog_name);
     (void)printf("[client command] get config value by name\n");
     if (print_flag == GR_HELP_SIMPLE) {
         return;
     }
     (void)printf("-n/--name <name>, <required>, the config name to set\n");
+    (void)printf("-i/--addr <addr>, the value of ip:port\n");
 }
 
 static status_t getcfg_proc(void)
 {
+    gr_conn_t *conn;
+    status_t status = CM_SUCCESS;
     char *name = cmd_getcfg_args[GR_ARG_IDX_0].input_args;
-    gr_conn_t *conn = gr_get_connection_for_cmd();
+    const char *addr = cmd_getcfg_args[GR_ARG_IDX_1].input_args;
+    if (addr == NULL) {
+        conn = gr_get_connection_for_cmd();
+    } else {
+        status = gr_enter_api(&conn, addr);
+        if (status != CM_SUCCESS) {
+            GR_PRINT_ERROR("Failed to get conn.\n");
+            return CM_ERROR;
+        }
+    }
     if (conn == NULL) {
         return CM_ERROR;
     }
     char value[GR_PARAM_BUFFER_SIZE] = {0};
-    status_t status = gr_getcfg_impl(conn, name, value, GR_PARAM_BUFFER_SIZE);
+    status = gr_getcfg_impl(conn, name, value, GR_PARAM_BUFFER_SIZE);
     if (status != CM_SUCCESS) {
         GR_PRINT_ERROR("Failed to get cfg, name is %s, value is %s.\n", name, (strlen(value) == 0) ? NULL : value);
     } else {
@@ -303,7 +343,9 @@ static status_t getcfg_proc(void)
     return status;
 }
 
-static gr_args_t cmd_getstatus_args[] = {};
+static gr_args_t cmd_getstatus_args[] = {
+    {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
+};
 
 static gr_args_set_t cmd_getstatus_args_set = {
     cmd_getstatus_args,
@@ -318,17 +360,29 @@ static void getstatus_help(const char *prog_name, int print_flag)
     if (print_flag == GR_HELP_SIMPLE) {
         return;
     }
+    (void)printf("-i/--addr <addr>, the value of ip:port\n");
 }
 
 static status_t getstatus_proc(void)
 {
-    gr_conn_t *conn = gr_get_connection_for_cmd();
+    gr_conn_t *conn;
+    status_t status = CM_SUCCESS;
+    const char *addr = cmd_getstatus_args[GR_ARG_IDX_0].input_args;
+    if (addr == NULL) {
+        conn = gr_get_connection_for_cmd();
+    } else {
+        status = gr_enter_api(&conn, addr);
+        if (status != CM_SUCCESS) {
+            GR_PRINT_ERROR("Failed to get conn.\n");
+            return CM_ERROR;
+        }
+    }
     if (conn == NULL) {
         return CM_ERROR;
     }
 
     gr_server_status_t gr_status;
-    status_t status = gr_get_inst_status_on_server(conn, &gr_status);
+    status = gr_get_inst_status_on_server(conn, &gr_status);
     if (status != CM_SUCCESS) {
         GR_PRINT_ERROR("Failed to get server status.\n");
     } else {
@@ -340,7 +394,9 @@ static status_t getstatus_proc(void)
     return status;
 }
 
-static gr_args_t cmd_stop_args[] = {};
+static gr_args_t cmd_stop_args[] = {
+    {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
+};
 static gr_args_set_t cmd_stop_args_set = {
     cmd_stop_args,
     sizeof(cmd_stop_args) / sizeof(gr_args_t),
@@ -354,11 +410,23 @@ static void stop_help(const char *prog_name, int print_flag)
     if (print_flag == GR_HELP_SIMPLE) {
         return;
     }
+    (void)printf("-i/--addr <addr>, the value of ip:port\n");
 }
 
 static status_t stop_proc(void)
 {
-    gr_conn_t *conn = gr_get_connection_for_cmd();
+    gr_conn_t *conn;
+    status_t status = CM_SUCCESS;
+    const char *addr = cmd_stop_args[GR_ARG_IDX_0].input_args;
+    if (addr == NULL) {
+        conn = gr_get_connection_for_cmd();
+    } else {
+        status = gr_enter_api(&conn, addr);
+        if (status != CM_SUCCESS) {
+            GR_PRINT_ERROR("Failed to get conn.\n");
+            return CM_ERROR;
+        }
+    }
     if (conn == NULL) {
         return CM_ERROR;
     }
@@ -373,7 +441,9 @@ static status_t stop_proc(void)
     return ret;
 }
 
-static gr_args_t cmd_switchover_args[] = {};
+static gr_args_t cmd_switchover_args[] = {
+    {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
+};
 static gr_args_set_t cmd_switchover_args_set = {
     cmd_switchover_args,
     sizeof(cmd_switchover_args) / sizeof(gr_args_t),
@@ -387,16 +457,28 @@ static void switchover_help(const char *prog_name, int print_flag)
     if (print_flag == GR_HELP_SIMPLE) {
         return;
     }
+    (void)printf("-i/--addr <addr>, the value of ip:port\n");
 }
 
 static status_t switchover_proc(void)
 {
-    gr_conn_t *conn = gr_get_connection_for_cmd();
+    gr_conn_t *conn;
+    status_t status = CM_SUCCESS;
+    const char *addr = cmd_switchover_args[GR_ARG_IDX_0].input_args;
+    if (addr == NULL) {
+        conn = gr_get_connection_for_cmd();
+    } else {
+        status = gr_enter_api(&conn, addr);
+        if (status != CM_SUCCESS) {
+            GR_PRINT_ERROR("Failed to get conn.\n");
+            return CM_ERROR;
+        }
+    }
     if (conn == NULL) {
         return CM_ERROR;
     }
     
-    status_t status = gr_set_main_inst_impl(conn);
+    status = gr_set_main_inst_impl(conn);
     if (status != CM_SUCCESS) {
         GR_PRINT_ERROR("Failed to switchover server.\n");
     } else {
@@ -704,7 +786,9 @@ static status_t gencert_proc(void)
     return CM_SUCCESS;
 }
 
-static gr_args_t cmd_datausage_args[] = {};
+static gr_args_t cmd_datausage_args[] = {
+    {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
+};
 static gr_args_set_t cmd_datausage_args_set = {
     cmd_datausage_args,
     sizeof(cmd_datausage_args) / sizeof(gr_args_t),
@@ -718,17 +802,29 @@ static void datausage_help(const char *prog_name, int print_flag)
     if (print_flag == GR_HELP_SIMPLE) {
         return;
     }
+    (void)printf("-i/--addr <addr>, the value of ip:port\n");
 }
 
 static status_t datausage_proc(void)
 {
+    status_t status = CM_SUCCESS;
     const double GB = 1073741824.0; // 1 GB in bytes
-    gr_conn_t *conn = gr_get_connection_for_cmd();
+    const char *addr = cmd_datausage_args[GR_ARG_IDX_0].input_args;
+    gr_conn_t *conn;
+    if (addr == NULL) {
+        conn = gr_get_connection_for_cmd();
+    } else {
+        status = gr_enter_api(&conn, addr);
+        if (status != CM_SUCCESS) {
+            GR_PRINT_ERROR("Failed to get conn.\n");
+            return CM_ERROR;
+        }
+    }
     if (conn == NULL) {
         return CM_ERROR;
     }
     gr_disk_usage_info_t info = {0};
-    status_t status = gr_get_disk_usage_impl(conn, &info);
+    status = gr_get_disk_usage_impl(conn, &info);
     if (status != CM_SUCCESS) {
         GR_PRINT_ERROR("Failed to get disk usage.\n");
     } else {
