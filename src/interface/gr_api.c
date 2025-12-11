@@ -835,7 +835,16 @@ void gr_refresh_logger(char *log_field, unsigned long long *value)
     }
 
     if (strcmp(log_field, "LOG_LEVEL") == 0) {
-        cm_log_param_instance()->log_level = (uint32_t)(*value);
+        uint32_t new_level = (uint32_t)(*value);
+        cm_log_param_instance()->log_level = new_level;
+        uint32_t audit_val = 0;
+        if ((new_level & LOG_AUDIT_MODIFY_LEVEL) != 0) {
+            audit_val |= GR_AUDIT_MODIFY;
+        }
+        if ((new_level & LOG_AUDIT_QUERY_LEVEL) != 0) {
+            audit_val |= GR_AUDIT_QUERY;
+        }
+        cm_log_param_instance()->audit_level = audit_val;
     } else if (strcmp(log_field, "LOG_MAX_FILE_SIZE") == 0) {
         cm_log_param_instance()->max_log_file_size = (uint64)(*value);
         cm_log_param_instance()->max_audit_file_size = (uint64)(*value);
@@ -890,8 +899,7 @@ int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *va
 
     if (cm_strcmpi(name, "LOG_LEVEL") != 0 && cm_strcmpi(name, "LOG_MAX_FILE_SIZE") != 0 &&
         cm_strcmpi(name, "LOG_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_MAX_FILE_SIZE") != 0 &&
-        cm_strcmpi(name, "AUDIT_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "AUDIT_LEVEL") != 0 && 
-        cm_strcmpi(name, "DATA_FILE_PATH") != 0) {
+        cm_strcmpi(name, "AUDIT_BACKUP_FILE_COUNT") != 0 && cm_strcmpi(name, "DATA_FILE_PATH") != 0) {
         LOG_RUN_ERR("gr_set_conf: invalid configuration name: %s", name);
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid name when set cfg");
         return GR_ERROR;
@@ -943,6 +951,14 @@ int gr_init(const gr_param_t param)
     log_param->audit_backup_file_count = param.log_backup_file_count;
     log_param->max_log_file_size = param.log_max_file_size;
     log_param->max_audit_file_size = param.log_max_file_size;
+    uint32_t audit_val = 0;
+    if ((log_param->log_level & LOG_AUDIT_MODIFY_LEVEL) != 0) {
+        audit_val |= GR_AUDIT_MODIFY;
+    }
+    if ((log_param->log_level & LOG_AUDIT_QUERY_LEVEL) != 0) {
+        audit_val |= GR_AUDIT_QUERY;
+    }
+    log_param->audit_level = audit_val;
     log_param->log_compressed = GR_TRUE;
     if (log_param->log_compress_buf == NULL) {
         log_param->log_compress_buf = malloc(CM_LOG_COMPRESS_BUFSIZE);
