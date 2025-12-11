@@ -252,19 +252,19 @@ static status_t gr_init_loggers_inner(gr_config_t *inst_cfg, log_param_t *log_pa
     value = cm_get_config_value(&inst_cfg->config, "LOG_LEVEL");
     status = cm_str2uint32(value, (uint32_t *)&log_param->log_level);
     GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL"));
-    if (log_param->log_level > MAX_LOG_LEVEL) {
+    if (log_param->log_level > GR_MAX_LOG_LEVEL) {
         CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL");
         return CM_ERROR;
     }
 
-    if (cm_str2uint32(value, (uint32_t *)&log_param->audit_level) != CM_SUCCESS) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_LEVEL");
-        return CM_ERROR;
+    uint32_t audit_val = 0;
+    if ((log_param->log_level & LOG_AUDIT_MODIFY_LEVEL) != 0) {
+        audit_val |= GR_AUDIT_MODIFY;
     }
-    if (log_param->audit_level > GR_AUDIT_ALL) {
-        CM_THROW_ERROR(ERR_INVALID_PARAM, "AUDIT_LEVEL");
-        return CM_ERROR;
+    if ((log_param->log_level & LOG_AUDIT_QUERY_LEVEL) != 0) {
+        audit_val |= GR_AUDIT_QUERY;
     }
+    log_param->audit_level = audit_val;
     return gr_load_log_compressed(inst_cfg, log_param);
 }
 
@@ -399,11 +399,13 @@ void sql_record_audit_log(void *sess, status_t status, uint8 cmd_type)
         return;
     }
     gr_session_t *session = (gr_session_t *)sess;
-    uint32_t audit_level = cm_log_param_instance()->audit_level;
-    if ((audit_level & GR_AUDIT_MODIFY) == 0 && cmd_type >= GR_CMD_MODIFY_BEGIN && cmd_type < GR_CMD_MODIFY_END) {
+    uint32_t audit_mask = cm_log_param_instance()->log_level;
+    if ((audit_mask & LOG_AUDIT_MODIFY_LEVEL) == 0 &&
+        cmd_type >= GR_CMD_MODIFY_BEGIN && cmd_type < GR_CMD_MODIFY_END) {
         return;
     }
-    if ((audit_level & GR_AUDIT_QUERY) == 0 && cmd_type >= GR_CMD_QUERY_BEGIN && cmd_type < GR_CMD_QUERY_END) {
+    if ((audit_mask & LOG_AUDIT_QUERY_LEVEL) == 0 &&
+        cmd_type >= GR_CMD_QUERY_BEGIN && cmd_type < GR_CMD_QUERY_END) {
         return;
     }
     sql_audit_log(session, status, cmd_type);

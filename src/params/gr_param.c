@@ -84,7 +84,7 @@ static config_item_t g_gr_params[] = {
     // ==================== Logging Configuration ====================
     {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"LOG_LEVEL", CM_TRUE, ATTR_NONE, "519", NULL, NULL, "-", "[0,4087]", "GS_TYPE_INTEGER",
+    {"LOG_LEVEL", CM_TRUE, ATTR_NONE, "255", NULL, NULL, "-", "[0,16375]", "GS_TYPE_INTEGER",
         NULL, 4, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
     {"LOG_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
         NULL, 5, EFFECT_REBOOT, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},

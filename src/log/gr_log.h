@@ -28,6 +28,19 @@
 #include "cm_text.h"
 #include "gr_defs.h"
 
+#ifndef LOG_AUDIT_MODIFY_LEVEL
+#define LOG_AUDIT_MODIFY_LEVEL 0x00001000
+#endif
+#ifndef LOG_AUDIT_QUERY_LEVEL
+#define LOG_AUDIT_QUERY_LEVEL  0x00002000
+#endif
+#ifndef LOG_AUDIT_LEVEL_MASK
+#define LOG_AUDIT_LEVEL_MASK  (LOG_AUDIT_MODIFY_LEVEL | LOG_AUDIT_QUERY_LEVEL)
+#endif
+#ifndef GR_MAX_LOG_LEVEL
+#define GR_MAX_LOG_LEVEL (MAX_LOG_LEVEL | LOG_AUDIT_LEVEL_MASK)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

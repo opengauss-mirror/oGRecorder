@@ -27,6 +27,7 @@
 #include "gr_defs.h"
 #include "gr_errno.h"
 #include "gr_param.h"
+#include "gr_log.h"
 #include "gr_fault_injection.h"
 #include "gr_param_verify.h"
 
@@ -43,7 +44,7 @@ status_t gr_verify_log_level(void *lex, void *def)
     status_t status = cm_text2uint32(&text, &num);
     GR_RETURN_IFERR2(status, CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL"));
 
-    if (num > MAX_LOG_LEVEL) {
+    if (num > GR_MAX_LOG_LEVEL) {
         GR_RETURN_IFERR2(CM_ERROR, CM_THROW_ERROR(ERR_INVALID_PARAM, "LOG_LEVEL"));
     }
 
