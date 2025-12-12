@@ -82,12 +82,12 @@ static config_item_t g_gr_params[] = {
         NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Logging Configuration ====================
-    {"LOG_HOME", CM_TRUE, CM_TRUE, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+    {"LOG_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_LEVEL", CM_TRUE, ATTR_NONE, "255", NULL, NULL, "-", "[0,16375]", "GS_TYPE_INTEGER",
         NULL, 4, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
     {"LOG_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
-        NULL, 5, EFFECT_REBOOT, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
+        NULL, 5, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
     {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
         NULL, 6, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
@@ -108,8 +108,8 @@ static config_item_t g_gr_params[] = {
     // ==================== Network and Cluster Configuration ====================
     {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 8, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
-    {"IP_WHITE_LIST", CM_TRUE, ATTR_NONE, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 9, EFFECT_IMMEDIATELY, CFG_INS, NULL, NULL, NULL, NULL},
+    {"IP_WHITE_LIST", CM_TRUE, ATTR_READONLY, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 9, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Performance and Thread Configuration ====================
     {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
