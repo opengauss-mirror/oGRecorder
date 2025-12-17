@@ -48,14 +48,15 @@ GR（WAL Recorder）是一款提供WAL日志记录服务的基础组件。
 | -3rd | [binarylibs path] | 指定binarylibs路径（三方库解压完成的路径）。该路径必须是绝对路径。|
 | -m   | [version_mode] | 编译目标版本，Debug或者Release。默认Release |
 | -t   | [build_tool] | 指定编译工具，cmake或者make。默认cmake |
+| -pkg   | 无需参数 | 是否生成安装包的开关参数，默认不生成；指定该参数则生成安装包 |
 
 编译命令示例：
 
 ```bash
-sh build.sh -3rd [binarylibs path] -m Release -t cmake
+sh build.sh -3rd [binarylibs path] -m Release -t cmake -pkg
 ```
 
-编译完成后，动态库生成在 `GR/output/lib` 目录中，可执行文件生成在 `GR/output/bin` 目录中。
+编译完成后，动态库生成在 `GR/output/lib` 目录中，可执行文件生成在 `GR/output/bin` 目录中，安装包生成再 `GR` 目录中（包名：openGauss-oGRecorder-xxxx.tar.gz）。
 
 ### 使用
 
