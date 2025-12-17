@@ -102,7 +102,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
             break;
         }
         case 8:
-            gr_file_delete(g_vfs, file_name);
+            gr_file_delete(g_vfs, file_name, 0);
             break;
         case 9: {
             int file_num = 0;

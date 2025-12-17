@@ -260,13 +260,13 @@ status_t gr_create_reactors()
     pool->reactor_count = g_gr_instance.inst_cfg.params.iothread_count;
     size_t size = sizeof(reactor_t) * pool->reactor_count;
     if ((size == 0) || (size / sizeof(reactor_t) != pool->reactor_count)) {
-        CM_THROW_ERROR(ERR_ALLOC_MEMORY, (uint64)0, "creating reactors");
+        CM_THROW_ERROR(ERR_GR_ALLOC_MEMORY, (uint64)0, "creating reactors");
         return CM_ERROR;
     }
 
     pool->reactor_arr = (reactor_t *)malloc(size);
     if (pool->reactor_arr == NULL) {
-        CM_THROW_ERROR(ERR_ALLOC_MEMORY, (uint64)size, "creating reactors");
+        CM_THROW_ERROR(ERR_GR_ALLOC_MEMORY, (uint64)size, "creating reactors");
         return CM_ERROR;
     }
 

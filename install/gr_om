@@ -930,6 +930,7 @@ class dbClusterInfo():
         """
         self.name = ""
         self.appPath = ""
+        self.appSoftPath = ""
         self.logPath = ""
         self.xmlFile = ""
         self.dbNodes = []
@@ -2208,7 +2209,8 @@ class dbClusterInfo():
         self.name = self.__read_and_check_config_item(xmlRootNode, "clusterName", "cluster")
 
         self.installPath = self.__read_and_check_config_item(xmlRootNode, "installPath", "cluster")
-        self.appPath = os.path.join(self.installPath, "gr")
+        self.appPath = os.path.join(self.installPath, "APP")
+        self.appSoftPath = self.appPath
         self.toolPath = os.path.join(self.installPath, "tool")
         self.tmpPath = os.path.join(self.installPath, "tmp")
         self.logPath = os.path.join(self.installPath, "log")
@@ -4319,11 +4321,16 @@ class dbClusterInfo():
 
     def execute_on_node(self, node, cmd, local_name=None, ssh_ip=None):
         """
-        node: 节点名
-        cmd: 要执行的命令（不带ssh前缀）
-        local_name: 本地主机名或IP
-        ssh_ip: 远程ssh IP（如有）
-        返回: (status, output)
+        在指定节点上执行命令
+        
+        Args:
+            node: 节点名
+            cmd: 要执行的命令（不带ssh前缀）
+            local_name: 本地主机名或IP
+            ssh_ip: 远程ssh IP（如有）
+        
+        Returns:
+            (status, output): 命令执行状态码和输出
         """
         if node == local_name or node == GetHostIpOrName():
             return subprocess.getstatusoutput(cmd)
@@ -4332,7 +4339,170 @@ class dbClusterInfo():
             ssh_cmd = f"ssh -q -o ConnectTimeout=5 {ssh_target} '{cmd}'"
             return subprocess.getstatusoutput(ssh_cmd)
 
-    def gr_install(self, xmlFile, PkgPath, RestPkgPath):
+    def distribute_file(self, source_path, dest_path, nodes, set_executable=False, recursive=False):
+        """
+        分发文件或目录到多个节点
+        
+        Args:
+            source_path: 源文件/目录路径（本地）
+            dest_path: 目标路径
+            nodes: 节点列表（dbNode 对象列表）
+            set_executable: 是否设置可执行权限
+            recursive: 是否递归复制目录
+        
+        Returns:
+            成功分发的节点数
+        
+        Raises:
+            Exception: 如果任意节点分发失败
+        """
+        success_count = 0
+        local_name = GetHostIpOrName()
+        r_flag = "-r" if recursive else ""
+        
+        for dbNode in nodes:
+            if dbNode.name != local_name:
+                # 远程节点：使用 scp
+                cmd = f"scp -q {r_flag} {source_path} {dbNode.sshIps[0]}:{dest_path}"
+                status, output = subprocess.getstatusoutput(cmd)
+                if status != 0:
+                    raise Exception(f"Failed to distribute {source_path} to {dbNode.name}: {output}")
+                
+                if set_executable:
+                    # 设置可执行权限
+                    target_file = os.path.join(dest_path, os.path.basename(source_path)) if not source_path.endswith('*') else f"{dest_path}/*"
+                    cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.sshIps[0]} 'chmod +x {target_file}'"
+                    subprocess.getstatusoutput(cmd)
+            else:
+                # 本地节点：使用 cp
+                cmd = f"cp {r_flag} {source_path} {dest_path}"
+                status, output = subprocess.getstatusoutput(cmd)
+                if status != 0:
+                    raise Exception(f"Failed to copy {source_path} to {dest_path}: {output}")
+                
+                if set_executable:
+                    if source_path.endswith('*'):
+                        cmd = f"chmod +x {dest_path}/*"
+                        subprocess.getstatusoutput(cmd)
+                    else:
+                        target_file = os.path.join(dest_path, os.path.basename(source_path)) if os.path.isdir(dest_path) else dest_path
+                        os.chmod(target_file, 0o755)
+            
+            success_count += 1
+        
+        return success_count
+
+    def _check_gr_status(self, user, nodes_to_check, check_phase="pre-upgrade"):
+        """
+        检查每个节点的 GR 状态，确保 grcmd getstatus 命令执行成功且状态为 open
+        
+        Args:
+            user: 当前用户
+            nodes_to_check: 要检查的节点列表
+            check_phase: 检查阶段描述 ("pre-upgrade" 或 "post-upgrade")
+        
+        Returns:
+            True 如果所有节点检查通过
+        
+        Raises:
+            Exception 如果任一节点命令执行失败或状态不是 open
+        """
+        self.logger.log(f"Checking GR status on all nodes ({check_phase})...")
+        
+        # 获取环境变量文件路径
+        envfile_path = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
+        env_source = f"source {envfile_path} && " if envfile_path else ""
+        
+        # 在每个节点上执行检查
+        for dbNode in nodes_to_check:
+            self.logger.log(f"Checking GR status on node {dbNode.name} ({check_phase})...")
+            
+            # 执行 grcmd getstatus 命令
+            cmd = f"{env_source}grcmd getstatus"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            
+            if status != 0:
+                raise Exception(f"GR status check failed on node {dbNode.name} ({check_phase}): grcmd getstatus command failed with status {status}. Output: {output}")
+            
+            self.logger.log(f"Node {dbNode.name} grcmd getstatus output:\n{output}")
+            
+            # 检查输出中是否包含 "open" 状态
+            # 输出格式示例: "Server status of instance 1 is open and READONLY."
+            if "is open" not in output.lower():
+                raise Exception(f"GR status check failed on node {dbNode.name} ({check_phase}): Server status is not 'open'. Output: {output}")
+            
+            self.logger.log(f"GR status check passed on node {dbNode.name} ({check_phase}): Server status is open.")
+        
+        self.logger.log(f"All nodes passed GR status check ({check_phase}).")
+        return True
+
+    def _check_cm_status(self, user, check_phase="pre-upgrade"):
+        """
+        检查 CM 集群状态，确保 cm_ctl query -Cv 命令执行成功且集群状态正常
+        
+        Args:
+            user: 当前用户
+            check_phase: 检查阶段描述 ("pre-upgrade" 或 "post-upgrade")
+        
+        Returns:
+            True 如果检查通过
+        
+        Raises:
+            Exception 如果命令执行失败或集群状态不正常
+        """
+        self.logger.log(f"Checking CM cluster status ({check_phase})...")
+        
+        # 获取环境变量文件路径
+        envfile_path = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
+        env_source = f"source {envfile_path} && " if envfile_path else ""
+        
+        # 执行 cm_ctl query -Cv 命令
+        cmd = f"{env_source}cm_ctl query -Cv"
+        status, output = subprocess.getstatusoutput(cmd)
+        
+        if status != 0:
+            raise Exception(f"CM status check failed ({check_phase}): cm_ctl query -Cv command failed with status {status}. Output: {output}")
+        
+        self.logger.log(f"cm_ctl query -Cv output:\n{output}")
+        
+        # 检查 CMServer State 部分，确保所有节点的 CMServer 都有状态（Primary 或 Standby）
+        # 输出格式示例:
+        # [  CMServer State   ]
+        # node           instance state
+        # -------------------------------
+        # 1  openGauss56 1        Primary
+        # 2  openGauss54 2        Standby
+        
+        output_lower = output.lower()
+        
+        # 检查是否有 CMServer State 部分
+        if "cmserver state" not in output_lower:
+            raise Exception(f"CM status check failed ({check_phase}): CMServer State section not found in output. Output: {output}")
+        
+        # 检查集群状态是否为 Normal
+        # 输出格式示例: cluster_state   : Normal
+        if "cluster_state" not in output_lower:
+            raise Exception(f"CM status check failed ({check_phase}): cluster_state not found in output. Output: {output}")
+        
+        # 提取 cluster_state 的值
+        cluster_state_match = re.search(r'cluster_state\s*:\s*(\w+)', output, re.IGNORECASE)
+        if not cluster_state_match:
+            raise Exception(f"CM status check failed ({check_phase}): Unable to parse cluster_state. Output: {output}")
+        
+        cluster_state = cluster_state_match.group(1)
+        if cluster_state.lower() != "normal":
+            raise Exception(f"CM status check failed ({check_phase}): cluster_state is '{cluster_state}', expected 'Normal'. Output: {output}")
+        
+        # 检查 CMServer 是否都有 Primary 或 Standby 状态
+        # 确保至少有一个 Primary
+        if "primary" not in output_lower:
+            raise Exception(f"CM status check failed ({check_phase}): No Primary CMServer found. Output: {output}")
+        
+        self.logger.log(f"CM status check passed ({check_phase}): cluster_state is Normal, CMServer is running.")
+        return True
+
+    def gr_install(self, xmlFile, PkgPath, RestPkgPath, jsonFile=None):
         user = getpass.getuser()
         gaussHome = self.__getEnvironmentParameterValue("GAUSSHOME", user)
         if (gaussHome == ""):
@@ -4343,7 +4513,34 @@ class dbClusterInfo():
         # 初始化日志模块
         self.initLogger("install")
 
-        self.logger.log("Start insatll oGRecorder.")
+        self.logger.log("Start install oGRecorder.")
+        
+        # 备份 JSON 配置文件到 GR_HOME 目录
+        if jsonFile and os.path.exists(jsonFile):
+            backup_dir = os.path.join(clusterInfo.grPath, "cfg")
+            backup_file = os.path.join(backup_dir, "cluster_config.json")
+            self.logger.log(f"Backing up JSON config file to {backup_file}")
+            for dbNode in clusterInfo.dbNodes:
+                # 确保备份目录存在
+                cmd = f"mkdir -p {backup_dir}"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0:
+                    self.logger.warn(f"Failed to create backup directory on {dbNode.name}: {output}")
+                    continue
+                
+                # 复制 JSON 文件到备份目录
+                if dbNode.name != GetHostIpOrName():
+                    cmd = f"scp {jsonFile} {dbNode.sshIps[0]}:{backup_file}"
+                    status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = f"cp {jsonFile} {backup_file}"
+                    status, output = subprocess.getstatusoutput(cmd)
+                
+                if status != 0:
+                    self.logger.warn(f"Failed to backup JSON config to {dbNode.name}: {output}")
+                else:
+                    self.logger.log(f"Successfully backed up JSON config to {dbNode.name}:{backup_file}")
         pkgName = os.path.basename(PkgPath)
         cfg_path = os.path.join(clusterInfo.grPath, "cfg", "gr_inst.ini")
         parent_dir = os.path.dirname(cfg_path)
@@ -4377,6 +4574,71 @@ class dbClusterInfo():
                 raise Exception(f"failed to decompress gr pkg, Error output:\n{output}")
         self.logger.log("Successfully decompress gr pkg.")
 
+        # 提取版本信息（从包名或包内文件，这里使用时间戳+commit ID作为版本标识）
+        # 尝试从包名提取版本，格式如：gr-1.0.0.tar.gz 或 gr_1.0.0.tar.gz
+        version_match = re.search(r'[_-](\d+\.\d+\.\d+)', pkgName)
+        if version_match:
+            version_str = version_match.group(1)
+        else:
+            # 如果包名中没有版本，使用时间戳
+            version_str = time.strftime("%Y%m%d_%H%M%S")
+        
+        # 创建版本化目录结构：APP -> APP_VERSION
+        install_base = clusterInfo.installPath
+        app_link_name = "APP"
+        app_version_dir = f"APP_{version_str}"
+        app_link_path = os.path.join(install_base, app_link_name)
+        app_version_path = os.path.join(install_base, app_version_dir)
+        
+        self.logger.log(f"Creating versioned directory structure: {app_link_name} -> {app_version_dir}")
+        
+        # 创建版本化目录和软链接
+        for dbNode in clusterInfo.dbNodes:
+            # 创建版本化目录
+            cmd = f"mkdir -p {app_version_path}"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status != 0:
+                raise Exception(f"Failed to create versioned directory on {dbNode.name}: {output}")
+            
+            # 只复制bin、lib、share到版本化目录（这些需要版本隔离）
+            cmd = f"cp -r {clusterInfo.toolPath}/bin {clusterInfo.toolPath}/lib {app_version_path}/"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status != 0:
+                raise Exception(f"Failed to copy bin/lib to versioned directory on {dbNode.name}: {output}")
+            
+            # 如果解压包中有share目录，也复制过去（在远程节点检查并复制）
+            cmd = f"if [ -d {clusterInfo.toolPath}/share ]; then cp -r {clusterInfo.toolPath}/share {app_version_path}/; fi"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status != 0:
+                self.logger.warn(f"Failed to copy share to versioned directory on {dbNode.name}: {output}")
+            
+            # 创建或更新APP软链接指向新版本
+            cmd = f"ln -sfn {app_version_dir} {app_link_path}"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status != 0:
+                raise Exception(f"Failed to create/update APP symlink on {dbNode.name}: {output}")
+        
+        self.logger.log(f"Successfully created versioned directory: {app_version_dir} and symlink: {app_link_name}")
+        clusterInfo.appSoftPath = app_link_path
+        clusterInfo.appPath = app_version_path
+        
+        # cfg目录在共享位置，不在版本化目录中
+        cfg_path = os.path.join(clusterInfo.grPath, "cfg", "gr_inst.ini")
+        parent_dir = os.path.dirname(cfg_path)
+        
+        # 收集所有节点的 IP 地址用于白名单
+        all_node_ips = []
+        for node in clusterInfo.dbNodes:
+            if node.sshIps and node.sshIps[0] not in all_node_ips:
+                all_node_ips.append(node.sshIps[0])
+        all_node_ips.append("127.0.0.1")
+        ip_white_list = ",".join(all_node_ips)
+        self.logger.log(f"IP white list for all nodes: {ip_white_list}")
+        
         # 修改配置文件
         for i, dbNode in enumerate(clusterInfo.dbNodes):
             config_content = (
@@ -4384,25 +4646,16 @@ class dbClusterInfo():
                 f"LOG_LEVEL=255\n"
                 f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
                 f"LISTEN_ADDR={dbNode.listen_addr}\n"
-                f"IP_WHITE_LIST={dbNode.sshIps[0]},127.0.0.1\n"
+                f"IP_WHITE_LIST={ip_white_list}\n"
                 f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
             )
-            cmd = f"printf \"%s\" \"{config_content}\" > {cfg_path}"
+            cmd = f"mkdir -p {parent_dir} && printf \"%s\" \"{config_content}\" > {cfg_path}"
             status, output = self.execute_on_node(
                 dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
             if status != 0:
                 self.logger.error(f"Failed to create/write gr config file on {dbNode.name}, output:\n{output}")
                 raise Exception(f"failed to create/write gr config file, Error output:\n{output}")
         self.logger.log("Successfully create and write gr config file.")
-
-        # 放到grPath下面
-        for dbNode in clusterInfo.dbNodes:
-            cmd = 'cp -r %s/bin %s/lib %s' % (clusterInfo.toolPath, clusterInfo.toolPath, clusterInfo.grPath)
-            status, output = self.execute_on_node(
-                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
-            if status != 0:
-                raise Exception(f"failed to add gr bin and lib, Error output:\n{output}")
-        self.logger.log("Successfully add gr bin and lib.")
 
         # 生成标志文件(CM)
         for dbNode in clusterInfo.dbNodes:
@@ -4423,7 +4676,7 @@ class dbClusterInfo():
             'restart_times=5,'
             'restart_delay=1,'
             'restart_period=1"'
-        ).format(app_path=clusterInfo.grPath)
+        ).format(app_path=clusterInfo.appPath)
 
         edit_cmds = []
         for i, dbNode in enumerate(clusterInfo.dbNodes):
@@ -4478,132 +4731,49 @@ class dbClusterInfo():
                     raise Exception(f"failed to create gr_res.sh file, Error output:\n{output}")
         self.logger.log("Successfully create gr_res.sh file.")
 
-
-        # 只在主节点生成配置文件
-        main_node = clusterInfo.dbNodes[0]  # 使用第一个节点作为主节点
-
-        # 构造包含所有节点 IP 的白名单（每个节点的 sshIps[0] + 127.0.0.1）
-        all_ips = []
-        for node in clusterInfo.dbNodes:
-            if node.sshIps and node.sshIps[0]:
-                all_ips.append(node.sshIps[0])
-        all_ips.append("127.0.0.1")
-        ip_white_list = ",".join(all_ips)
-
-        main_config_content = (
-            f"INST_ID=0\n"
-            f"LOG_LEVEL=255\n"
-            f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
-            f"LISTEN_ADDR={main_node.listen_addr}\n"
-            f"IP_WHITE_LIST={ip_white_list}\n"
-            f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
-        )
-        
-        # 在主节点生成配置文件
-        main_config_path = f"{parent_dir}/gr_inst.ini"
-        cli_config_path = f"{parent_dir}/gr_cli_inst.ini"
-        with open(main_config_path, 'w') as f:
-            f.write(main_config_content)
-
-        self.logger.log("Successfully create initial config file on main node.")
-
         # 生成证书（grcmd会在配置文件中添加证书相关配置）
         envfile = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
         ca_path = clusterInfo.grPath
         if not ca_path.endswith("CA"):
             ca_path = os.path.join(ca_path, "CA")
-        for dbNode in clusterInfo.dbNodes:
-            if (dbNode.name != GetHostIpOrName()):
-                cmd = "scp -r {certPath}/ {host}:{certPath}".format(certPath=ca_path, host=dbNode.sshIps[0])
-            else:
-                cmd = 'source %s && grcmd gencert -t server -d 1000 && grcmd gencert -t client -d 1000' % (envfile)
-            (status, output) = subprocess.getstatusoutput(cmd)
-            if (status != 0):
-                raise Exception(f"failed to create gr cert, Error output:\n{output}, cmd is {cmd}")
-
-        # 为每个节点生成正确的配置文件并分发
-        for i, dbNode in enumerate(clusterInfo.dbNodes):
-            # 读取主节点的配置文件（包含证书配置）
-            with open(main_config_path, 'r') as f:
-                config_content = f.read()
-            
-            # 修改INST_ID和LISTEN_ADDR（IP_WHITE_LIST 对所有节点保持一致，允许所有节点互访）
-            config_content = config_content.replace(f"INST_ID=0", f"INST_ID={i}")
-            config_content = config_content.replace(f"LISTEN_ADDR={main_node.listen_addr}", f"LISTEN_ADDR={dbNode.listen_addr}")
-            
-            # 在本地生成节点特定的gr_inst.ini配置文件
-            local_config_path = f"{parent_dir}/gr_inst_{dbNode.name}.ini"
-            with open(local_config_path, 'w') as f:
-                f.write(config_content)
-            
-            # 分发配置文件到对应节点
-            cmd = f"scp {local_config_path} {dbNode.sshIps[0]}:{parent_dir}/gr_inst.ini"
-            status, output = subprocess.getstatusoutput(cmd)
-            if status != 0:
-                raise Exception(f"failed to distribute gr_inst.ini to {dbNode.name}, Error output:\n{output}")
-            
-            # 分发gr_cli_inst.ini（直接使用主节点的配置）
-            cmd = f"scp {cli_config_path} {dbNode.sshIps[0]}:{parent_dir}/gr_cli_inst.ini"
-            status, output = subprocess.getstatusoutput(cmd)
-            if status != 0:
-                raise Exception(f"failed to distribute gr_cli_inst.ini to {dbNode.name}, Error output:\n{output}")
-            
-            # 清理本地临时文件
-            if os.path.exists(local_config_path):
-                os.remove(local_config_path)
-
-        self.logger.log("Successfully create gr cert.")
-
-        # gr_om
+        grcmd_bin = os.path.join(
+            clusterInfo.appSoftPath if clusterInfo.appSoftPath else clusterInfo.appPath,
+            "bin",
+            "grcmd",
+        )
+        
+        # 1. 先在本地节点生成证书
+        cmd = f'source {envfile} && "{grcmd_bin}" gencert -t server -d 1000 && "{grcmd_bin}" gencert -t client -d 1000'
+        status, output = subprocess.getstatusoutput(cmd)
+        if status != 0:
+            raise Exception(f"Failed to create gr cert on local node, Error output:\n{output}, cmd is {cmd}")
+        self.logger.log("Successfully create gr cert on local node.")
+        
+        # 2. 分发证书到其他节点
         for dbNode in clusterInfo.dbNodes:
             if dbNode.name != GetHostIpOrName():
-                cmd = "scp gr_om %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
+                cmd = f"scp -r {ca_path}/ {dbNode.sshIps[0]}:{ca_path}"
                 status, output = subprocess.getstatusoutput(cmd)
-            else:
-                cmd = 'cp gr_om %s/bin' % (clusterInfo.appPath)
-                status, output = subprocess.getstatusoutput(cmd)
-            if status != 0:
-                raise Exception(f"failed tp distribute gr_om, Error output:\n{output}")
+                if status != 0:
+                    raise Exception(f"Failed to distribute gr cert to {dbNode.name}, Error output:\n{output}")
+                self.logger.log(f"Successfully distribute gr cert to {dbNode.name}.")
+
+        self.logger.log("Successfully create and distribute gr cert.")
+
+        # 分发脚本和工具
+        bin_path = os.path.join(clusterInfo.appPath, "bin")
+        script_path = os.path.join(clusterInfo.toolPath, "script")
+        
+        # gr_om
+        self.distribute_file("gr_om", bin_path, clusterInfo.dbNodes)
         self.logger.log("Successfully distribute gr_om.")
 
         # pssh
-        for dbNode in clusterInfo.dbNodes:
-            if dbNode.name != GetHostIpOrName():
-                cmd = "scp -r pssh/bin/* %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
-                status, output = subprocess.getstatusoutput(cmd)
-                if status == 0:
-                    # Set execute permissions for pssh binaries
-                    cmd = "ssh -q -o ConnectTimeout=5 %s 'chmod +x %s/bin/*'" % (dbNode.sshIps[0], clusterInfo.appPath)
-                    status, output = subprocess.getstatusoutput(cmd)
-            else:
-                cmd = 'cp -r pssh/bin/* %s/bin' % (clusterInfo.appPath)
-                status, output = subprocess.getstatusoutput(cmd)
-                if status == 0:
-                    # Set execute permissions for pssh binaries
-                    cmd = 'chmod +x %s/bin/*' % (clusterInfo.appPath)
-                    status, output = subprocess.getstatusoutput(cmd)
-            if status != 0:
-                raise Exception(f"failed to distribute pssh, Error output:\n{output}")
+        self.distribute_file("pssh/bin/*", bin_path, clusterInfo.dbNodes, set_executable=True, recursive=True)
         self.logger.log("Successfully distribute pssh.")
 
         # gr_contrl.sh脚本
-        for dbNode in clusterInfo.dbNodes:
-            if dbNode.name != GetHostIpOrName():
-                cmd = "scp gr_contrl.sh %s:%s/bin" % (dbNode.sshIps[0], clusterInfo.appPath)
-                status, output = subprocess.getstatusoutput(cmd)
-                if status == 0:
-                    # Set execute permissions for gr_contrl.sh
-                    cmd = "ssh -q -o ConnectTimeout=5 %s 'chmod +x %s/bin/gr_contrl.sh'" % (dbNode.sshIps[0], clusterInfo.appPath)
-                    status, output = subprocess.getstatusoutput(cmd)
-            else:
-                cmd = 'cp gr_contrl.sh %s/bin' % (clusterInfo.appPath)
-                status, output = subprocess.getstatusoutput(cmd)
-                if status == 0:
-                    # Set execute permissions for gr_contrl.sh
-                    cmd = 'chmod +x %s/bin/gr_contrl.sh' % (clusterInfo.appPath)
-                    status, output = subprocess.getstatusoutput(cmd)
-            if status != 0:
-                raise Exception(f"failed to distribute gr_contrl.sh, Error output:\n{output}")
+        self.distribute_file("gr_contrl.sh", bin_path, clusterInfo.dbNodes, set_executable=True)
         self.logger.log("Successfully distribute gr_contrl.sh.")
 
         if RestPkgPath:
@@ -4670,26 +4840,1265 @@ class dbClusterInfo():
             if status != 0:
                 raise Exception(f"failed to distribute rest_ssl.properties, Error output:\n{output}")
             self.logger.log("Successfully distribute rest_ssl.properties.")
+
         # py_pstree.py脚本
-        for dbNode in clusterInfo.dbNodes:
-            if dbNode.name != GetHostIpOrName():
-                cmd = "scp py_pstree.py %s:%s/script/" % (dbNode.sshIps[0], clusterInfo.toolPath)
-                status, output = subprocess.getstatusoutput(cmd)
-                if status == 0:
-                    # Set execute permissions for py_pstree.py
-                    cmd = "ssh -q -o ConnectTimeout=5 %s 'chmod +x %s/script/py_pstree.py'" % (dbNode.sshIps[0], clusterInfo.toolPath)
-                    status, output = subprocess.getstatusoutput(cmd)
-            else:
-                cmd = 'cp py_pstree.py %s/script' % (clusterInfo.toolPath)
-                status, output = subprocess.getstatusoutput(cmd)
-                if status == 0:
-                    # Set execute permissions for py_pstree.py
-                    cmd = 'chmod +x %s/script/py_pstree.py' % (clusterInfo.toolPath)
-                    status, output = subprocess.getstatusoutput(cmd)
-            if status != 0:
-                raise Exception(f"failed to distribute py_pstree.py, Error output:\n{output}")
+        self.distribute_file("py_pstree.py", script_path, clusterInfo.dbNodes, set_executable=True)
         self.logger.log("Successfully distribute py_pstree.py.")
+
         self.logger.log("Successfully install oGRecorder.")
+
+    def gr_upgrade(self, xmlFile, PkgPath, target_nodeids=None):
+        """
+        Upgrade GR application to new version with atomic symlink switching (rolling upgrade)
+        
+        滚动升级：逐个节点进行升级，确保服务持续可用
+        
+        Args:
+            xmlFile: XML configuration file
+            PkgPath: Path to new version installation package
+            target_nodeids: List of node IDs to upgrade (starting from 1, None means all nodes)
+        """
+        user = getpass.getuser()
+        gaussHome = self.__getEnvironmentParameterValue("GAUSSHOME", user)
+        if (gaussHome == ""):
+            raise Exception(ErrorCode.GAUSS_502["GAUSS_50201"] % \
+                            ("installation path of designated user [%s]" % user))
+        
+        clusterInfo = dbClusterInfo()
+        clusterInfo.initFromXml(xmlFile)
+        # 初始化日志模块
+        self.initLogger("upgrade")
+
+        self.logger.log("Start upgrade oGRecorder (rolling upgrade - one node at a time).")
+        
+        # 确定要升级的节点（根据节点ID，从1开始）
+        nodes_to_upgrade = []
+        if target_nodeids is None or len(target_nodeids) == 0:
+            nodes_to_upgrade = clusterInfo.dbNodes
+            self.logger.log("Upgrading all nodes in cluster (one by one)")
+        else:
+            # 只升级指定的节点（根据节点ID）
+            for node_id in target_nodeids:
+                # 节点ID从1开始，但数组索引从0开始
+                node_index = node_id - 1
+                if node_index >= 0 and node_index < len(clusterInfo.dbNodes):
+                    nodes_to_upgrade.append(clusterInfo.dbNodes[node_index])
+                    self.logger.log(f"Node ID {node_id} ({clusterInfo.dbNodes[node_index].name}) will be upgraded")
+                else:
+                    self.logger.warn(f"Node ID {node_id} is out of range (valid range: 1-{len(clusterInfo.dbNodes)}), skipping")
+        
+        if len(nodes_to_upgrade) == 0:
+            raise Exception("No valid nodes to upgrade")
+        
+        # 获取 cm_ctl 路径
+        gaussHome = self.__getEnvironmentParameterValue("GAUSSHOME", user)
+        toolPath = self.__getEnvironmentParameterValue("GPHOME", user)
+        cm_ctl_path = None
+        if gaussHome:
+            cm_ctl_path = os.path.join(gaussHome, "bin", "cm_ctl")
+        elif toolPath:
+            cm_ctl_path = os.path.join(toolPath, "bin", "cm_ctl")
+        else:
+            # 尝试在 PATH 中查找
+            status, output = subprocess.getstatusoutput("which cm_ctl")
+            if status == 0:
+                cm_ctl_path = output.strip()
+        
+        if not cm_ctl_path:
+            self.logger.warn("cm_ctl not found, will skip service stop/start operations")
+        else:
+            self.logger.log(f"Using cm_ctl: {cm_ctl_path}")
+        
+        # 使用时间戳作为版本号
+        pkgName = os.path.basename(PkgPath)
+        version_str = time.strftime("%Y%m%d_%H%M%S")
+        
+        self.logger.log(f"Upgrading to version: {version_str} (package: {pkgName})")
+        
+        # 获取当前版本信息
+        install_base = clusterInfo.installPath
+        app_link_name = "APP"
+        app_link_path = os.path.join(install_base, app_link_name)
+        app_version_dir = f"APP_{version_str}"
+        app_version_path = os.path.join(install_base, app_version_dir)
+        backup_dir = os.path.join(install_base, "backup")
+        timestamp = time.strftime("%Y%m%d%H%M%S")
+        
+        # 获取环境变量文件路径
+        envfile_path = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
+        env_source = f"source {envfile_path} && " if envfile_path else ""
+        
+        # 记录每个节点的状态信息（用于回滚）
+        node_rollback_info = {}  # {node_name: {'old_version_dir': '...', 'old_version_name': '...', 'services_stopped': True/False, 'symlink_switched': False, 'upgrade_completed': False}}
+        
+        # 预先记录所有节点的当前版本信息
+        for dbNode in nodes_to_upgrade:
+            cmd = f"readlink -f {app_link_path} 2>/dev/null || echo ''"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status == 0 and output.strip():
+                current_version_dir = output.strip()
+                current_version_name = os.path.basename(current_version_dir)
+                node_rollback_info[dbNode.name] = {
+                    'old_version_dir': current_version_dir,
+                    'old_version_name': current_version_name,
+                    'services_stopped': False,
+                    'symlink_switched': False,
+                    'upgrade_completed': False
+                }
+                self.logger.log(f"Recorded rollback info for {dbNode.name}: {current_version_name}")
+            else:
+                node_rollback_info[dbNode.name] = {
+                    'old_version_dir': None,
+                    'old_version_name': None,
+                    'services_stopped': False,
+                    'symlink_switched': False,
+                    'upgrade_completed': False
+                }
+                self.logger.warn(f"No current version found for {dbNode.name}, rollback may not be possible")
+        
+        # 分发安装包到所有远程节点（提前分发，避免升级过程中分发失败）
+        self.logger.log("Pre-distributing package to remote nodes...")
+        for dbNode in nodes_to_upgrade:
+            if dbNode.name != GetHostIpOrName():
+                cmd = f"test -f {PkgPath}"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0:
+                    self.logger.log(f"Distributing package to {dbNode.name}")
+                    cmd = f"scp {PkgPath} {dbNode.sshIps[0]}:{clusterInfo.toolPath}/"
+                    status, output = subprocess.getstatusoutput(cmd)
+                    if status != 0:
+                        raise Exception(f"Failed to distribute package to {dbNode.name}: {output}")
+                    self.logger.log(f"Package distributed to {dbNode.name}")
+        
+        # 升级成功的节点列表
+        upgraded_nodes = []
+        
+        # 滚动升级：逐个节点进行
+        self.logger.log("=" * 60)
+        self.logger.log(f"Starting rolling upgrade for {len(nodes_to_upgrade)} node(s)")
+        self.logger.log("=" * 60)
+        
+        for node_index, dbNode in enumerate(nodes_to_upgrade):
+            node_id = clusterInfo.dbNodes.index(dbNode) + 1
+            
+            self.logger.log("")
+            self.logger.log("=" * 60)
+            self.logger.log(f"UPGRADING NODE {node_index + 1}/{len(nodes_to_upgrade)}: {dbNode.name} (ID: {node_id})")
+            self.logger.log("=" * 60)
+            
+            try:
+                # ===== 步骤1: 升级前检查该节点 =====
+                self.logger.log(f"[{dbNode.name}] Step 1: Pre-upgrade check")
+                self._check_gr_status(user, [dbNode], f"pre-upgrade node {node_id}")
+                
+                # 检查当前软链接是否存在
+                cmd = f"test -L {app_link_path} && readlink -f {app_link_path} || echo ''"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status == 0 and output.strip():
+                    current_version_dir = output.strip()
+                    self.logger.log(f"[{dbNode.name}] Current version: {current_version_dir}")
+                else:
+                    self.logger.warn(f"[{dbNode.name}] No current version found, this appears to be a fresh installation")
+                
+                # ===== 步骤2: 停止该节点服务 =====
+                if cm_ctl_path:
+                    self.logger.log(f"[{dbNode.name}] Step 2: Stopping services on node {node_id}")
+                    
+                    if dbNode.name == GetHostIpOrName():
+                        cmd = f"{env_source}{cm_ctl_path} stop -n {node_id}"
+                        status, output = subprocess.getstatusoutput(cmd)
+                    else:
+                        cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.sshIps[0]} '{env_source}{cm_ctl_path} stop -n {node_id}'"
+                        status, output = subprocess.getstatusoutput(cmd)
+                    
+                    if status != 0:
+                        self.logger.warn(f"[{dbNode.name}] Failed to stop services: {output}")
+                        self.logger.warn(f"[{dbNode.name}] Service stop failed, but continuing with upgrade...")
+                    else:
+                        self.logger.log(f"[{dbNode.name}] Services stopped successfully")
+                    
+                    node_rollback_info[dbNode.name]['services_stopped'] = True
+                    time.sleep(2)
+                
+                # ===== 步骤3: 备份当前版本 =====
+                self.logger.log(f"[{dbNode.name}] Step 3: Backup current version")
+                
+                cmd = f"mkdir -p {backup_dir}"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                cmd = f"readlink -f {app_link_path} 2>/dev/null || echo ''"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                if status == 0 and output.strip():
+                    current_version_dir = output.strip()
+                    current_version_name = os.path.basename(current_version_dir)
+                    backup_file = os.path.join(backup_dir, f"{current_version_name}-backup-{timestamp}.tar.gz")
+                    
+                    cmd = f"tar -czf {backup_file} -C {install_base} {current_version_name} 2>/dev/null && echo 'OK' || echo 'FAILED'"
+                    status, output = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status == 0 and 'OK' in output:
+                        self.logger.log(f"[{dbNode.name}] Backed up to {backup_file}")
+                    else:
+                        self.logger.warn(f"[{dbNode.name}] Backup failed: {output}")
+                
+                # ===== 步骤4: 安装新版本 =====
+                self.logger.log(f"[{dbNode.name}] Step 4: Install new version")
+                
+                # 如果版本目录已存在，先删除
+                cmd = f"test -d {app_version_path} && rm -rf {app_version_path} || true"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                # 获取当前版本目录，如果存在则复制原有内容
+                cmd = f"readlink -f {app_link_path} 2>/dev/null || echo ''"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                if status == 0 and output.strip():
+                    current_version_dir = output.strip()
+                    self.logger.log(f"[{dbNode.name}] Copying existing directory from {current_version_dir}")
+                    cmd = f"cp -a {current_version_dir} {app_version_path}"
+                    status, output = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status != 0:
+                        self.logger.warn(f"[{dbNode.name}] Failed to copy existing directory, creating new: {output}")
+                        cmd = f"mkdir -p {app_version_path}"
+                        status, output = self.execute_on_node(
+                            dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                        if status != 0:
+                            raise Exception(f"Failed to create version directory on {dbNode.name}: {output}")
+                else:
+                    self.logger.log(f"[{dbNode.name}] No existing version found, creating new directory")
+                    cmd = f"mkdir -p {app_version_path}"
+                    status, output = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status != 0:
+                        raise Exception(f"Failed to create version directory on {dbNode.name}: {output}")
+                
+                # 解压安装包
+                local_pkg_path = PkgPath if dbNode.name == GetHostIpOrName() else os.path.join(clusterInfo.toolPath, pkgName)
+                temp_extract_dir = os.path.join(clusterInfo.toolPath, f"temp_extract_{version_str}")
+                
+                cmd = f"rm -rf {temp_extract_dir} && mkdir -p {temp_extract_dir} && tar -zxf {local_pkg_path} -C {temp_extract_dir} && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0 or 'FAILED' in output:
+                    raise Exception(f"Failed to decompress package on {dbNode.name}: {output}")
+                
+                # 用新包内容覆盖
+                self.logger.log(f"[{dbNode.name}] Replacing files with new package content")
+                cmd = f"if [ -d {temp_extract_dir}/bin ]; then cp -r {temp_extract_dir}/bin/* {app_version_path}/bin/ 2>/dev/null || cp -r {temp_extract_dir}/bin {app_version_path}/; fi && " \
+                      f"if [ -d {temp_extract_dir}/lib ]; then cp -r {temp_extract_dir}/lib/* {app_version_path}/lib/ 2>/dev/null || cp -r {temp_extract_dir}/lib {app_version_path}/; fi && " \
+                      f"if [ -d {temp_extract_dir}/share ]; then cp -r {temp_extract_dir}/share/* {app_version_path}/share/ 2>/dev/null || cp -r {temp_extract_dir}/share {app_version_path}/; fi && " \
+                      f"if [ -d {temp_extract_dir}/include ]; then cp -r {temp_extract_dir}/include/* {app_version_path}/include/ 2>/dev/null || cp -r {temp_extract_dir}/include {app_version_path}/; fi && " \
+                      f"if [ -d {temp_extract_dir}/add-ons ]; then cp -r {temp_extract_dir}/add-ons/* {app_version_path}/add-ons/ 2>/dev/null || cp -r {temp_extract_dir}/add-ons {app_version_path}/; fi && " \
+                      f"echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0 or 'FAILED' in output:
+                    self.logger.warn(f"[{dbNode.name}] Some files may not have been replaced: {output}")
+                
+                # 复制其他文件
+                cmd = f"find {temp_extract_dir} -maxdepth 1 -type f -exec cp -f {{}} {app_version_path}/ \\; 2>/dev/null || true"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                # 清理临时目录
+                cmd = f"rm -rf {temp_extract_dir}"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                # 设置权限
+                cmd = f"find {app_version_path} -type d -exec chmod 755 {{}} \\;"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                cmd = f"find {app_version_path}/bin -type f -exec chmod 755 {{}} \\; 2>/dev/null || true"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                cmd = f"find {app_version_path}/lib -type f -exec chmod 644 {{}} \\; 2>/dev/null || true"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                # 修复SSL证书权限
+                sslcert_path = os.path.join(app_version_path, "share", "sslcert")
+                cmd = f"if [ -d {sslcert_path} ]; then " \
+                      f"find {sslcert_path} -type f \\( -name '*.pem' -o -name '*.crt' -o -name '*.key' -o -name '*.csr' \\) -exec chmod 400 {{}} \\; && " \
+                      f"find {sslcert_path} -type d -exec chmod 700 {{}} \\; && " \
+                      f"echo 'SSL cert permissions fixed'; fi"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                cmd = f"find {app_version_path} -type f ! -path '*/bin/*' ! -path '*/lib/*' ! -path '*/share/sslcert/*' -exec chmod 644 {{}} \\; 2>/dev/null || true"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                self.logger.log(f"[{dbNode.name}] New version installed: {app_version_path}")
+                
+                # ===== 步骤5: 验证新版本 =====
+                self.logger.log(f"[{dbNode.name}] Step 5: Verify new version")
+                key_files = ["bin/grserver", "bin/grcmd"]
+                for key_file in key_files:
+                    cmd = f"test -f {app_version_path}/{key_file} && echo 'EXISTS' || echo 'MISSING'"
+                    status, output = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status != 0 or 'MISSING' in output:
+                        raise Exception(f"Required file missing on {dbNode.name}: {key_file}")
+                
+                # ===== 步骤6: 原子性切换软链接 =====
+                self.logger.log(f"[{dbNode.name}] Step 6: Atomically switch symlink")
+                link_name = os.path.basename(app_link_path)
+                temp_link_name = f"{link_name}.new"
+                temp_link_path = os.path.join(install_base, temp_link_name)
+                
+                # 删除临时链接
+                cmd = f"rm -f {temp_link_path}"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                # 创建临时软链接
+                cmd = f"cd {install_base} && ln -sfn {app_version_dir} {temp_link_name}"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0:
+                    raise Exception(f"Failed to create temporary symlink on {dbNode.name}: {output}")
+                
+                # 标记软链接即将被修改
+                node_rollback_info[dbNode.name]['symlink_switched'] = True
+                
+                # 删除旧链接并移动新链接
+                cmd = f"cd {install_base} && rm -f {link_name} && mv {temp_link_name} {link_name} && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0 or 'FAILED' in output:
+                    raise Exception(f"Failed to switch symlink on {dbNode.name}: {output}")
+                
+                # 验证软链接
+                cmd = f"readlink {app_link_path}"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0 or output.strip() != app_version_dir:
+                    # 强制重新创建
+                    cmd = f"cd {install_base} && rm -f {link_name} && ln -sfn {app_version_dir} {link_name}"
+                    status, output = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status != 0:
+                        raise Exception(f"Failed to force recreate symlink on {dbNode.name}: {output}")
+                
+                self.logger.log(f"[{dbNode.name}] Symlink switched: {app_link_path} -> {app_version_dir}")
+                
+                # ===== 步骤7: 后检查 =====
+                self.logger.log(f"[{dbNode.name}] Step 7: Post-upgrade check")
+                cmd = f"test -f {app_link_path}/bin/grserver && test -f {app_link_path}/bin/grcmd && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0 or 'FAILED' in output:
+                    raise Exception(f"Post-upgrade verification failed on {dbNode.name}")
+                
+                # ===== 步骤8: 启动该节点服务 =====
+                if cm_ctl_path:
+                    self.logger.log(f"[{dbNode.name}] Step 8: Starting services on node {node_id}")
+                    
+                    if dbNode.name == GetHostIpOrName():
+                        cmd = f"{env_source}{cm_ctl_path} start -n {node_id} -t 20"
+                        status, output = subprocess.getstatusoutput(cmd)
+                    else:
+                        cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.sshIps[0]} '{env_source}{cm_ctl_path} start -n {node_id} -t 20'"
+                        status, output = subprocess.getstatusoutput(cmd)
+                    
+                    if status != 0:
+                        # 服务启动失败，需要回滚
+                        raise Exception(f"Failed to start services on node {node_id}: {output}")
+                    
+                    self.logger.log(f"[{dbNode.name}] Services started successfully")
+                    node_rollback_info[dbNode.name]['services_stopped'] = False
+                    
+                    # 等待服务完全启动
+                    time.sleep(5)
+                
+                # ===== 步骤9: 验证该节点服务状态（带重试） =====
+                self.logger.log(f"[{dbNode.name}] Step 9: Verify service status")
+                max_retries = 3
+                retry_interval = 10  # 秒
+                service_check_passed = False
+                last_error = None
+                
+                for retry in range(max_retries):
+                    try:
+                        self._check_gr_status(user, [dbNode], f"post-upgrade node {node_id}")
+                        service_check_passed = True
+                        break
+                    except Exception as check_error:
+                        last_error = check_error
+                        if retry < max_retries - 1:
+                            self.logger.warn(f"[{dbNode.name}] Service status check failed (attempt {retry + 1}/{max_retries}): {check_error}")
+                            self.logger.log(f"[{dbNode.name}] Waiting {retry_interval}s before retry...")
+                            time.sleep(retry_interval)
+                        else:
+                            self.logger.warn(f"[{dbNode.name}] Service status check failed after {max_retries} attempts")
+                
+                if not service_check_passed:
+                    # 服务状态检查最终失败，需要回滚
+                    raise Exception(f"Service status check failed on {dbNode.name} after {max_retries} retries: {last_error}")
+                
+                self.logger.log(f"[{dbNode.name}] Service status verified successfully")
+                
+                # 标记该节点升级完成
+                node_rollback_info[dbNode.name]['upgrade_completed'] = True
+                upgraded_nodes.append(dbNode)
+                
+                self.logger.log(f"[{dbNode.name}] ✓ Node upgrade completed successfully!")
+                self.logger.log("")
+                
+            except Exception as e:
+                # 该节点升级失败，执行回滚
+                self.logger.log("")
+                self.logger.log("=" * 60)
+                self.logger.log(f"NODE {dbNode.name} UPGRADE FAILED! Starting rollback...")
+                self.logger.log("=" * 60)
+                self.logger.log(f"Error: {str(e)}")
+                
+                try:
+                    # 只回滚当前失败的节点
+                    self._rollback_upgrade(clusterInfo, [dbNode], node_rollback_info, 
+                                          cm_ctl_path, user, version_str, install_base, app_link_path)
+                except Exception as rollback_error:
+                    self.logger.log(f"[{dbNode.name}] Rollback failed: {str(rollback_error)}")
+                    self.logger.log(f"[{dbNode.name}] Manual intervention required!")
+                
+                # 停止升级，不继续处理后续节点
+                self.logger.log("")
+                self.logger.log("=" * 60)
+                self.logger.log("ROLLING UPGRADE ABORTED!")
+                self.logger.log("=" * 60)
+                self.logger.log(f"Successfully upgraded nodes: {[n.name for n in upgraded_nodes]}")
+                self.logger.log(f"Failed node: {dbNode.name}")
+                remaining_nodes = nodes_to_upgrade[node_index + 1:]
+                if remaining_nodes:
+                    self.logger.log(f"Remaining nodes (not upgraded): {[n.name for n in remaining_nodes]}")
+                
+                raise Exception(f"Rolling upgrade failed at node {dbNode.name}: {str(e)}")
+        
+        # 所有节点升级成功
+        self.logger.log("")
+        self.logger.log("=" * 60)
+        self.logger.log("ROLLING UPGRADE COMPLETED SUCCESSFULLY!")
+        self.logger.log("=" * 60)
+        self.logger.log(f"Upgraded {len(upgraded_nodes)} node(s): {[n.name for n in upgraded_nodes]}")
+        self.logger.log(f"New version: {version_str}")
+    
+    def _rollback_upgrade(self, clusterInfo, nodes_to_upgrade, node_rollback_info, 
+                         cm_ctl_path, user, new_version_str, install_base, app_link_path):
+        """
+        回滚升级：恢复软链接到旧版本，删除新版本目录，重启服务
+        
+        Args:
+            clusterInfo: 集群信息
+            nodes_to_upgrade: 要回滚的节点列表
+            node_rollback_info: 回滚信息字典
+            cm_ctl_path: cm_ctl 路径
+            user: 用户名
+            new_version_str: 新版本字符串（用于删除新版本目录）
+            install_base: 安装基础目录
+            app_link_path: APP 软链接路径
+        """
+        self.logger.log("=" * 60)
+        self.logger.log("ROLLBACK: Restoring previous version")
+        self.logger.log("=" * 60)
+        
+        app_version_dir = f"APP_{new_version_str}"
+        app_version_path = os.path.join(install_base, app_version_dir)
+        link_name = os.path.basename(app_link_path)
+        
+        # 获取环境变量文件路径
+        envfile_path = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
+        env_source = f"source {envfile_path} && " if envfile_path else ""
+        
+        for dbNode in nodes_to_upgrade:
+            rollback_info = node_rollback_info.get(dbNode.name, {})
+            old_version_name = rollback_info.get('old_version_name')
+            old_version_dir = rollback_info.get('old_version_dir')
+            services_stopped = rollback_info.get('services_stopped', False)
+            symlink_switched = rollback_info.get('symlink_switched', False)
+            
+            self.logger.log(f"Rolling back node {dbNode.name}...")
+            node_id = clusterInfo.dbNodes.index(dbNode) + 1
+            
+            # 1. 先停止服务（不管当前状态，确保服务停止后再切换软链接）
+            if cm_ctl_path:
+                self.logger.log(f"Stopping services on node {node_id} ({dbNode.name}) before rollback")
+                
+                if dbNode.name == GetHostIpOrName():
+                    cmd = f"{env_source}{cm_ctl_path} stop -n {node_id}"
+                    status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.sshIps[0]} '{env_source}{cm_ctl_path} stop -n {node_id}'"
+                    status, output = subprocess.getstatusoutput(cmd)
+                
+                if status != 0:
+                    self.logger.warn(f"Failed to stop services on node {node_id} ({dbNode.name}): {output}")
+                    self.logger.warn("Services may already be stopped, continuing with rollback...")
+                else:
+                    self.logger.log(f"Services stopped on node {node_id} ({dbNode.name})")
+                
+                time.sleep(2)
+            
+            # 2. 恢复软链接到旧版本（只要有旧版本信息就尝试恢复）
+            # 注意：即使 symlink_switched=False，也可能软链接已被删除，所以只要有旧版本就尝试恢复
+            if old_version_name:
+                self.logger.log(f"Restoring symlink on {dbNode.name} to {old_version_name}")
+                
+                # 检查当前软链接状态
+                cmd = f"readlink {app_link_path} 2>/dev/null || echo 'NOT_EXISTS'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                current_target = output.strip() if status == 0 else 'NOT_EXISTS'
+                
+                # 如果软链接不存在或指向新版本，则恢复到旧版本
+                if current_target == 'NOT_EXISTS' or current_target != old_version_name:
+                    cmd = f"cd {install_base} && rm -f {link_name} && ln -sfn {old_version_name} {link_name} && echo 'OK' || echo 'FAILED'"
+                    status, output = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status == 0 and 'OK' in output:
+                        self.logger.log(f"Symlink restored on {dbNode.name}: {link_name} -> {old_version_name}")
+                    else:
+                        self.logger.warn(f"Failed to restore symlink on {dbNode.name}: {output}")
+                else:
+                    self.logger.log(f"Symlink on {dbNode.name} already points to old version: {old_version_name}")
+            
+            # 3. 删除新版本目录（如果存在）
+            self.logger.log(f"Removing new version directory on {dbNode.name}: {app_version_path}")
+            cmd = f"rm -rf {app_version_path}"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status == 0:
+                self.logger.log(f"New version directory removed on {dbNode.name}")
+            else:
+                self.logger.warn(f"Failed to remove new version directory on {dbNode.name}: {output}")
+            
+            # 4. 重启服务（总是尝试重启，确保服务恢复运行）
+            if cm_ctl_path and old_version_name:
+                self.logger.log(f"Restarting services on node {node_id} ({dbNode.name}) with old version")
+                
+                if dbNode.name == GetHostIpOrName():
+                    cmd = f"{env_source}{cm_ctl_path} start -n {node_id} -t 20"
+                    status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.sshIps[0]} '{env_source}{cm_ctl_path} start -n {node_id} -t 20'"
+                    status, output = subprocess.getstatusoutput(cmd)
+                
+                if status != 0:
+                    self.logger.warn(f"Failed to restart services on node {node_id} ({dbNode.name}): {output}")
+                    self.logger.warn(f"Please manually restart: cm_ctl start -n {node_id} -t 20")
+                else:
+                    self.logger.log(f"Services restarted successfully on node {node_id} ({dbNode.name})")
+                
+                time.sleep(3)
+        
+        self.logger.log("=" * 60)
+        self.logger.log("ROLLBACK COMPLETED")
+        self.logger.log("=" * 60)
+        self.logger.log("All nodes have been rolled back to previous version")
+        self.logger.log("Please verify the system status manually")
+
+    def cm_cluster_upgrade(self, xmlFile, cmPkgPath):
+        """
+        集群 CM 升级（无 nodeid 模式）：
+          - 停整集群（cm_ctl stop -n）
+          - 在当前 APP 目录下覆盖 CM 的 bin/lib
+          - 启动整集群（cm_ctl start -n）
+        仅覆盖二进制和库文件，不重新走 cm_install 的目录/配置流程。
+        支持失败回滚：恢复备份的 bin/lib，重启服务。
+        """
+        user = getpass.getuser()
+        gaussHome = self.__getEnvironmentParameterValue("GAUSSHOME", user)
+        if gaussHome == "":
+            raise Exception(ErrorCode.GAUSS_502["GAUSS_50201"] %
+                            ("installation path of designated user [%s]" % user))
+
+        clusterInfo = dbClusterInfo()
+        clusterInfo.initFromXml(xmlFile)
+        self.initLogger("cm_cluster_upgrade")
+
+        self.logger.log("Start CM cluster upgrade (full cluster stop required).")
+
+        nodes_to_upgrade = clusterInfo.dbNodes
+        if not nodes_to_upgrade:
+            raise Exception("No nodes found in cluster for CM upgrade")
+
+        install_base = clusterInfo.installPath
+        app_link_path = os.path.join(install_base, "APP")
+
+        # 获取 cm_ctl 路径
+        toolPath = self.__getEnvironmentParameterValue("GPHOME", user)
+        cm_ctl_path = None
+        if gaussHome:
+            cm_ctl_path = os.path.join(gaussHome, "bin", "cm_ctl")
+        elif toolPath:
+            cm_ctl_path = os.path.join(toolPath, "bin", "cm_ctl")
+        else:
+            status, output = subprocess.getstatusoutput("which cm_ctl")
+            if status == 0:
+                cm_ctl_path = output.strip()
+
+        if not cm_ctl_path:
+            raise Exception("cm_ctl not found, cannot perform CM cluster upgrade")
+
+        self.logger.log(f"Using cm_ctl: {cm_ctl_path}")
+
+        # 记录回滚信息：每个节点的 bin/lib 备份路径、服务停止状态、bin/lib 是否已覆盖
+        node_rollback_info = {}
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        
+        # 预先记录所有节点的 APP 路径和备份信息
+        for dbNode in nodes_to_upgrade:
+            cmd = f"readlink -f {app_link_path} 2>/dev/null || echo ''"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status == 0 and output.strip():
+                app_real_path = output.strip()
+                backup_dir = os.path.join(clusterInfo.toolPath, f"cm_backup_{timestamp}")
+                node_rollback_info[dbNode.name] = {
+                    'app_real_path': app_real_path,
+                    'backup_dir': backup_dir,
+                    'services_stopped': False,
+                    'bin_lib_overlaid': False
+                }
+                self.logger.log(f"Recorded rollback info for {dbNode.name}: APP={app_real_path}")
+            else:
+                raise Exception(f"Failed to resolve APP symlink on {dbNode.name} for rollback preparation")
+
+        envfile_path = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
+        env_source = f"source {envfile_path} && " if envfile_path else ""
+
+        # 使用 try-except 包装整个升级流程，实现失败回滚
+        upgrade_success = False
+        try:
+            # 升级前检查: 验证 CM 集群状态正常
+            self._check_cm_status(user, "pre-upgrade")
+            
+            # Step CM-0: 停整集群
+            self.logger.log("Step CM-0: Stopping CM services on all nodes")
+            self.logger.log(f"Stopping services for CM upgrade")
+            
+            # 使用 cm_ctl stop 一次性停止所有节点
+            cmd = f"{env_source}{cm_ctl_path} stop"
+            status, output = subprocess.getstatusoutput(cmd)
+            time.sleep(2)
+
+            # Step CM-0.5: 备份每个节点的 bin/lib（CM 相关文件）
+            self.logger.log("Step CM-0.5: Backup CM bin/lib on all nodes")
+            for dbNode in nodes_to_upgrade:
+                rollback_info = node_rollback_info[dbNode.name]
+                app_real_path = rollback_info['app_real_path']
+                backup_dir = rollback_info['backup_dir']
+                
+                # 创建备份目录
+                cmd = f"mkdir -p {backup_dir}"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0:
+                    raise Exception(f"Failed to create backup directory on {dbNode.name}: {output}")
+                
+                # 备份 bin 目录（只备份 CM 相关文件，如 cm_ctl, cm_server, cm_agent 等）
+                # 为了简化，直接备份整个 bin 目录（因为可能还有其他 GR 文件）
+                backup_bin = os.path.join(backup_dir, "bin")
+                cmd = f"cp -a {app_real_path}/bin {backup_bin} 2>/dev/null && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status == 0 and 'OK' in output:
+                    self.logger.log(f"Backed up bin directory on {dbNode.name}")
+                else:
+                    self.logger.warn(f"Backup bin directory failed on {dbNode.name}: {output}")
+                
+                # 备份 lib 目录
+                backup_lib = os.path.join(backup_dir, "lib")
+                cmd = f"cp -a {app_real_path}/lib {backup_lib} 2>/dev/null && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status == 0 and 'OK' in output:
+                    self.logger.log(f"Backed up lib directory on {dbNode.name}")
+                else:
+                    self.logger.warn(f"Backup lib directory failed on {dbNode.name}: {output}")
+
+            # 提取 cm 包基本信息
+            cm_pkg_name = os.path.basename(cmPkgPath)
+
+            # Step CM-1: 在每个节点覆盖 APP/bin 和 APP/lib 里的 CM 组件
+            self.logger.log("Step CM-1: Overlay CM bin/lib from cmpkg into APP on all nodes")
+            for dbNode in nodes_to_upgrade:
+                rollback_info = node_rollback_info[dbNode.name]
+                app_real_path = rollback_info['app_real_path']
+                
+                # 确定本地 cm 包路径（远端需要先分发）
+                local_cm_pkg = cmPkgPath
+                if dbNode.name != GetHostIpOrName():
+                    target_pkg_path = os.path.join(clusterInfo.toolPath, cm_pkg_name)
+                    # 如果远端不存在该包，则分发
+                    cmd = f"test -f {target_pkg_path} || scp {cmPkgPath} {dbNode.sshIps[0]}:{target_pkg_path}"
+                    status, output = subprocess.getstatusoutput(cmd)
+                    if status != 0:
+                        raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
+                    local_cm_pkg = target_pkg_path
+
+                # 在远端临时目录解压 cm 包
+                temp_dir = os.path.join(clusterInfo.toolPath, f"cm_upgrade_{timestamp}")
+                cmd = f"rm -rf {temp_dir} && mkdir -p {temp_dir} && tar -zxf {local_cm_pkg} -C {temp_dir} && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0 or 'FAILED' in output:
+                    raise Exception(f"Failed to decompress CM package on {dbNode.name}: {output}")
+
+                # 仅覆盖 bin / lib 目录；其余（配置、证书等）保持不变
+                self.logger.log(f"Node {dbNode.name}: overlay CM bin/lib into {app_real_path}")
+                overlay_cmd = (
+                    f"if [ -d {temp_dir}/bin ]; then "
+                    f"  mkdir -p {app_real_path}/bin; "
+                    f"  cp -rf {temp_dir}/bin/* {app_real_path}/bin/ 2>/dev/null || cp -rf {temp_dir}/bin {app_real_path}/; "
+                    f"fi; "
+                    f"if [ -d {temp_dir}/lib ]; then "
+                    f"  mkdir -p {app_real_path}/lib; "
+                    f"  cp -rf {temp_dir}/lib/* {app_real_path}/lib/ 2>/dev/null || cp -rf {temp_dir}/lib {app_real_path}/; "
+                    f"fi; "
+                    f"echo 'OK' || echo 'FAILED'"
+                )
+                status, output = self.execute_on_node(
+                    dbNode.name, overlay_cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0 or 'FAILED' in output:
+                    raise Exception(f"Failed to overlay CM bin/lib on {dbNode.name}: {output}")
+                
+                # 标记 bin/lib 已覆盖（用于回滚判断）
+                node_rollback_info[dbNode.name]['bin_lib_overlaid'] = True
+
+                # 基本权限修复：bin 可执行，lib 只读
+                perm_cmds = [
+                    f"find {app_real_path}/bin -type f -exec chmod 755 {{}} \\; 2>/dev/null || true",
+                    f"find {app_real_path}/lib -type f -exec chmod 644 {{}} \\; 2>/dev/null || true",
+                ]
+                for pcmd in perm_cmds:
+                    self.execute_on_node(
+                        dbNode.name, pcmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+
+                # 清理临时目录
+                cmd = f"rm -rf {temp_dir}"
+                self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+
+            # Step CM-2: 启动整集群
+            self.logger.log("Step CM-2: Starting CM services on all nodes after CM upgrade")
+            # 使用 cm_ctl start 一次性启动所有节点
+            cmd = f"{env_source}{cm_ctl_path} start"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                self.logger.warn(f"Failed to start CM services: {output}")
+                self.logger.warn(f"Please manually start CM services using: cm_ctl start")
+            else:
+                self.logger.log(f"CM services started successfully")
+            
+            # 等待 CM 服务完全启动
+            self.logger.log("Waiting for CM services to fully start...")
+            time.sleep(5)
+            
+            # 升级后检查: 验证 CM 集群状态正常
+            self._check_cm_status(user, "post-upgrade")
+            
+            # 升级成功
+            upgrade_success = True
+            self.logger.log("=" * 60)
+            self.logger.log("CM CLUSTER UPGRADE COMPLETED SUCCESSFULLY!")
+            self.logger.log("=" * 60)
+            
+        except Exception as e:
+            # 升级失败，执行回滚
+            self.logger.log("=" * 60)
+            self.logger.log("CM UPGRADE FAILED! Starting rollback process...")
+            self.logger.log("=" * 60)
+            self.logger.log(f"Error: {str(e)}")
+            
+            try:
+                self._rollback_cm_upgrade(clusterInfo, nodes_to_upgrade, node_rollback_info, 
+                                         cm_ctl_path, user, env_source)
+            except Exception as rollback_error:
+                self.logger.log("=" * 60)
+                self.logger.log("CM ROLLBACK FAILED! Manual intervention required!")
+                self.logger.log("=" * 60)
+                self.logger.log(f"Rollback error: {str(rollback_error)}")
+                self.logger.log("Please manually restore the system:")
+                for dbNode in nodes_to_upgrade:
+                    rollback_info = node_rollback_info.get(dbNode.name, {})
+                    app_real_path = rollback_info.get('app_real_path', 'UNKNOWN')
+                    backup_dir = rollback_info.get('backup_dir', 'UNKNOWN')
+                    self.logger.log(f"  Node {dbNode.name}: Restore bin/lib from {backup_dir} to {app_real_path}")
+                    if rollback_info.get('services_stopped', False):
+                        node_id = clusterInfo.dbNodes.index(dbNode) + 1
+                        self.logger.log(f"  Node {dbNode.name}: Restart services: cm_ctl start -n {node_id} -t 20")
+            
+            # 重新抛出原始异常
+            raise
+        
+        if not upgrade_success:
+            raise Exception("CM upgrade process completed but success flag not set")
+    
+    def _rollback_cm_upgrade(self, clusterInfo, nodes_to_upgrade, node_rollback_info, 
+                            cm_ctl_path, user, env_source):
+        """
+        回滚 CM 升级：恢复备份的 bin/lib，重启服务
+        
+        Args:
+            clusterInfo: 集群信息
+            nodes_to_upgrade: 要回滚的节点列表
+            node_rollback_info: 回滚信息字典
+            cm_ctl_path: cm_ctl 路径
+            user: 用户名
+            env_source: 环境变量 source 命令前缀
+        """
+        self.logger.log("=" * 60)
+        self.logger.log("CM ROLLBACK: Restoring previous CM bin/lib")
+        self.logger.log("=" * 60)
+        
+        for dbNode in nodes_to_upgrade:
+            rollback_info = node_rollback_info.get(dbNode.name, {})
+            app_real_path = rollback_info.get('app_real_path')
+            backup_dir = rollback_info.get('backup_dir')
+            services_stopped = rollback_info.get('services_stopped', False)
+            bin_lib_overlaid = rollback_info.get('bin_lib_overlaid', False)
+            
+            self.logger.log(f"Rolling back CM upgrade on node {dbNode.name}...")
+            
+            # 1. 如果 bin/lib 已覆盖，恢复备份
+            if bin_lib_overlaid and backup_dir and app_real_path:
+                self.logger.log(f"Restoring bin/lib from backup on {dbNode.name}")
+                
+                # 恢复 bin 目录
+                backup_bin = os.path.join(backup_dir, "bin")
+                cmd = f"if [ -d {backup_bin} ]; then "
+                cmd += f"  rm -rf {app_real_path}/bin && cp -a {backup_bin} {app_real_path}/bin && echo 'OK' || echo 'FAILED'; "
+                cmd += f"else echo 'NO_BACKUP'; fi"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status == 0 and 'OK' in output:
+                    self.logger.log(f"Bin directory restored on {dbNode.name}")
+                elif 'NO_BACKUP' in output:
+                    self.logger.warn(f"No bin backup found on {dbNode.name}, skipping bin restore")
+                else:
+                    self.logger.warn(f"Failed to restore bin directory on {dbNode.name}: {output}")
+                
+                # 恢复 lib 目录
+                backup_lib = os.path.join(backup_dir, "lib")
+                cmd = f"if [ -d {backup_lib} ]; then "
+                cmd += f"  rm -rf {app_real_path}/lib && cp -a {backup_lib} {app_real_path}/lib && echo 'OK' || echo 'FAILED'; "
+                cmd += f"else echo 'NO_BACKUP'; fi"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status == 0 and 'OK' in output:
+                    self.logger.log(f"Lib directory restored on {dbNode.name}")
+                elif 'NO_BACKUP' in output:
+                    self.logger.warn(f"No lib backup found on {dbNode.name}, skipping lib restore")
+                else:
+                    self.logger.warn(f"Failed to restore lib directory on {dbNode.name}: {output}")
+            
+            # 2. 如果服务已停止，尝试启动服务
+            if services_stopped and cm_ctl_path:
+                node_id = clusterInfo.dbNodes.index(dbNode) + 1
+                self.logger.log(f"Restarting CM services on node {node_id} ({dbNode.name})")
+                
+                if dbNode.name == GetHostIpOrName():
+                    cmd = f"{env_source}{cm_ctl_path} start -n {node_id}"
+                    status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    cmd = f"ssh -q -o ConnectTimeout=5 {dbNode.sshIps[0]} '{env_source}{cm_ctl_path} start -n {node_id}'"
+                    status, output = subprocess.getstatusoutput(cmd)
+                
+                if status != 0:
+                    self.logger.warn(f"Failed to restart CM services on node {node_id} ({dbNode.name}): {output}")
+                    self.logger.warn(f"Please manually restart: cm_ctl start -n {node_id}")
+                else:
+                    self.logger.log(f"CM services restarted successfully on node {node_id} ({dbNode.name})")
+                
+                time.sleep(1)
+        
+        self.logger.log("=" * 60)
+        self.logger.log("CM ROLLBACK COMPLETED")
+        self.logger.log("=" * 60)
+        self.logger.log("All nodes have been rolled back to previous CM version")
+        self.logger.log("Please verify the system status manually")
+
+    def gr_cm_combined_upgrade(self, xmlFile, grPkgPath, cmPkgPath):
+        """
+        GR + CM 组合升级（一次停止、一次启动、失败全部回滚）
+        
+        升级流程：
+          1. 停止整个集群（一次性）
+          2. 在所有节点上备份当前版本
+          3. 在所有节点上升级 GR（黑匣子）
+          4. 在所有节点上升级 CM
+          5. 启动整个集群（一次性）
+          6. 检查状态
+          7. 检查失败则全部回滚
+        """
+        user = getpass.getuser()
+        gaussHome = self.__getEnvironmentParameterValue("GAUSSHOME", user)
+        if gaussHome == "":
+            raise Exception(ErrorCode.GAUSS_502["GAUSS_50201"] %
+                            ("installation path of designated user [%s]" % user))
+
+        clusterInfo = dbClusterInfo()
+        clusterInfo.initFromXml(xmlFile)
+        self.initLogger("gr_cm_combined_upgrade")
+
+        self.logger.log("=" * 60)
+        self.logger.log("GR + CM COMBINED UPGRADE (single stop/start)")
+        self.logger.log("=" * 60)
+
+        nodes_to_upgrade = clusterInfo.dbNodes
+        if not nodes_to_upgrade:
+            raise Exception("No nodes found in cluster for upgrade")
+
+        install_base = clusterInfo.installPath
+        app_link_name = "APP"
+        app_link_path = os.path.join(install_base, app_link_name)
+
+        # 获取 cm_ctl 路径
+        toolPath = self.__getEnvironmentParameterValue("GPHOME", user)
+        cm_ctl_path = None
+        if gaussHome:
+            cm_ctl_path = os.path.join(gaussHome, "bin", "cm_ctl")
+        elif toolPath:
+            cm_ctl_path = os.path.join(toolPath, "bin", "cm_ctl")
+        else:
+            status, output = subprocess.getstatusoutput("which cm_ctl")
+            if status == 0:
+                cm_ctl_path = output.strip()
+
+        if not cm_ctl_path:
+            raise Exception("cm_ctl not found, cannot perform combined upgrade")
+
+        self.logger.log(f"Using cm_ctl: {cm_ctl_path}")
+
+        envfile_path = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
+        env_source = f"source {envfile_path} && " if envfile_path else ""
+
+        # 时间戳用于版本目录和备份
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        version_str = timestamp
+        app_version_dir = f"APP_{version_str}"
+        app_version_path = os.path.join(install_base, app_version_dir)
+        backup_dir = os.path.join(install_base, "backup", f"combined_backup_{timestamp}")
+
+        gr_pkg_name = os.path.basename(grPkgPath)
+        cm_pkg_name = os.path.basename(cmPkgPath)
+
+        # 记录回滚信息
+        node_rollback_info = {}
+        
+        # 预先记录所有节点的当前版本信息
+        self.logger.log("Collecting current version info from all nodes...")
+        for dbNode in nodes_to_upgrade:
+            cmd = f"readlink -f {app_link_path} 2>/dev/null || echo ''"
+            status, output = self.execute_on_node(
+                dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+            if status == 0 and output.strip():
+                current_version_dir = output.strip()
+                current_version_name = os.path.basename(current_version_dir)
+                node_rollback_info[dbNode.name] = {
+                    'old_version_dir': current_version_dir,
+                    'old_version_name': current_version_name,
+                    'backup_dir': backup_dir,
+                    'services_stopped': False,
+                    'gr_upgraded': False,
+                    'cm_upgraded': False,
+                    'symlink_switched': False
+                }
+                self.logger.log(f"  {dbNode.name}: current version = {current_version_name}")
+            else:
+                raise Exception(f"Failed to resolve APP symlink on {dbNode.name}")
+
+        # ===== 升级前检查（检查失败直接退出，不触发回滚）=====
+        self.logger.log("Step 0: Pre-upgrade status check")
+        try:
+            self._check_cm_status(user, "pre-upgrade")
+            self._check_gr_status(user, nodes_to_upgrade, "pre-upgrade")
+        except Exception as e:
+            self.logger.log("=" * 60)
+            self.logger.log("PRE-UPGRADE CHECK FAILED!")
+            self.logger.log("=" * 60)
+            self.logger.log(f"Error: {str(e)}")
+            self.logger.log("")
+            self.logger.log("The cluster is not in a healthy state for upgrade.")
+            self.logger.log("Please fix the above issues and retry the upgrade.")
+            self.logger.log("No changes have been made to the cluster.")
+            self.logger.log("=" * 60)
+            raise Exception(f"Pre-upgrade check failed: {str(e)}")
+
+        # 升级成功标志
+        upgrade_success = False
+
+        try:
+            # ===== Step 1: 分发安装包到所有节点 =====
+            self.logger.log("Step 1: Distributing packages to all nodes...")
+            for dbNode in nodes_to_upgrade:
+                if dbNode.name != GetHostIpOrName():
+                    # 分发 GR 包
+                    gr_target = os.path.join(clusterInfo.toolPath, gr_pkg_name)
+                    cmd = f"test -f {gr_target}"
+                    status, _ = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status != 0:
+                        self.logger.log(f"  Distributing GR package to {dbNode.name}")
+                        cmd = f"scp {grPkgPath} {dbNode.sshIps[0]}:{gr_target}"
+                        status, output = subprocess.getstatusoutput(cmd)
+                        if status != 0:
+                            raise Exception(f"Failed to distribute GR package to {dbNode.name}: {output}")
+                    
+                    # 分发 CM 包
+                    cm_target = os.path.join(clusterInfo.toolPath, cm_pkg_name)
+                    cmd = f"test -f {cm_target}"
+                    status, _ = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    if status != 0:
+                        self.logger.log(f"  Distributing CM package to {dbNode.name}")
+                        cmd = f"scp {cmPkgPath} {dbNode.sshIps[0]}:{cm_target}"
+                        status, output = subprocess.getstatusoutput(cmd)
+                        if status != 0:
+                            raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
+            self.logger.log("  Package distribution completed")
+
+            # ===== Step 2: 停止整个集群 =====
+            self.logger.log("Step 2: Stopping entire cluster (single stop)...")
+            cmd = f"{env_source}{cm_ctl_path} stop"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                self.logger.warn(f"  cm_ctl stop returned non-zero: {output}")
+            else:
+                self.logger.log("  Cluster stopped successfully")
+            
+            # 标记所有节点服务已停止
+            for dbNode in nodes_to_upgrade:
+                node_rollback_info[dbNode.name]['services_stopped'] = True
+            
+            time.sleep(3)
+
+            # ===== Step 3: 在所有节点上备份并升级 =====
+            self.logger.log("Step 3: Backup and upgrade on all nodes...")
+            
+            for dbNode in nodes_to_upgrade:
+                rollback_info = node_rollback_info[dbNode.name]
+                old_version_dir = rollback_info['old_version_dir']
+                
+                self.logger.log(f"  [{dbNode.name}] Starting upgrade...")
+                
+                # 3.1 创建备份目录
+                cmd = f"mkdir -p {backup_dir}"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                # 3.2 备份当前版本的 bin/lib
+                self.logger.log(f"  [{dbNode.name}] Backing up current bin/lib...")
+                cmd = f"cp -a {old_version_dir}/bin {backup_dir}/bin 2>/dev/null && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'FAILED' in output:
+                    self.logger.warn(f"  [{dbNode.name}] Backup bin failed: {output}")
+                
+                cmd = f"cp -a {old_version_dir}/lib {backup_dir}/lib 2>/dev/null && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'FAILED' in output:
+                    self.logger.warn(f"  [{dbNode.name}] Backup lib failed: {output}")
+                
+                # 3.3 创建新版本目录（从旧版本复制）
+                self.logger.log(f"  [{dbNode.name}] Creating new version directory...")
+                cmd = f"test -d {app_version_path} && rm -rf {app_version_path} || true"
+                self.execute_on_node(dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                cmd = f"cp -a {old_version_dir} {app_version_path}"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0:
+                    raise Exception(f"Failed to create new version directory on {dbNode.name}: {output}")
+                
+                # 3.4 升级 GR（黑匣子）
+                self.logger.log(f"  [{dbNode.name}] Upgrading GR (blackbox)...")
+                local_gr_pkg = grPkgPath if dbNode.name == GetHostIpOrName() else os.path.join(clusterInfo.toolPath, gr_pkg_name)
+                temp_gr_dir = os.path.join(clusterInfo.toolPath, f"temp_gr_{timestamp}")
+                
+                cmd = f"rm -rf {temp_gr_dir} && mkdir -p {temp_gr_dir} && tar -zxf {local_gr_pkg} -C {temp_gr_dir} && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'FAILED' in output:
+                    raise Exception(f"Failed to extract GR package on {dbNode.name}: {output}")
+                
+                # 覆盖 GR 文件
+                cmd = (
+                    f"if [ -d {temp_gr_dir}/bin ]; then cp -rf {temp_gr_dir}/bin/* {app_version_path}/bin/ 2>/dev/null || cp -rf {temp_gr_dir}/bin {app_version_path}/; fi; "
+                    f"if [ -d {temp_gr_dir}/lib ]; then cp -rf {temp_gr_dir}/lib/* {app_version_path}/lib/ 2>/dev/null || cp -rf {temp_gr_dir}/lib {app_version_path}/; fi; "
+                    f"if [ -d {temp_gr_dir}/share ]; then cp -rf {temp_gr_dir}/share/* {app_version_path}/share/ 2>/dev/null || cp -rf {temp_gr_dir}/share {app_version_path}/; fi; "
+                    f"rm -rf {temp_gr_dir} && echo 'OK' || echo 'FAILED'"
+                )
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'FAILED' in output:
+                    raise Exception(f"Failed to overlay GR files on {dbNode.name}: {output}")
+                
+                node_rollback_info[dbNode.name]['gr_upgraded'] = True
+                
+                # 3.5 升级 CM
+                self.logger.log(f"  [{dbNode.name}] Upgrading CM...")
+                local_cm_pkg = cmPkgPath if dbNode.name == GetHostIpOrName() else os.path.join(clusterInfo.toolPath, cm_pkg_name)
+                temp_cm_dir = os.path.join(clusterInfo.toolPath, f"temp_cm_{timestamp}")
+                
+                cmd = f"rm -rf {temp_cm_dir} && mkdir -p {temp_cm_dir} && tar -zxf {local_cm_pkg} -C {temp_cm_dir} && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'FAILED' in output:
+                    raise Exception(f"Failed to extract CM package on {dbNode.name}: {output}")
+                
+                # 覆盖 CM 文件
+                cmd = (
+                    f"if [ -d {temp_cm_dir}/bin ]; then cp -rf {temp_cm_dir}/bin/* {app_version_path}/bin/ 2>/dev/null || cp -rf {temp_cm_dir}/bin {app_version_path}/; fi; "
+                    f"if [ -d {temp_cm_dir}/lib ]; then cp -rf {temp_cm_dir}/lib/* {app_version_path}/lib/ 2>/dev/null || cp -rf {temp_cm_dir}/lib {app_version_path}/; fi; "
+                    f"rm -rf {temp_cm_dir} && echo 'OK' || echo 'FAILED'"
+                )
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'FAILED' in output:
+                    raise Exception(f"Failed to overlay CM files on {dbNode.name}: {output}")
+                
+                node_rollback_info[dbNode.name]['cm_upgraded'] = True
+                
+                # 3.6 修复权限
+                perm_cmds = [
+                    f"find {app_version_path}/bin -type f -exec chmod 755 {{}} \\; 2>/dev/null || true",
+                    f"find {app_version_path}/lib -type f -exec chmod 644 {{}} \\; 2>/dev/null || true",
+                ]
+                for pcmd in perm_cmds:
+                    self.execute_on_node(dbNode.name, pcmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                
+                # 3.7 切换软链接
+                self.logger.log(f"  [{dbNode.name}] Switching symlink to new version...")
+                cmd = f"rm -f {app_link_path} && ln -s {app_version_path} {app_link_path} && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'FAILED' in output:
+                    raise Exception(f"Failed to switch symlink on {dbNode.name}: {output}")
+                
+                node_rollback_info[dbNode.name]['symlink_switched'] = True
+                self.logger.log(f"  [{dbNode.name}] Upgrade completed")
+
+            # ===== Step 4: 启动整个集群 =====
+            self.logger.log("Step 4: Starting entire cluster (single start)...")
+            cmd = f"{env_source}{cm_ctl_path} start"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                self.logger.warn(f"  cm_ctl start returned non-zero: {output}")
+            else:
+                self.logger.log("  Cluster started successfully")
+            
+            # 等待服务完全启动
+            self.logger.log("  Waiting for services to fully start...")
+            time.sleep(10)
+
+            # ===== Step 5: 升级后检查 =====
+            self.logger.log("Step 5: Post-upgrade status check...")
+            self._check_cm_status(user, "post-upgrade")
+            self._check_gr_status(user, nodes_to_upgrade, "post-upgrade")
+
+            # 升级成功
+            upgrade_success = True
+            self.logger.log("=" * 60)
+            self.logger.log("GR + CM COMBINED UPGRADE COMPLETED SUCCESSFULLY!")
+            self.logger.log(f"New version: {app_version_dir}")
+            self.logger.log("=" * 60)
+
+        except Exception as e:
+            # 升级失败，执行全部回滚
+            self.logger.log("=" * 60)
+            self.logger.log("COMBINED UPGRADE FAILED! Starting full rollback...")
+            self.logger.log("=" * 60)
+            self.logger.log(f"Error: {str(e)}")
+
+            try:
+                self._rollback_combined_upgrade(clusterInfo, nodes_to_upgrade, node_rollback_info,
+                                               app_link_path, cm_ctl_path, env_source)
+            except Exception as rollback_error:
+                self.logger.log("=" * 60)
+                self.logger.log("ROLLBACK FAILED! Manual intervention required!")
+                self.logger.log("=" * 60)
+                self.logger.log(f"Rollback error: {str(rollback_error)}")
+                self.logger.log("Please manually restore the system using backups in:")
+                for dbNode in nodes_to_upgrade:
+                    rollback_info = node_rollback_info.get(dbNode.name, {})
+                    self.logger.log(f"  {dbNode.name}: {rollback_info.get('backup_dir', 'UNKNOWN')}")
+
+            raise
+
+        if not upgrade_success:
+            raise Exception("Combined upgrade process completed but success flag not set")
+
+    def _rollback_combined_upgrade(self, clusterInfo, nodes_to_upgrade, node_rollback_info,
+                                   app_link_path, cm_ctl_path, env_source):
+        """
+        GR + CM 组合升级回滚：恢复所有节点的软链接和 bin/lib，重启服务
+        """
+        self.logger.log("=" * 60)
+        self.logger.log("COMBINED ROLLBACK: Restoring all nodes to previous version")
+        self.logger.log("=" * 60)
+
+        for dbNode in nodes_to_upgrade:
+            rollback_info = node_rollback_info.get(dbNode.name, {})
+            old_version_dir = rollback_info.get('old_version_dir')
+            backup_dir = rollback_info.get('backup_dir')
+            symlink_switched = rollback_info.get('symlink_switched', False)
+            gr_upgraded = rollback_info.get('gr_upgraded', False)
+            cm_upgraded = rollback_info.get('cm_upgraded', False)
+
+            self.logger.log(f"Rolling back node {dbNode.name}...")
+
+            # 1. 恢复软链接到旧版本
+            if symlink_switched and old_version_dir:
+                self.logger.log(f"  [{dbNode.name}] Restoring symlink to {old_version_dir}")
+                cmd = f"rm -f {app_link_path} && ln -s {old_version_dir} {app_link_path} && echo 'OK' || echo 'FAILED'"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'OK' in output:
+                    self.logger.log(f"  [{dbNode.name}] Symlink restored")
+                else:
+                    self.logger.warn(f"  [{dbNode.name}] Failed to restore symlink: {output}")
+
+            # 2. 如果 bin/lib 已被修改，从备份恢复
+            if (gr_upgraded or cm_upgraded) and backup_dir and old_version_dir:
+                self.logger.log(f"  [{dbNode.name}] Restoring bin/lib from backup")
+                
+                # 恢复 bin
+                backup_bin = os.path.join(backup_dir, "bin")
+                cmd = f"if [ -d {backup_bin} ]; then rm -rf {old_version_dir}/bin && cp -a {backup_bin} {old_version_dir}/bin && echo 'OK' || echo 'FAILED'; else echo 'NO_BACKUP'; fi"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'OK' in output:
+                    self.logger.log(f"  [{dbNode.name}] Bin restored")
+                elif 'NO_BACKUP' not in output:
+                    self.logger.warn(f"  [{dbNode.name}] Failed to restore bin: {output}")
+                
+                # 恢复 lib
+                backup_lib = os.path.join(backup_dir, "lib")
+                cmd = f"if [ -d {backup_lib} ]; then rm -rf {old_version_dir}/lib && cp -a {backup_lib} {old_version_dir}/lib && echo 'OK' || echo 'FAILED'; else echo 'NO_BACKUP'; fi"
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if 'OK' in output:
+                    self.logger.log(f"  [{dbNode.name}] Lib restored")
+                elif 'NO_BACKUP' not in output:
+                    self.logger.warn(f"  [{dbNode.name}] Failed to restore lib: {output}")
+
+        # 3. 重启整个集群
+        self.logger.log("Restarting cluster after rollback...")
+        if cm_ctl_path:
+            cmd = f"{env_source}{cm_ctl_path} start"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                self.logger.warn(f"Failed to restart cluster: {output}")
+                self.logger.warn("Please manually restart: cm_ctl start")
+            else:
+                self.logger.log("Cluster restarted successfully")
+
+        self.logger.log("=" * 60)
+        self.logger.log("COMBINED ROLLBACK COMPLETED")
+        self.logger.log("=" * 60)
+        self.logger.log("All nodes have been rolled back to previous version")
+        self.logger.log("Please verify the system status manually")
 
     def preinstall(self, config_file, user, envfile):
         """
@@ -4725,12 +6134,13 @@ class dbClusterInfo():
         logger = clusterInfo.logger
         
         # Set paths based on JSON configuration
-        install_path = cluster_config.get('install_path', '/home/czk/install/')
-        worm_path = cluster_config.get('worm_path', '/home/czk/data/')
+        install_path = cluster_config.get('install_path', '')
+        worm_path = cluster_config.get('worm_path', '')
         clusterInfo.installPath = install_path
         clusterInfo.toolPath = os.path.join(install_path, "tool")
         clusterInfo.grPath = os.path.join(install_path, "gr")
-        clusterInfo.appPath = os.path.join(install_path, "gr")
+        clusterInfo.appPath = os.path.join(install_path, "APP")
+        clusterInfo.appSoftPath = clusterInfo.appPath
         clusterInfo.logPath = os.path.join(install_path, "log")
         clusterInfo.tmpPath = os.path.join(install_path, "tmp")
         clusterInfo.wormPath = worm_path  # 保存worm_path到clusterInfo中
@@ -4741,7 +6151,14 @@ class dbClusterInfo():
         for node in nodes:
             node_name = node.get('ip', node.get('name', ''))
             # Create basic directories
-            cmd = f"mkdir -p {clusterInfo.toolPath} {clusterInfo.grPath} {clusterInfo.appPath} {clusterInfo.logPath} {clusterInfo.tmpPath} {datadnPath} -m 755"
+            cmd = (
+                f"mkdir -p {clusterInfo.installPath} "
+                f"{clusterInfo.toolPath} "
+                f"{clusterInfo.grPath} "
+                f"{clusterInfo.logPath} "
+                f"{clusterInfo.tmpPath} "
+                f"{datadnPath} -m 755"
+            )
             status, output = self.execute_on_node(
                 node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
             if status != 0:
@@ -4774,7 +6191,15 @@ class dbClusterInfo():
                 logger.log(f"Successfully created and set permissions for disk files on {node_name}")
             
             # 设置其他目录权限
-            cmd = f'chown -R {user}:{user} {clusterInfo.toolPath} {clusterInfo.grPath} {clusterInfo.appPath} {clusterInfo.logPath} {clusterInfo.tmpPath} {datadnPath}'
+            cmd = (
+                f'chown -R {user}:{user} '
+                f'{clusterInfo.installPath} '
+                f'{clusterInfo.toolPath} '
+                f'{clusterInfo.grPath} '
+                f'{clusterInfo.logPath} '
+                f'{clusterInfo.tmpPath} '
+                f'{datadnPath}'
+            )
             status, output = self.execute_on_node(
                 node_name, cmd, local_name=GetHostIpOrName(), ssh_ip=node_name)
             if status != 0:
@@ -4794,30 +6219,32 @@ class dbClusterInfo():
                 raise Exception(f"failed to create environment variable file on {node_name}, Error output:\n{output}")
         
         # Configure environment variables
+        # GR_HOME 指向共享目录，但 PATH 和 LD_LIBRARY_PATH 指向 APP 软链接（版本化目录）
+        app_link_path = os.path.join(clusterInfo.installPath, "APP")
         for node in nodes:
             node_name = node.get('ip', node.get('name', ''))
             if (node_name != GetHostIpOrName()):
                 cmd = f'''ssh -q -o ConnectTimeout=5 {node_name} "cat > {envfile} <<'EOF'
 export MPPDB_ENV_SEPARATE_PATH={envfile}
 export GPHOME={clusterInfo.toolPath}
-export GAUSSHOME={clusterInfo.appPath}
+export GAUSSHOME={app_link_path}
 export GAUSSLOG={clusterInfo.logPath}
 export GR_HOME={clusterInfo.grPath}
 export PGHOST={clusterInfo.tmpPath}
-export PATH=\$GAUSSHOME/bin/:\$GR_HOME/bin/:\$PATH
-export LD_LIBRARY_PATH=\$GAUSSHOME/lib:\$GR_HOME/lib:\$LD_LIBRARY_PATH
+export PATH=$GAUSSHOME/bin/:{app_link_path}/bin/:$PATH
+export LD_LIBRARY_PATH=$GAUSSHOME/lib:{app_link_path}/lib:$LD_LIBRARY_PATH
 EOF"
 '''
             else:
                 cmd = f'''cat > {envfile} <<'EOF'
 export MPPDB_ENV_SEPARATE_PATH={envfile}
 export GPHOME={clusterInfo.toolPath}
-export GAUSSHOME={clusterInfo.appPath}
+export GAUSSHOME={app_link_path}
 export GAUSSLOG={clusterInfo.logPath}
 export GR_HOME={clusterInfo.grPath}
 export PGHOST={clusterInfo.tmpPath}
-export PATH=$GAUSSHOME/bin/:$GR_HOME/bin/:$PATH
-export LD_LIBRARY_PATH=$GAUSSHOME/lib:$GR_HOME/lib:$LD_LIBRARY_PATH
+export PATH=$GAUSSHOME/bin/:{app_link_path}/bin/:$PATH
+export LD_LIBRARY_PATH=$GAUSSHOME/lib:{app_link_path}/lib:$LD_LIBRARY_PATH
 EOF
 '''
             (status, output) = subprocess.getstatusoutput(cmd)
@@ -5091,9 +6518,6 @@ EOF
         logger.log("Successfully reload gr certs on all nodes.")
 
     def setup_ssh_trust(self, config_file):
-        import getpass
-        import tempfile
-
         RED = '\033[0;31m'
         GREEN = '\033[0;32m'
         YELLOW = '\033[0;33m'
@@ -5469,7 +6893,7 @@ class InstallImpl:
         try:
             self.clusterInfo = dbClusterInfo()
             self.clusterInfo.initFromXml(self.xmlFile)
-        except:
+        except Exception:
             pass  # 如果初始化失败，继续使用原始主机名
 
     def executeCmdOnHost(self, host, cmd, isLocal = False):
@@ -5483,7 +6907,7 @@ class InstallImpl:
                         if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
                             host = dbNode.sshIps[0]
                             break
-            except:
+            except Exception:
                 pass  # 如果获取失败，继续使用原始主机名
         return executeCmdOnHost(host, cmd, isLocal)
 
@@ -5530,7 +6954,7 @@ class InstallImpl:
                         if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
                             ssh_ip = dbNode.sshIps[0]
                             break
-            except:
+            except Exception:
                 pass  # 如果获取失败，继续使用原始主机名
             
             if ":" in ssh_ip:
@@ -5696,7 +7120,7 @@ class InstallImpl:
                         if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
                             ssh_ip = dbNode.sshIps[0]
                             break
-            except:
+            except Exception:
                 pass  # 如果获取失败，继续使用原始主机名
             
             if ":" in ssh_ip:
@@ -6140,7 +7564,7 @@ server.ssl.trust-store-type=JKS
                         if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
                             ssh_ip = dbNode.sshIps[0]
                             break
-            except:
+            except Exception:
                 pass  # 如果获取失败，继续使用原始主机名
             
             # Determine if the host is an IPv6 address and format accordingly
@@ -6583,7 +8007,7 @@ General options:
                 if hasattr(dbNode, 'sshIps') and dbNode.sshIps:
                     hostname_ip_map[dbNode.name] = dbNode.sshIps[0]
             set_hostname_ip_map(hostname_ip_map)
-        except:
+        except Exception:
             pass  # 如果设置失败，继续使用原始主机名
         
         installImpl = InstallImpl(self)
@@ -6987,10 +8411,6 @@ def isupper(c):
 
 def json_to_xml(json_file):
     """将JSON配置文件转换为XML格式"""
-    import json
-    import tempfile
-    import os
-    
     try:
         with open(json_file, 'r', encoding='utf-8') as f:
             config = json.load(f)
@@ -7092,7 +8512,6 @@ def main():
                 # 如果是trust或uninstall命令，跳过XML转换
                 if is_json_command:
                     # 仍然需要读取JSON中的env_file和user信息
-                    import json
                     try:
                         with open(json_file, 'r', encoding='utf-8') as f:
                             config = json.load(f)
@@ -7129,6 +8548,8 @@ def main():
     install_all_parser.add_argument('--grpkg', dest='gr_package', required=True, help='Path to GR installation package')
     install_all_parser.add_argument('--cmpkg', dest='cm_package', required=True, help='Path to CM package')
     install_all_parser.add_argument('--restpkg', dest='rest_package', required=False, help='Path to CM-RESTAPI package')
+    install_all_parser.add_argument('-n', '--nodeids', dest='target_nodeids', nargs='+', type=int, default=None,
+        help='(Not supported for install, only for upgrade)')
 
     # GR uninstall command
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall cluster')
@@ -7141,6 +8562,30 @@ def main():
     # GR preinstall command
     preinstall_parser = subparsers.add_parser('preinstall', help='Preinstall cluster')
     preinstall_parser.add_argument('-X', dest='config_file', required=True, help='JSON configuration file path')
+
+    # GR / CM upgrade command
+    upgrade_parser = subparsers.add_parser(
+        'upgrade',
+        help='Upgrade GR/CM to new version. '
+             'With --nodeids: online GR upgrade on specific nodes; '
+             'without --nodeids: cluster upgrade (GR, CM or both).'
+    )
+    upgrade_parser.add_argument(
+        '-X', dest='xmlFile', required=True,
+        help='XML configuration file (or JSON file)'
+    )
+    upgrade_parser.add_argument(
+        '--grpkg', dest='gr_package', required=False,
+        help='Path to new GR installation package'
+    )
+    upgrade_parser.add_argument(
+        '--cmpkg', dest='cm_package', required=False,
+        help='Path to new CM package (only valid in cluster upgrade mode without --nodeids)'
+    )
+    upgrade_parser.add_argument(
+        '-n', '--nodeids', dest='target_nodeids', nargs='+', type=int, default=None,
+        help='List of node IDs to upgrade (starting from 1, default: all nodes)'
+    )
 
     # SSH trust command
     trust_parser = subparsers.add_parser('trust', help='Automatically configure SSH mutual trust for cluster')
@@ -7173,7 +8618,10 @@ def main():
             clusterInfo.initFromXml(args.xmlFile)
             clusterInfo.doRebuildConf(args.xmlFile)
         elif args.command == 'install':
-            clusterInfo.gr_install(args.xmlFile, args.gr_package, args.rest_package)
+            if args.target_nodeids:
+                print("Error: -n/--nodeids is only supported for 'upgrade' command, not 'install'")
+                sys.exit(1)
+            clusterInfo.gr_install(args.xmlFile, args.gr_package, args.rest_package, json_file)
             install = Install()
             install.xmlFile = args.xmlFile
             install.envFile = args.envFile
@@ -7186,6 +8634,31 @@ def main():
             clusterInfo.uninstall(args.config_file)
         elif args.command == 'gr_certs':
             clusterInfo.distribute_gr_certs(args.config_file, args.envFile)
+        elif args.command == 'upgrade':
+            # 整体升级模式：指定 --cmpkg 时进入集群升级流程
+            if args.cm_package:
+                if args.target_nodeids:
+                    print("Error: -n/--nodeids cannot be used with --cmpkg (CM upgrade requires full-cluster stop)")
+                    sys.exit(1)
+                # 同时升级 GR 和 CM：一次停止、一次启动、失败全部回滚
+                if args.gr_package:
+                    print("Combined upgrade: upgrading GR + CM together (single stop/start, full rollback on failure).")
+                    clusterInfo.gr_cm_combined_upgrade(args.xmlFile, args.gr_package, args.cm_package)
+                # 仅升级 CM
+                else:
+                    clusterInfo.cm_cluster_upgrade(args.xmlFile, args.cm_package)
+            # 在线节点级升级：指定 -n/--nodeids，只支持 GR 升级
+            elif args.target_nodeids:
+                if not args.gr_package:
+                    print("Error: --grpkg is required when -n/--nodeids is specified (online node upgrade mode)")
+                    sys.exit(1)
+                clusterInfo.gr_upgrade(args.xmlFile, args.gr_package, args.target_nodeids)
+            # 集群级 GR 升级：不指定 nodeids，仅升级 GR
+            elif args.gr_package:
+                clusterInfo.gr_upgrade(args.xmlFile, args.gr_package, target_nodeids=None)
+            else:
+                print("Error: at least one of --grpkg or --cmpkg must be specified")
+                sys.exit(1)
         elif args.command == 'trust':
             clusterInfo.setup_ssh_trust(args.config_file)
         else:
@@ -7197,8 +8670,18 @@ def main():
             try:
                 os.unlink(xml_file)
                 print(f"Cleaned up temporary XML file: {xml_file}")
-            except:
+            except Exception:
                 pass
+        
+        # 如果是 upgrade 命令且成功完成，使用 os._exit(0) 强制退出
+        # 避免正常的 Python 退出流程触发库析构问题导致 coredump
+        # 注意：这会在 finally 之后执行，所以临时文件清理已完成
+        try:
+            if 'args' in locals() and args.command == 'upgrade':
+                # 升级命令成功完成，强制退出避免 coredump
+                os._exit(0)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()

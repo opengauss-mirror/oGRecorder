@@ -178,12 +178,13 @@ int gr_create_inst(const char *storageServerAddr, gr_instance_handle *inst_handl
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)malloc(sizeof(st_gr_instance_handle));
     if (hdl == NULL) {
         LOG_RUN_ERR("failed to allocate memory for instance handle");
-        GR_THROW_ERROR(ERR_ALLOC_MEMORY, sizeof(st_gr_instance_handle), "gr_create_inst");
+        GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, sizeof(st_gr_instance_handle), "gr_create_inst");
         return GR_ERROR;
     }
     hdl->conn = NULL;
-    errno_t err = memcpy_s(hdl->addr, strlen(storageServerAddr) + 1, 
-                            storageServerAddr, strlen(storageServerAddr) + 1);
+
+    size_t addr_len = strlen(storageServerAddr);
+    errno_t err = memcpy_s(hdl->addr, addr_len + 1, storageServerAddr, addr_len + 1);
     if (err != EOK) {
         LOG_RUN_ERR("Error occured when copying addr, errno code is %d.\n", err);
         GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
@@ -204,6 +205,7 @@ int gr_create_inst(const char *storageServerAddr, gr_instance_handle *inst_handl
 static int parse_server_addresses(const char *serverAddrs, char **addresses, int max_count, int *actual_count)
 {
     if (serverAddrs == NULL || addresses == NULL || actual_count == NULL) {
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid parameters for parse_server_addresses");
         return GR_ERROR;
     }
 
@@ -211,6 +213,7 @@ static int parse_server_addresses(const char *serverAddrs, char **addresses, int
     char *input_copy = strdup(serverAddrs);
     if (input_copy == NULL) {
         LOG_RUN_ERR("failed to allocate memory for parsing server addresses");
+        GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, 0, "parse_server_addresses");
         return GR_ERROR;
     }
 
@@ -235,6 +238,7 @@ static int parse_server_addresses(const char *serverAddrs, char **addresses, int
                     free(addresses[i]);
                 }
                 free(input_copy);
+                GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, 0, "parse_server_addresses");
                 return GR_ERROR;
             }
             (*actual_count)++;
@@ -250,6 +254,7 @@ int gr_create_inst_only_primary(const char *serverAddrs, gr_instance_handle *ins
 {
     if (serverAddrs == NULL || inst_handle == NULL) {
         LOG_RUN_ERR("gr_create_inst_only_primary get invalid parameter.");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid parameters for gr_create_inst_only_primary");
         return GR_ERROR;
     }
 
@@ -260,6 +265,7 @@ int gr_create_inst_only_primary(const char *serverAddrs, gr_instance_handle *ins
     int ret = parse_server_addresses(serverAddrs, addresses, MAX_SERVER_COUNT, &addrCount);
     if (ret != GR_SUCCESS || addrCount == 0) {
         LOG_RUN_ERR("failed to parse server addresses or no valid addresses found");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "failed to parse server addresses or no valid addresses found");
         return GR_ERROR;
     }
 
@@ -319,6 +325,7 @@ int gr_create_inst_only_primary(const char *serverAddrs, gr_instance_handle *ins
 
     if (!primary_found || primary_handle == NULL) {
         LOG_RUN_ERR("no primary server found");
+        GR_THROW_ERROR(ERR_GR_SERVER_IS_DOWN, "no primary server found");
         return GR_ERROR;
     }
 
@@ -386,6 +393,7 @@ int gr_vfs_mount(gr_instance_handle inst_handle, const char *vfs_name, gr_vfs_ha
 
     st_gr_instance_handle *hdl = (st_gr_instance_handle *)inst_handle;
     if (gr_check_path_exist(hdl->conn, vfs_name) != GR_SUCCESS) {
+        GR_THROW_ERROR(ERR_GR_DIR_NOT_EXIST, "VFS path does not exist: %s", vfs_name);
         return GR_ERROR;
     }
 
@@ -403,15 +411,18 @@ int gr_vfs_unmount(gr_vfs_handle *vfs_handle)
 {
     if (vfs_handle == NULL) {
         LOG_RUN_ERR("vfs_handle is NULL.");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "vfs_handle is NULL");
         return GR_ERROR;
     }
     if (vfs_handle->handle == NULL) {
         LOG_RUN_ERR("vfs_handle->handle is NULL.");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "vfs_handle->handle is NULL");
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)vfs_handle->handle;
     if (hdl == NULL || hdl->conn == NULL) {
         LOG_RUN_ERR("dremove get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
     status_t ret = gr_vfs_unmount_impl(hdl->conn, vfs_handle);
@@ -431,6 +442,7 @@ int gr_vfs_query_file_num(gr_vfs_handle vfs_handle, int *file_num)
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("lstat get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
 
@@ -452,6 +464,7 @@ int gr_vfs_query_file_info(gr_vfs_handle vfs_handle, gr_file_item_t *result, boo
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("lstat get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
 
@@ -472,6 +485,7 @@ int gr_file_create(gr_vfs_handle vfs_handle, const char *name, const FileParamet
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fcreate get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
     char full_name[GR_MAX_NAME_LEN];
@@ -486,7 +500,7 @@ int gr_file_create(gr_vfs_handle vfs_handle, const char *name, const FileParamet
     return (int)ret;
 }
 
-int gr_file_delete(gr_vfs_handle vfs_handle, const char *name)
+int gr_file_delete(gr_vfs_handle vfs_handle, const char *name, unsigned long long attrFlag)
 {
     if (validate_vfs_handle(vfs_handle, "gr_file_delete") != GR_SUCCESS ||
         validate_file_name(name, "gr_file_delete") != GR_SUCCESS) {
@@ -495,6 +509,7 @@ int gr_file_delete(gr_vfs_handle vfs_handle, const char *name)
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fremove get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
 
@@ -504,7 +519,7 @@ int gr_file_delete(gr_vfs_handle vfs_handle, const char *name)
         GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
         return GR_ERROR;
     }
-    status_t ret = gr_remove_file_impl(hdl->conn, full_name);
+    status_t ret = gr_remove_file_impl(hdl->conn, full_name, attrFlag);
     return (int)ret;
 }
 
@@ -541,10 +556,12 @@ int gr_file_open(gr_vfs_handle vfs_handle, const char *name, int flag, gr_file_h
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fopen get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
 
-    errno_t err = memcpy_s(hdl->addr, strlen(name) + 1, name, strlen(name) + 1);
+    size_t name_len = strlen(name);
+    errno_t err = memcpy_s(hdl->addr, name_len + 1, name, name_len + 1);
     if (SECUREC_UNLIKELY(err < 0)) {
         GR_THROW_ERROR(ERR_SYSTEM_CALL, err);
         return GR_ERROR;
@@ -575,6 +592,7 @@ int gr_file_postpone(gr_vfs_handle vfs_handle, const char *file, const char *tim
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fcreate get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
     char full_name[GR_MAX_NAME_LEN];
@@ -603,6 +621,7 @@ int gr_get_inst_status(gr_instance_handle inst_handle,
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("get conn error when get inst status.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
     
@@ -633,6 +652,7 @@ int gr_get_disk_usage(gr_instance_handle inst_handle,
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)inst_handle;
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("get conn error when get disk usage.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
     
@@ -657,6 +677,7 @@ int gr_set_main_inst(const char *storageServerAddr)
 
     if (check_server_addr_format(storageServerAddr) != GR_SUCCESS) {
         LOG_RUN_ERR("invalid address: %s.", storageServerAddr);
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid address format");
         return GR_ERROR;
     }
     st_gr_instance_handle hdl;
@@ -674,11 +695,13 @@ int gr_file_close(gr_vfs_handle vfs_handle, gr_file_handle *file_handle, bool ne
 {
     if (vfs_handle.handle == NULL) {
         LOG_RUN_ERR("instance handle is NULL.");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "vfs_handle.handle is NULL");
         return GR_ERROR;
     }
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fclose get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
 
@@ -703,6 +726,27 @@ long long int gr_file_pwrite(
     return ret;
 }
 
+long long int gr_file_append(
+    gr_vfs_handle vfs_handle, gr_file_handle *file_handle, const void *buf, unsigned long long count)
+{
+    if (validate_vfs_handle(vfs_handle, "gr_file_append") != GR_SUCCESS ||
+        validate_pointer_param(file_handle, "file_handle", "gr_file_append") != GR_SUCCESS ||
+        validate_pointer_param(buf, "buf", "gr_file_append") != GR_SUCCESS ||
+        validate_size_param(count, "count", "gr_file_append") != GR_SUCCESS) {
+        return GR_ERROR;
+    }
+
+    st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("append get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
+        return GR_ERROR;
+    }
+
+    long long int ret = gr_append_file_impl(hdl->conn, file_handle, buf, count);
+    return ret;
+}
+
 long long int gr_file_pread(
     gr_vfs_handle vfs_handle, gr_file_handle file_handle, void *buf, unsigned long long count, long long offset)
 {
@@ -718,6 +762,7 @@ long long int gr_file_pread(
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("pread get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
 
@@ -737,6 +782,7 @@ int gr_file_truncate(gr_vfs_handle vfs_handle, gr_file_handle file_handle, int t
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("ftruncate get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
     status_t ret = gr_truncate_impl(hdl->conn, HANDLE_VALUE(file_handle.fd), offset, truncateType);
@@ -757,6 +803,7 @@ int gr_file_stat(
     st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
     if (hdl->conn == NULL) {
         LOG_RUN_ERR("fcreate get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
         return GR_ERROR;
     }
     char full_name[GR_MAX_NAME_LEN];

@@ -56,12 +56,14 @@ typedef struct str_files_rw_ctx {
 
 status_t gr_connect(const char *server_locator, gr_conn_opt_t *options, gr_conn_t *conn)
 {
+    LOG_DEBUG_INF("gr connect entry, server_locator:%s", server_locator);
     if (server_locator == NULL) {
         GR_THROW_ERROR(ERR_GR_TCP_INVALID_URL, "NULL", 0);
         return CM_ERROR;
     }
 
     if ((conn->flag == CM_TRUE) && (conn->pipe.link.tcp.closed == CM_FALSE)) {
+        LOG_DEBUG_INF("gr connect already connected");
         return CM_SUCCESS;
     }
 
@@ -91,13 +93,14 @@ status_t gr_connect(const char *server_locator, gr_conn_opt_t *options, gr_conn_
 
 void gr_disconnect(gr_conn_t *conn)
 {
+    LOG_DEBUG_INF("gr disconnect entry");
     gr_set_thv_run_ctx_item(GR_THV_RUN_CTX_ITEM_SESSION, NULL);
     if (conn->flag == CM_TRUE) {
         cs_disconnect(&conn->pipe);
         gr_free_packet_buffer(&conn->pack);
         conn->flag = CM_FALSE;
     }
-
+    LOG_DEBUG_INF("gr disconnect leave");
     return;
 }
 
@@ -159,11 +162,13 @@ status_t gr_cli_handshake(gr_conn_t *conn, uint32_t max_open_file)
 
 status_t gr_cli_ssl_connect(gr_conn_t *conn)
 {
+    LOG_DEBUG_INF("gr cli ssl connect entry");
     status_t status = cli_ssl_connect(&conn->cli_ssl_inst, &conn->pipe);
     if (status != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to do cli ssl certification.");
         return CM_ERROR;
     }
+    LOG_DEBUG_INF("gr cli ssl connect leave");
     return CM_SUCCESS;
 }
 
@@ -292,17 +297,21 @@ status_t gr_create_file_impl(gr_conn_t *conn, const char *file_path, int flag)
     return status;
 }
 
-status_t gr_remove_file_impl(gr_conn_t *conn, const char *file_path)
+status_t gr_remove_file_impl(gr_conn_t *conn, const char *file_path, unsigned long long attrFlag)
 {
     LOG_DEBUG_INF("gr remove file entry, file path:%s", file_path);
     GR_RETURN_IF_ERROR(gr_check_device_path(file_path));
-    status_t status = gr_msg_interact(conn, GR_CMD_DELETE_FILE, (void *)file_path, NULL);
+    gr_remove_file_info_t send_info;
+    send_info.name = file_path;
+    send_info.attrFlag = attrFlag;
+    status_t status = gr_msg_interact(conn, GR_CMD_DELETE_FILE, (void *)&send_info, NULL);
     LOG_DEBUG_INF("gr remove file leave");
     return status;
 }
 
 status_t gr_open_file_on_server(gr_conn_t *conn, const char *file_path, int flag, gr_file_handle *file_handle)
 {
+    LOG_DEBUG_INF("gr open file on server entry, file_path:%s, flag:%d", file_path, flag);
     gr_open_file_info_t send_info;
     send_info.file_path = file_path;
     send_info.flag = flag;
@@ -410,16 +419,6 @@ status_t gr_check_file_flag(int flag)
 
 int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset)
 {
-    if (size < 0) {
-        LOG_RUN_ERR("File size is invalid: %lld.", size);
-        return CM_ERROR;
-    }
-    
-    if (file_handle == NULL || buf == NULL) {
-        LOG_RUN_ERR("Invalid parameters: file_handle or buf is NULL");
-        return CM_ERROR;
-    }
-    
     LOG_DEBUG_INF("gr pwrite file entry, handle:%d, size:%lld, offset:%lld",
                     HANDLE_VALUE(file_handle->fd), size, offset);
 
@@ -445,20 +444,22 @@ int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const vo
             status = calculate_data_hash(send_info.buf, curr_size, hash);
             if (status != CM_SUCCESS) {
                 LOG_RUN_ERR("Failed to calculate data hash.");
+                GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to calculate data hash.");
                 return CM_ERROR;
             }
 
             status = xor_sha256_hash(hash, file_handle->hash, send_info.hash);
             if (status != CM_SUCCESS) {
                 LOG_RUN_ERR("Failed to calculate combine_hash.");
+                GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to calculate combine_hash.");
                 return CM_ERROR;
             }
         }
 
         status = gr_msg_interact(conn, GR_CMD_WRITE_FILE, (void *)&send_info, (void *)&rel_size);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("Failed to write file, total_size:%lld, remaining:%lld, offset:%lld, errmsg:%s.",
-                total_size, remaining_size, offset, strerror(errno));
+            LOG_RUN_ERR("Failed to write file, total_size:%lld, remaining:%lld, offset:%lld.",
+                total_size, remaining_size, offset);
             return CM_ERROR;
         }
         
@@ -482,6 +483,76 @@ int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const vo
     }
 
     LOG_DEBUG_INF("gr pwrite file leave, total written: %lld", total_size);
+    return total_size;
+}
+
+int64 gr_append_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const void *buf, unsigned long long size)
+{
+    LOG_DEBUG_INF("gr append file entry, handle:%d, size:%lld",
+                    HANDLE_VALUE(file_handle->fd), size);
+
+    gr_write_file_info_t send_info;
+    send_info.handle = HANDLE_VALUE(file_handle->fd);
+    send_info.size = size;
+    send_info.buf = (char *)buf;
+
+    status_t status;
+    unsigned long long total_size = 0;
+    unsigned long long remaining_size = size;
+    long long int rel_size = 0;
+    uint8_t hash[SHA256_DIGEST_LENGTH];
+    const char *buf_ptr = (const char *)buf;
+
+    while (total_size < size) {
+        const unsigned long long curr_size = (remaining_size > GR_RW_STEP_SIZE) ? 
+                                           GR_RW_STEP_SIZE : remaining_size;
+        
+        send_info.size = curr_size;
+        send_info.buf = (char *)(buf_ptr + total_size);
+
+        if (conn->hash_auth_enable) {
+            status = calculate_data_hash(send_info.buf, curr_size, hash);
+            if (status != CM_SUCCESS) {
+                LOG_RUN_ERR("Failed to calculate data hash.");
+                GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to calculate data hash.");
+                return CM_ERROR;
+            }
+
+            status = xor_sha256_hash(hash, file_handle->hash, send_info.hash);
+            if (status != CM_SUCCESS) {
+                LOG_RUN_ERR("Failed to calculate combine_hash.");
+                GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to calculate combine_hash.");
+                return CM_ERROR;
+            }
+        }
+
+        status = gr_msg_interact(conn, GR_CMD_APPEND_FILE, (void *)&send_info, (void *)&rel_size);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("Failed to append file, total_size:%lld, remaining:%lld.",
+                total_size, remaining_size);
+            return CM_ERROR;
+        }
+        
+        if (rel_size != curr_size) {
+            LOG_RUN_WAR("Partial append: expected %lld, actual %lld, total_size:%lld",
+                curr_size, rel_size, total_size);
+            total_size += rel_size;
+            break;
+        }
+
+        total_size += curr_size;
+        remaining_size -= curr_size;
+        
+        errno_t errcode = memcpy_s(file_handle->hash, SHA256_DIGEST_LENGTH,
+                                    send_info.hash, SHA256_DIGEST_LENGTH);
+        if (errcode != EOK) {
+            LOG_RUN_ERR("Failed to memcpy hash, size:%d.", SHA256_DIGEST_LENGTH);
+            GR_THROW_ERROR(ERR_SYSTEM_CALL, errcode);
+            return CM_ERROR;
+        }
+    }
+
+    LOG_DEBUG_INF("gr append file leave, total written: %lld", total_size);
     return total_size;
 }
 
@@ -531,6 +602,7 @@ int64 gr_pread_file_impl(gr_conn_t *conn, int handle, const void *buf, unsigned 
 
 status_t gr_truncate_impl(gr_conn_t *conn, int handle, long long length, int truncateType)
 {
+    LOG_DEBUG_INF("gr truncate file entry, handle:%d, length:%lld, truncateType:%d", handle, length, truncateType);
     if (length < 0) {
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "length must be a positive integer");
         LOG_RUN_ERR("File length is invalid:%lld.", length);
@@ -543,20 +615,20 @@ status_t gr_truncate_impl(gr_conn_t *conn, int handle, long long length, int tru
         return CM_ERROR;
     }
 
-    LOG_DEBUG_INF("Truncating file via handle(%d), length: %lld.", handle, length);
-
     gr_truncate_file_info_t send_info;
     send_info.handle = handle;
     send_info.length = length;
     send_info.truncateType = truncateType;
 
     status_t status = gr_msg_interact(conn, GR_CMD_TRUNCATE_FILE, (void *)&send_info, NULL);
+    LOG_DEBUG_INF("gr truncate file leave, status:%d", status);
     return status;
 }
 
 status_t gr_stat_file_impl(
     gr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *size, int *mode, char **time)
 {
+    LOG_DEBUG_INF("gr stat file entry, fileName:%s", fileName);
     gr_stat_file_info_t send_info;
     send_info.name = fileName;
     send_info.offset = 0;
@@ -568,6 +640,7 @@ status_t gr_stat_file_impl(
     *size = send_info.size;
     *mode = (int)send_info.mode;
     *time = send_info.expire_time;
+    LOG_DEBUG_INF("gr stat file leave, offset:%lld, size:%llu, mode:%d", *offset, *size, *mode);
     return status;
 }
 
@@ -590,6 +663,7 @@ static status_t gr_init_err_proc(
 
 status_t gr_init_client(uint32_t max_open_files, char *home)
 {
+    LOG_DEBUG_INF("gr init client entry, max_open_files:%u, home:%s", max_open_files, home ? home : "NULL");
     if (max_open_files > GR_MAX_OPEN_FILES) {
         GR_THROW_ERROR(ERR_INVALID_VALUE, "max_open_files", max_open_files);
         return CM_ERROR;
@@ -597,6 +671,7 @@ status_t gr_init_client(uint32_t max_open_files, char *home)
 
     gr_env_t *gr_env = gr_get_env();
     if (gr_env->initialized) {
+        LOG_DEBUG_INF("gr init client already initialized");
         return CM_SUCCESS;
     }
 
@@ -649,20 +724,24 @@ status_t gr_init_client(uint32_t max_open_files, char *home)
 
 void gr_destroy(void)
 {
+    LOG_DEBUG_INF("gr destroy entry");
     gr_env_t *gr_env = gr_get_env();
     gr_latch_x(&gr_env->latch);
     if (!gr_env->initialized) {
         gr_unlatch(&gr_env->latch);
+        LOG_DEBUG_INF("gr destroy already destroyed");
         return;
     }
 
     cm_close_thread_nowait(&gr_env->thread_heartbeat);
     gr_env->initialized = 0;
     gr_unlatch(&gr_env->latch);
+    LOG_DEBUG_INF("gr destroy leave");
 }
 
 status_t gr_setcfg_impl(gr_conn_t *conn, const char *name, const char *value, const char *scope)
 {
+    LOG_DEBUG_INF("gr set cfg entry, name:%s, value:%s, scope:%s", name, value, scope);
     GR_RETURN_IF_ERROR(gr_check_str_not_null(name, "name"));
     GR_RETURN_IF_ERROR(gr_check_str_not_null(value, "value"));
     GR_RETURN_IF_ERROR(gr_check_str_not_null(scope, "scope"));
@@ -677,6 +756,7 @@ status_t gr_setcfg_impl(gr_conn_t *conn, const char *name, const char *value, co
 
 status_t gr_getcfg_impl(gr_conn_t *conn, const char *name, char *out_str, size_t str_len)
 {
+    LOG_DEBUG_INF("gr get cfg entry, name:%s", name);
     GR_RETURN_IF_ERROR(gr_check_str_not_null(name, "name"));
     text_t extra_info = CM_NULL_TEXT;
     GR_RETURN_IF_ERROR(gr_msg_interact(conn, GR_CMD_GETCFG, (void *)name, (void *)&extra_info));
@@ -690,12 +770,13 @@ status_t gr_getcfg_impl(gr_conn_t *conn, const char *name, char *out_str, size_t
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "value of str_len is not large enough when getcfg.");
         return CM_ERROR;
     }
-    LOG_DEBUG_INF("Client get cfg is %s.", (strlen(out_str) == 0) ? "NULL" : out_str);
+    LOG_DEBUG_INF("gr get cfg leave, value:%s", (strlen(out_str) == 0) ? "NULL" : out_str);
     return CM_SUCCESS;
 }
 
 status_t gr_get_inst_status_on_server(gr_conn_t *conn, gr_server_status_t *gr_status)
 {
+    LOG_DEBUG_INF("gr get inst status entry");
     if (gr_status == NULL) {
         GR_THROW_ERROR_EX(ERR_GR_INVALID_PARAM, "gr_status");
         return CM_ERROR;
@@ -703,42 +784,55 @@ status_t gr_get_inst_status_on_server(gr_conn_t *conn, gr_server_status_t *gr_st
     text_t extra_info = CM_NULL_TEXT;
     GR_RETURN_IF_ERROR(gr_msg_interact(conn, GR_CMD_GET_INST_STATUS, NULL, (void *)&extra_info));
     *gr_status = *(gr_server_status_t *)extra_info.str;
+    LOG_DEBUG_INF("gr get inst status leave, status:%s", gr_status->instance_status);
     return CM_SUCCESS;
 }
 
 status_t gr_get_time_stat_on_server(gr_conn_t *conn, gr_stat_item_t *time_stat, uint64 size)
 {
+    LOG_DEBUG_INF("gr get time stat entry");
     text_t stat_info = CM_NULL_TEXT;
     GR_RETURN_IF_ERROR(gr_msg_interact(conn, GR_CMD_GET_TIME_STAT, NULL, (void *)&stat_info));
     for (uint64 i = 0; i < GR_EVT_COUNT; i++) {
         time_stat[i] = *(gr_stat_item_t *)(stat_info.str + i * (uint64)sizeof(gr_stat_item_t));
     }
+    LOG_DEBUG_INF("gr get time stat leave");
     return CM_SUCCESS;
 }
 
 status_t gr_set_main_inst_impl(gr_conn_t *conn)
 {
-    return gr_msg_interact(conn, GR_CMD_SET_MAIN_INST, NULL, NULL);
+    LOG_DEBUG_INF("gr set main inst entry");
+    status_t status = gr_msg_interact(conn, GR_CMD_SET_MAIN_INST, NULL, NULL);
+    LOG_DEBUG_INF("gr set main inst leave, status:%d", status);
+    return status;
 }
 
 status_t gr_reload_certs_impl(gr_conn_t *conn)
 {
-    return gr_msg_interact(conn, GR_CMD_RELOAD_CERTS, NULL, NULL);
+    LOG_DEBUG_INF("gr reload certs entry");
+    status_t status = gr_msg_interact(conn, GR_CMD_RELOAD_CERTS, NULL, NULL);
+    LOG_DEBUG_INF("gr reload certs leave, status:%d", status);
+    return status;
 }
 
 status_t gr_get_disk_usage_impl(gr_conn_t *conn, gr_disk_usage_info_t *info)
 {
+    LOG_DEBUG_INF("gr get disk usage entry");
     gr_disk_usage_ack_t ack_info = {0};
     GR_RETURN_IF_ERROR(gr_msg_interact(conn, GR_CMD_GET_DISK_USAGE, NULL, (void *)&ack_info));
     info->available_bytes = ack_info.available_bytes;
     info->total_bytes = ack_info.total_bytes;
     info->used_bytes = ack_info.used_bytes;
     info->usage_percent = ack_info.usage_percent;
+    LOG_DEBUG_INF("gr get disk usage leave, total:%lld, used:%lld, avail:%lld",
+        info->total_bytes, info->used_bytes, info->available_bytes);
     return CM_SUCCESS;
 }
 
 status_t gr_close_file_on_server(gr_conn_t *conn, int64 fd, bool need_lock)
 {
+    LOG_DEBUG_INF("gr close file on server entry, fd:%lld, need_lock:%d", fd, need_lock);
     gr_close_file_info_t send_info;
     send_info.fd = fd;
     send_info.need_lock = (int)need_lock;
@@ -747,7 +841,10 @@ status_t gr_close_file_on_server(gr_conn_t *conn, int64 fd, bool need_lock)
 
 status_t gr_stop_server_impl(gr_conn_t *conn)
 {
-    return gr_msg_interact(conn, GR_CMD_STOP_SERVER, NULL, NULL);
+    LOG_DEBUG_INF("gr stop server entry");
+    status_t status = gr_msg_interact(conn, GR_CMD_STOP_SERVER, NULL, NULL);
+    LOG_DEBUG_INF("gr stop server leave, status:%d", status);
+    return status;
 }
 
 static status_t gr_encode_setcfg(gr_conn_t *conn, gr_packet_t *pack, void *send_info)
@@ -843,6 +940,13 @@ static status_t gr_decode_query_file_info(gr_packet_t *ack_pack, void *ack)
 }
 
 static status_t gr_decode_write_file(gr_packet_t *ack_pack, void *ack)
+{
+    int64 *info = (int64*)ack;
+    CM_RETURN_IFERR(gr_get_int64(ack_pack, info));
+    return CM_SUCCESS;
+}
+
+static status_t gr_decode_append_file(gr_packet_t *ack_pack, void *ack)
 {
     int64 *info = (int64*)ack;
     CM_RETURN_IFERR(gr_get_int64(ack_pack, info));
@@ -1001,6 +1105,16 @@ static status_t gr_encode_write_file(gr_conn_t *conn, gr_packet_t *pack, void *s
     return CM_SUCCESS;
 }
 
+static status_t gr_encode_append_file(gr_conn_t *conn, gr_packet_t *pack, void *send_info)
+{
+    gr_write_file_info_t *info = (gr_write_file_info_t *)send_info;
+    CM_RETURN_IFERR(gr_put_int32(pack, info->handle));
+    CM_RETURN_IFERR(gr_put_int64(pack, info->size));
+    CM_RETURN_IFERR(gr_put_sha256(pack, info->hash));
+    CM_RETURN_IFERR(gr_put_data(pack, info->buf, info->size));
+    return CM_SUCCESS;
+}
+
 static status_t gr_encode_read_file(gr_conn_t *conn, gr_packet_t *pack, void *send_info)
 {
     gr_read_file_info_t *info = (gr_read_file_info_t *)send_info;
@@ -1070,7 +1184,10 @@ static status_t gr_decode_create_file(gr_packet_t *ack_pack, void *ack)
 
 static status_t gr_encode_delete_file(gr_conn_t *conn, gr_packet_t *pack, void *send_info)
 {
-    return gr_put_str(pack, (const char *)send_info);
+    gr_remove_file_info_t *info = (gr_remove_file_info_t *)send_info;
+    CM_RETURN_IFERR(gr_put_str(pack, info->name));
+    CM_RETURN_IFERR(gr_put_int64(pack, info->attrFlag));
+    return CM_SUCCESS;
 }
 
 static status_t gr_decode_open_file(gr_packet_t *ack_pack, void *ack)
@@ -1102,6 +1219,7 @@ gr_packet_proc_t g_gr_packet_proc[GR_CMD_END] =
     [GR_CMD_CREATE_FILE] = {gr_encode_create_file, gr_decode_create_file, "create file"},
     [GR_CMD_DELETE_FILE] = {gr_encode_delete_file, NULL, "delete file"},
     [GR_CMD_WRITE_FILE] = {gr_encode_write_file, gr_decode_write_file, "write file"},
+    [GR_CMD_APPEND_FILE] = {gr_encode_append_file, gr_decode_append_file, "append file"},
     [GR_CMD_READ_FILE] = {gr_encode_read_file, gr_decode_read_file, "read file"},
     [GR_CMD_RENAME_FILE] = {gr_encode_rename_file, NULL, "rename file"},
     [GR_CMD_TRUNCATE_FILE] = {gr_encode_truncate_file, NULL, "truncate file"},

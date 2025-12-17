@@ -33,7 +33,9 @@
 #include "gr_param.h"
 #include "gr_param_sync.h"
 #include "gr_stats.h"
+#include "gr_stats.h"
 #include <stdint.h>
+#include <unistd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -288,6 +290,7 @@ static status_t gr_process_mount_vfs(gr_session_t *session)
     gr_init_get(&session->recv_pack);
     uint64_t handle;
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &vfs_name));
+    GR_LOG_DEBUG_OP("Begin to mount vfs:%s", vfs_name);
     
     if (gr_filesystem_opendir(vfs_name, &handle) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to mount vfs:%s", vfs_name);
@@ -303,6 +306,7 @@ static status_t gr_process_unmount_vfs(gr_session_t *session)
     uint64_t handle;
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, (int64 *)&handle));
+    GR_LOG_DEBUG_OP("Begin to unmount vfs, handle:%llu", (unsigned long long)handle);
     if (gr_filesystem_closedir(handle) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to unmount vfs");
         return CM_ERROR;
@@ -316,6 +320,7 @@ static status_t gr_process_query_file_num(gr_session_t *session)
     uint32_t file_num = 0;
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, (int64 *)&handle));
+    GR_LOG_DEBUG_OP("Begin to query file num, handle:%llu", (unsigned long long)handle);
     if (gr_filesystem_query_file_num(handle, &file_num) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to query file num for vfs");
         return CM_ERROR;
@@ -335,6 +340,7 @@ static status_t gr_process_query_file_info(gr_session_t *session)
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_get_int32(&session->recv_pack, (int32*)&is_continue));
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, (int64*)&handle));
+    GR_LOG_DEBUG_OP("Begin to query file info, handle:%llu, is_continue:%d", (unsigned long long)handle, is_continue);
 
     if (gr_filesystem_query_file_info(handle, file_items, GR_MAX_FILE_NUM, &file_count, is_continue) != CM_SUCCESS) {
         LOG_RUN_ERR("Failed to query file info for vfs");
@@ -395,13 +401,14 @@ static status_t gr_process_create_file(gr_session_t *session)
 static status_t gr_process_delete_file(gr_session_t *session)
 {
     char *name = NULL;
+    int64 attrFlag = 0;
     gr_init_get(&session->recv_pack);
-    status_t status = gr_get_str(&session->recv_pack, &name);
-    GR_RETURN_IFERR2(status, LOG_RUN_ERR("delete file get file name failed."));
+    GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &name));
+    GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &attrFlag));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%s", name));
     GR_LOG_DEBUG_OP("Begin to rm file:%s", name);
     GR_RETURN_IF_ERROR(gr_check_readwrite("delete file"));
-    status = gr_filesystem_rm(name);
+    status_t status = gr_filesystem_rm(name, attrFlag);
     if (status == CM_SUCCESS) {
         LOG_DEBUG_INF("Succeed to rm file:%s", name);
         return status;
@@ -418,6 +425,7 @@ static status_t gr_process_exist(gr_session_t *session)
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &name));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_QUERY, "%s", name));
+    GR_LOG_DEBUG_OP("Begin to check exist:%s", name);
     GR_RETURN_IF_ERROR(gr_exist_item(session, (const char *)name, &result, &type));
 
     GR_RETURN_IF_ERROR(gr_put_int32(&session->send_pack, (uint32_t)result));
@@ -485,6 +493,7 @@ static status_t gr_process_write_file(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &file_size));
     GR_RETURN_IF_ERROR(gr_get_sha256(&session->recv_pack, cli_hash));
     GR_RETURN_IF_ERROR(gr_get_data(&session->recv_pack, file_size, (void**)&buf));
+    GR_LOG_DEBUG_OP("Begin to write file, handle:%d, offset:%lld, size:%lld", handle, offset, file_size);
     GR_RETURN_IF_ERROR(gr_check_readwrite("write file"));
 
     status_t status = CM_SUCCESS;
@@ -506,7 +515,8 @@ static status_t gr_process_write_file(gr_session_t *session)
         }
         status = compare_sha256(cli_hash, combine_hash);
         if (status != CM_SUCCESS) {
-            LOG_RUN_ERR("combine hash return failed.");
+            LOG_RUN_ERR("Hash authentication failed: client hash does not match server calculated hash.");
+            GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "hash authentication failed");
             return CM_ERROR;
         }
     }
@@ -531,6 +541,76 @@ static status_t gr_process_write_file(gr_session_t *session)
     return CM_SUCCESS;
 }
 
+static status_t gr_process_append_file(gr_session_t *session)
+{
+    int64 file_size = 0;
+    int64 rel_size = 0;
+    int handle = 0;
+    char *buf = NULL;
+    unsigned char cli_hash[SHA256_DIGEST_LENGTH];
+    unsigned char data_hash[SHA256_DIGEST_LENGTH];
+    unsigned char session_curr_hash[SHA256_DIGEST_LENGTH];
+    unsigned char session_prev_hash[SHA256_DIGEST_LENGTH];
+    unsigned char combine_hash[SHA256_DIGEST_LENGTH];
+
+    gr_init_get(&session->recv_pack);
+    GR_RETURN_IF_ERROR(gr_get_int32(&session->recv_pack, &handle));
+    GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &file_size));
+    GR_RETURN_IF_ERROR(gr_get_sha256(&session->recv_pack, cli_hash));
+    GR_RETURN_IF_ERROR(gr_get_data(&session->recv_pack, file_size, (void**)&buf));
+    GR_LOG_DEBUG_OP("Begin to append file, handle:%d, size:%lld", handle, file_size);
+    GR_RETURN_IF_ERROR(gr_check_readwrite("append file"));
+
+    status_t status = CM_SUCCESS;
+    if (gr_get_hash_auth_enable()) {
+        status = calculate_data_hash(buf, file_size, data_hash);
+        if (status != CM_SUCCESS) {
+            GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to calculate data hash.");
+            LOG_RUN_ERR("Failed to calculate data hash.");
+            return CM_ERROR;
+        }
+        status = get_file_hash(session, handle, session_curr_hash, session_prev_hash);
+        if (status != CM_SUCCESS) {
+            GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to get session hash.");
+            LOG_RUN_ERR("Failed to get session hash.");
+            return CM_ERROR;
+        }
+        status = xor_sha256_hash(data_hash, session_curr_hash, combine_hash);
+        if (status != CM_SUCCESS) {
+            GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to calculate combine_hash.");
+            LOG_RUN_ERR("Failed to calculate combine_hash.");
+            return CM_ERROR;
+        }
+        status = compare_sha256(cli_hash, combine_hash);
+        if (status != CM_SUCCESS) {
+            GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Hash authentication failed: client hash does not match server calculated hash.");
+            LOG_RUN_ERR("Hash authentication failed: client hash does not match server calculated hash.");
+            return CM_ERROR;
+        }
+    }
+
+    timeval_t begin_tv_disk;
+    gr_begin_stat(&begin_tv_disk);
+    status = gr_filesystem_write(handle, file_size, buf, &rel_size);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("Failed to append to handle: %d, size: %lld", handle, file_size);
+        cm_panic(0);
+        return CM_ERROR;
+    }
+    gr_end_stat_base(&g_gr_instance.gr_instance_stat[GR_PWRITE_DISK], &begin_tv_disk);
+    if (gr_get_hash_auth_enable()) {
+        status = update_file_hash(session, handle, combine_hash);
+        if (status != CM_SUCCESS) {
+            GR_THROW_ERROR(ERR_GR_HASH_AUTH_FAILED, "Failed to update file hash.");
+            LOG_RUN_ERR("Failed to update file hash.");
+            return CM_ERROR;
+        }
+    }
+
+    GR_RETURN_IF_ERROR(gr_put_int64(&session->send_pack, rel_size));
+    return CM_SUCCESS;
+}
+
 static status_t gr_process_read_file(gr_session_t *session)
 {
     int handle = 0;
@@ -542,6 +622,7 @@ static status_t gr_process_read_file(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &offset));
     GR_RETURN_IF_ERROR(gr_get_int32(&session->recv_pack, &handle));
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &size));
+    GR_LOG_DEBUG_OP("Begin to read file, handle:%d, offset:%lld, size:%lld", handle, offset, size);
 
     if (size <= 0) {
         LOG_RUN_ERR("Invalid read size: %lld", size);
@@ -581,7 +662,7 @@ static status_t gr_process_truncate_file(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &truncateType));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY,
         "handle:%d, length:%ld", handle, length));
-    LOG_DEBUG_INF("Truncate file handle:%d, length:%lld", handle, length);
+    GR_LOG_DEBUG_OP("Begin to truncate file, handle:%d, length:%lld", handle, length);
     return gr_filesystem_truncate(handle, length);
 }
 
@@ -594,6 +675,7 @@ static status_t gr_process_stat_file(gr_session_t *session)
     time_t time;
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &name));
+    GR_LOG_DEBUG_OP("Begin to stat file:%s", name);
     GR_RETURN_IF_ERROR(gr_filesystem_stat(name, &offset, &size, &mode, &time));
     gr_put_int64(&session->send_pack, offset);
     gr_put_int64(&session->send_pack, size);
@@ -608,6 +690,7 @@ static status_t gr_process_stat_file(gr_session_t *session)
 static status_t gr_process_handshake(gr_session_t *session)
 {
     gr_init_get(&session->recv_pack);
+    GR_LOG_DEBUG_OP("Begin to process handshake, session:%u", session->id);
     session->client_version = gr_get_version(&session->recv_pack);
     uint32_t current_proto_ver = gr_get_master_proto_ver();
     session->proto_version = MIN(session->client_version, current_proto_ver);
@@ -647,6 +730,7 @@ static status_t gr_process_rename(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &src));
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &dst));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%s, %s", src, dst));
+    GR_LOG_DEBUG_OP("Begin to rename file, src:%s, dst:%s", src, dst);
     return CM_SUCCESS;
 }
 
@@ -716,6 +800,7 @@ void gr_end_instance_stat(timeval_t *begin_tv, gr_wait_event_e event)
 
 static status_t gr_process_get_time_stat(gr_session_t *session)
 {
+    GR_LOG_DEBUG_OP("Begin to get time stat, session:%u", session->id);
     uint64 size = sizeof(gr_stat_item_t) * GR_EVT_COUNT;
     gr_stat_item_t *time_stat = NULL;
     GR_RETURN_IF_ERROR(gr_reserv_text_buf(&session->send_pack, (uint32_t)size, (char **)&time_stat));
@@ -789,6 +874,7 @@ static status_t gr_process_setcfg(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &value));
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &scope));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%s", name));
+    GR_LOG_DEBUG_OP("Begin to set cfg, name:%s, value:%s, scope:%s", name, value, scope);
 
     // Forward sync parameters to master on standby node, non-sync parameters are processed locally
     gr_config_t *inst_cfg = gr_get_inst_cfg();
@@ -849,6 +935,7 @@ static status_t gr_process_stop_server(gr_session_t *session)
 {
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%u", session->id));
+    GR_LOG_DEBUG_OP("Begin to stop server, session:%u", session->id);
     g_gr_instance.abort_status = CM_TRUE;
 
     return CM_SUCCESS;
@@ -913,6 +1000,7 @@ static status_t gr_process_switch_lock(gr_session_t *session)
     if (gr_get_int32(&session->recv_pack, &switch_id) != CM_SUCCESS) {
         return CM_ERROR;
     }
+    GR_LOG_DEBUG_OP("Begin to switch lock, switch_id:%d", switch_id);
     cm_unlatch(&g_gr_instance.switch_latch, LATCH_STAT(LATCH_SWITCH));  // when mes process req, will latch s
     cm_latch_x(&g_gr_instance.switch_latch, session->id, LATCH_STAT(LATCH_SWITCH));
     gr_set_recover_thread_id(gr_get_current_thread_id());
@@ -955,6 +1043,7 @@ static status_t gr_process_postpone_file_time(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &name));
     GR_RETURN_IF_ERROR(gr_get_str(&session->recv_pack, &time));
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%s", name));
+    GR_LOG_DEBUG_OP("Begin to postpone file time, name:%s, time:%s", name, time);
     GR_RETURN_IF_ERROR(gr_postpone_file(session, (const char *)name, (const char *)time));
     LOG_DEBUG_INF("Succeed to extend file %s expired time", name);
     return CM_SUCCESS;
@@ -962,6 +1051,7 @@ static status_t gr_process_postpone_file_time(gr_session_t *session)
 
 static status_t gr_process_reload_certs(gr_session_t *session)
 {
+    GR_LOG_DEBUG_OP("Begin to reload certs, session:%u", session->id);
     GR_RETURN_IF_ERROR(ser_cert_reload());
     return CM_SUCCESS;
 }
@@ -969,6 +1059,7 @@ static status_t gr_process_reload_certs(gr_session_t *session)
 static status_t gr_process_get_disk_usage(gr_session_t *session)
 {
     gr_init_get(&session->recv_pack);
+    GR_LOG_DEBUG_OP("Begin to get disk usage, session:%u", session->id);
     gr_disk_usage_info_t info;
     gr_get_disk_usage_info(&info);
     
@@ -991,6 +1082,7 @@ static status_t gr_process_set_main_inst(gr_session_t *session)
     uint32_t master_id;
     GR_RETURN_IF_ERROR(
         gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "set %u as master", curr_id));
+    GR_LOG_DEBUG_OP("Begin to set main inst, curr_id:%u", curr_id);
     while (CM_TRUE) {
         master_id = gr_get_master_id();
         if (master_id == curr_id) {
@@ -1069,6 +1161,7 @@ static gr_cmd_hdl_t g_gr_cmd_handle[GR_CMD_TYPE_OFFSET(GR_CMD_END)] = {
     [GR_CMD_TYPE_OFFSET(GR_CMD_CREATE_FILE)] = {GR_CMD_CREATE_FILE, gr_process_create_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_DELETE_FILE)] = {GR_CMD_DELETE_FILE, gr_process_delete_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_WRITE_FILE)] = {GR_CMD_WRITE_FILE, gr_process_write_file, NULL, CM_FALSE},
+    [GR_CMD_TYPE_OFFSET(GR_CMD_APPEND_FILE)] = {GR_CMD_APPEND_FILE, gr_process_append_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_READ_FILE)] = {GR_CMD_READ_FILE, gr_process_read_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_RENAME_FILE)] = {GR_CMD_RENAME_FILE, gr_process_rename, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_TRUNCATE_FILE)] = {GR_CMD_TRUNCATE_FILE, gr_process_truncate_file, NULL, CM_FALSE},

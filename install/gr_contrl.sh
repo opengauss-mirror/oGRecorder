@@ -14,8 +14,8 @@ if [ ${file_user} != ${os_user} ]; then
 fi
 
 GR_BIN=grserver
-GR_BIN_FULL=${GR_HOME}/bin/grserver
-GR_BIN_CMD=${GR_HOME}/bin/grcmd
+GR_BIN_FULL=${GAUSSHOME}/bin/grserver
+GR_BIN_CMD=${GAUSSHOME}/bin/grcmd
 BIN_PATH=${GAUSSHOME}/bin
 SCRIPT_NAME=$0
 
@@ -32,7 +32,7 @@ usage()
     echo "    -isreg: check whether grserver is registered"
     echo "grserver_id:"
     echo "    grserver id"
-    echo "GR_HOME:"
+    echo "GAUSSHOME:"
     echo "    grserver data path"
     echo "GSDB_HOME:"
 }
@@ -173,7 +173,6 @@ function Check()
 
 CMD=${1}
 INSTANCE_ID=${2}
-export GR_HOME=${3}
 startgr_log=${GR_HOME}/startgr.log
 
 get_startgr_log()
@@ -213,7 +212,7 @@ function Start()
     else
         log "[START]Starting weserver..."
         log "[START]grserver"
-        #nohup ${GR_BIN_FULL} -D ${GR_HOME} >> ${startgr_log} 2>&1  &
+        #nohup ${GR_BIN_FULL} -D ${GAUSSHOME} >> ${startgr_log} 2>&1  &
         ${GR_BIN_FULL} -D ${GR_HOME} &
         log "[START]start grserver in ${GR_HOME} is starting."
     fi

@@ -63,6 +63,11 @@ typedef struct st_gr_create_file_info {
     uint32_t flag;
 } gr_create_file_info_t;
 
+typedef struct st_gr_remove_file_info {
+    const char *name;
+    uint64 attrFlag;
+} gr_remove_file_info_t;
+
 typedef struct st_gr_add_or_remove_info {
     const char *vg_name;
     const char *volume_name;
@@ -169,10 +174,9 @@ typedef struct st_gr_mount_vfs_info {
 typedef struct st_gr_get_server_info {
     char *home;
     uint32_t objectid;
-    bool32 hash_auth_enable;  // 添加HASH_AUTH_ENABLE参数
+    bool32 hash_auth_enable;
 } gr_get_server_info_t;
 
-// 获取连接中的HASH_AUTH_ENABLE参数
 bool32 gr_get_conn_hash_auth_enable(gr_conn_t *conn);
 
 typedef struct st_gr_fallocate_info {
@@ -216,7 +220,7 @@ status_t gr_vfs_delete_impl(gr_conn_t *conn, const char *dir, unsigned long long
 status_t gr_vfs_mount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle, unsigned long long attrFlag);
 status_t gr_vfs_unmount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle);
 status_t gr_create_file_impl(gr_conn_t *conn, const char *file_path, int flag);
-status_t gr_remove_file_impl(gr_conn_t *conn, const char *file_path);
+status_t gr_remove_file_impl(gr_conn_t *conn, const char *file_path, unsigned long long attrFlag);
 status_t gr_open_file_impl(gr_conn_t *conn, const char *file_path, int flag, gr_file_handle* file_handle);
 status_t gr_close_file_impl(gr_conn_t *conn, int handle, bool need_lock);
 status_t gr_exist_impl(gr_conn_t *conn, const char *path, bool32 *result, gft_item_type_t *type);
@@ -237,6 +241,7 @@ status_t gr_vfs_query_file_num_impl(gr_conn_t *conn, gr_vfs_handle vfs_handle, u
 status_t gr_vfs_query_file_info_impl(gr_conn_t *conn, gr_vfs_handle vfs_handle, gr_file_item_t *file_info, bool is_continue);
 
 int64 gr_pwrite_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const void *buf, unsigned long long size, long long offset);
+int64 gr_append_file_impl(gr_conn_t *conn, gr_file_handle *file_handle, const void *buf, unsigned long long size);
 int64 gr_pread_file_impl(gr_conn_t *conn, int handle, const void *buf, unsigned long long size, long long offset);
 status_t gr_setcfg_impl(gr_conn_t *conn, const char *name, const char *value, const char *scope);
 status_t gr_getcfg_impl(gr_conn_t *conn, const char *name, char *out_str, size_t str_len);

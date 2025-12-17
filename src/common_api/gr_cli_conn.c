@@ -109,7 +109,7 @@ status_t gr_conn_opts_create(pointer_t *result, const char *addr)
 {
     gr_conn_opt_t *options = (gr_conn_opt_t *)cm_malloc(sizeof(gr_conn_opt_t));
     if (options == NULL) {
-        GR_THROW_ERROR(ERR_ALLOC_MEMORY, sizeof(gr_conn_opt_t), "gr_conn_opts_create");
+        GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, sizeof(gr_conn_opt_t), "gr_conn_opts_create");
         return CM_ERROR;
     }
     (void)memset_s(options, sizeof(gr_conn_opt_t), 0, sizeof(gr_conn_opt_t));
@@ -137,7 +137,7 @@ status_t gr_conn_create(pointer_t *result, const char *addr)
 {
     gr_conn_t *conn = (gr_conn_t *)cm_malloc(sizeof(gr_conn_t));
     if (conn == NULL) {
-        GR_THROW_ERROR(ERR_ALLOC_MEMORY, sizeof(gr_conn_t), "gr_conn_create");
+        GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, sizeof(gr_conn_t), "gr_conn_create");
         return CM_ERROR;
     }
 
