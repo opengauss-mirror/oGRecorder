@@ -105,7 +105,7 @@ int main() {
     }
 
     // 删除文件
-    if (gr_file_delete(TEST_FILE1, g_inst_handle) != GR_SUCCESS) {
+    if (gr_file_delete(TEST_FILE1, g_inst_handle, 0) != GR_SUCCESS) {
         gr_get_error(&errorcode, &errormsg);
         fprintf(stderr, "Error deleting file: %d : %s\n", errorcode, errormsg);
         return EXIT_FAILURE;

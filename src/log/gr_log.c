@@ -82,7 +82,7 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
                                 Eg:server_locator=\"TCP:127.0.0.1:8080\"",
     [ERR_GR_RECV_MSG_FAILED] = "Recv msg failed, errcode:%d, inst:%u.",
     [ERR_GR_INIT_LOGGER_FAILED] = "Log init failed.",
-    [ERR_GR_OUT_OF_MEM] = "Failed to apply for memory.",
+    [ERR_GR_ALLOC_MEMORY] = "Failed to allocate memory.",
     [ERR_GR_INVALID_ID] = "Invalid %s id : %llu.",
     [ERR_GR_PROCESS_REMOTE] = "Failed to process remote, errcode: %d, errmsg: %s.",
     [ERR_GR_CONNECT_FAILED] = "Failed to connect gr server, errcode: %d, errmsg: %s.",
@@ -99,7 +99,8 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_MEM_CMP_FAILED] = "pwrite failed to compare hash",
     [ERR_GR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s.",
     [ERR_GR_WHITELIST_INVALID] = "GR handshake rejected: IP %s not in whitelist",
-    [ERR_GR_CALL_SERVER_FAILED] = "gr client call server failed."
+    [ERR_GR_CALL_SERVER_FAILED] = "gr client call server failed.",
+    [ERR_GR_HASH_AUTH_FAILED] = "Hash authentication failed: %s"
 };
 
 gr_log_def_t g_gr_cmd_log[] = {

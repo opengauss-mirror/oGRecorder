@@ -220,7 +220,7 @@ status_t gr_simulation_cm_res_mgr_init(const char *so_lib_path, cm_res_mgr_t *cm
     LOG_RUN_INF("[GR][simulation_cm]Start simulate cm.");
     char *cm_simulation_path = (char *)malloc(CM_SIMULATION_PATH_LEN + 1);
     if (cm_simulation_path == NULL) {
-        CM_THROW_ERROR(ERR_ALLOC_MEMORY, CM_SIMULATION_PATH_LEN + 1, "simulation cm");
+        CM_THROW_ERROR(ERR_GR_ALLOC_MEMORY, CM_SIMULATION_PATH_LEN + 1, "simulation cm");
         return CM_ERROR;
     }
     errno_t rc = strcpy_s(cm_simulation_path, CM_SIMULATION_PATH_LEN + 1, so_lib_path);

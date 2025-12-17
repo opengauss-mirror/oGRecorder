@@ -106,7 +106,7 @@ void test_gr_file_open(gr_vfs_handle vfs, const char *fileName, int flags, gr_fi
 }
 
 void test_gr_file_delete(gr_vfs_handle vfs, const char *fileName){
-    int ret = gr_file_delete(vfs, fileName);
+    int ret = gr_file_delete(vfs, fileName, 0);
     if (ret!= 0 ) {
         gr_get_error(&errorcode, &errormsg);
         printf("gr_file_delete interaction failure. code:%d msg:%s\n", errorcode, errormsg);

@@ -43,6 +43,92 @@ if (VG_FILE_LOCK)
     message(STATUS "vg file lock on")
 endif (VG_FILE_LOCK)
 
+# ==================== ARM 优化配置 ====================
+# 自动检测ARM平台并启用优化
+# 编译时硬编码选择实现分支，无运行时开销
+
+# 自动检测ARM平台
+set(IS_ARM_PLATFORM FALSE)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|ARM|aarch64|ARM64|arm64")
+    set(IS_ARM_PLATFORM TRUE)
+    message(STATUS "Detected ARM platform: ${CMAKE_SYSTEM_PROCESSOR}")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # 尝试通过uname检测
+    find_program(UNAME_EXECUTABLE uname)
+    if(UNAME_EXECUTABLE)
+        execute_process(
+            COMMAND ${UNAME_EXECUTABLE} -m
+            OUTPUT_VARIABLE UNAME_MACHINE
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(UNAME_MACHINE MATCHES "arm|aarch64|arm64")
+            set(IS_ARM_PLATFORM TRUE)
+            message(STATUS "Detected ARM platform via uname: ${UNAME_MACHINE}")
+        endif()
+    endif()
+endif()
+
+# 根据检测结果自动设置
+if(IS_ARM_PLATFORM)
+    set(ENABLE_ARM_NEON ON)
+    set(ENABLE_ARM_CRC32 ON)
+    message(STATUS "ARM optimizations: ENABLED (ARM platform detected)")
+else()
+    set(ENABLE_ARM_NEON OFF)
+    set(ENABLE_ARM_CRC32 OFF)
+    message(STATUS "ARM optimizations: DISABLED (not ARM platform)")
+endif()
+
+# 应用ARM NEON优化
+if(ENABLE_ARM_NEON)
+    message(STATUS "ARM NEON optimization: ENABLED")
+    add_definitions(-DENABLE_ARM_NEON)
+    
+    # 检测并设置编译选项
+    include(CheckCCompilerFlag)
+    check_c_compiler_flag("-march=armv8-a+simd" COMPILER_SUPPORTS_ARM_NEON)
+    if(COMPILER_SUPPORTS_ARM_NEON)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a+simd")
+        message(STATUS "  Using ARMv8 NEON instructions")
+    else()
+        check_c_compiler_flag("-mfpu=neon" COMPILER_SUPPORTS_ARM_NEON_V7)
+        if(COMPILER_SUPPORTS_ARM_NEON_V7)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon -march=armv7-a")
+            message(STATUS "  Using ARMv7 NEON instructions")
+        else()
+            message(WARNING "  Compiler may not support NEON, but ENABLE_ARM_NEON=ON")
+            message(WARNING "  Continuing anyway - ensure your compiler supports NEON")
+        endif()
+    endif()
+else()
+    message(STATUS "ARM NEON optimization: DISABLED (using generic 64-bit implementation)")
+endif()
+
+# 应用ARM CRC32优化
+if(ENABLE_ARM_CRC32)
+    message(STATUS "ARM CRC32 hardware acceleration: ENABLED")
+    add_definitions(-DENABLE_ARM_CRC32)
+    
+    include(CheckCCompilerFlag)
+    check_c_compiler_flag("-march=armv8-a+crc" COMPILER_SUPPORTS_ARM_CRC32)
+    if(COMPILER_SUPPORTS_ARM_CRC32)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a+crc")
+        message(STATUS "  Using ARMv8 CRC32 instructions")
+    else()
+        message(WARNING "  Compiler may not support CRC32, but ENABLE_ARM_CRC32=ON")
+        message(WARNING "  Continuing anyway - ensure your compiler supports CRC32")
+    endif()
+else()
+    message(STATUS "ARM CRC32 hardware acceleration: DISABLED")
+endif()
+
+# ARM平台通用优化
+if(ENABLE_ARM_NEON AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mtune=native")
+    message(STATUS "  Added -mtune=native for Release build")
+endif()
+# ==================== ARM 优化配置结束 ====================
+
 EXECUTE_PROCESS(
         COMMAND bash -c "git rev-parse HEAD | cut -b 1-8"
         OUTPUT_VARIABLE COMMIT_ID

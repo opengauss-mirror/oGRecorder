@@ -90,10 +90,10 @@ static status_t gr_is_valid_name_char(char name)
     if (!is_number(name) && !is_letter(name) && name != '_' && name != '.' && name != '-') {
         return CM_ERROR;
     }
-
-    return CM_SUCCESS;
-}
-
+    
+        return CM_SUCCESS;
+    }
+    
 static status_t gr_is_valid_path_char(char name)
 {
     if (name != '/' && gr_is_valid_name_char(name) != CM_SUCCESS) {
@@ -104,7 +104,8 @@ static status_t gr_is_valid_path_char(char name)
 
 static status_t gr_check_name_is_valid(const char *name, uint32_t path_max_size)
 {
-    if (strlen(name) >= path_max_size) {
+    size_t name_len = strlen(name);
+    if (name_len >= path_max_size) {
         GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, name, ", name is too long"));
     }
     if (cm_str_equal(name, GR_DIR_PARENT) || cm_str_equal(name, GR_DIR_SELF)) {
@@ -112,7 +113,7 @@ static status_t gr_check_name_is_valid(const char *name, uint32_t path_max_size)
         return CM_ERROR;
     }
 
-    for (uint32_t i = 0; i < strlen(name); i++) {
+    for (uint32_t i = 0; i < name_len; i++) {
         status_t status = gr_is_valid_name_char(name[i]);
         GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, name, ", name should be [0~9,a~z,A~Z,-,_,.]"));
     }
@@ -121,12 +122,13 @@ static status_t gr_check_name_is_valid(const char *name, uint32_t path_max_size)
 
 static status_t gr_check_path_is_valid(const char *path, uint32_t path_max_size)
 {
-    if (strlen(path) >= path_max_size) {
+    size_t path_len = strlen(path);
+    if (path_len >= path_max_size) {
         GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, path, ", path is too long\n");
         return CM_ERROR;
     }
 
-    for (uint32_t i = 0; i < strlen(path); i++) {
+    for (uint32_t i = 0; i < path_len; i++) {
         if (gr_is_valid_path_char(path[i]) != CM_SUCCESS) {
             GR_RETURN_IFERR2(
                 CM_ERROR, GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, path, ", path should be [0~9,a~z,A~Z,-,_,/,.]"));

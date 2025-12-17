@@ -66,8 +66,8 @@ protected:
         EXPECT_EQ(gr_file_close(g_vfs_handle1, &file_handle1, true), GR_SUCCESS);
         EXPECT_EQ(gr_file_close(g_vfs_handle1, &file_handle2, true), GR_SUCCESS);
 #ifndef ENABLE_WORM
-        EXPECT_EQ(gr_file_delete(g_vfs_handle1, TEST_FILE1), GR_SUCCESS);
-        EXPECT_EQ(gr_file_delete(g_vfs_handle1, TEST_FILE2), GR_SUCCESS);
+        EXPECT_EQ(gr_file_delete(g_vfs_handle1, TEST_FILE1, 0), GR_SUCCESS);
+        EXPECT_EQ(gr_file_delete(g_vfs_handle1, TEST_FILE2, 0), GR_SUCCESS);
 #endif
         EXPECT_EQ(gr_vfs_unmount(&g_vfs_handle1), GR_SUCCESS);
         EXPECT_EQ(gr_vfs_unmount(&g_vfs_handle2), GR_SUCCESS);

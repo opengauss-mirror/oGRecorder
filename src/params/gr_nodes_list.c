@@ -59,7 +59,7 @@ static status_t gr_alloc_and_extract_inst_addrs(char *nodes_list_str, uint32_t *
     size_t mes_addrs_size = nodes_list.inst_cnt * sizeof(mes_addr_t);
     *inst_addrs = (mes_addr_t *)cm_malloc(mes_addrs_size);
     if (*inst_addrs == NULL) {
-        GR_THROW_ERROR(ERR_ALLOC_MEMORY, mes_addrs_size, "gr_extract_inst_addrs");
+        GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, mes_addrs_size, "gr_extract_inst_addrs");
         return CM_ERROR;
     }
     errno_t err = memset_sp(*inst_addrs, mes_addrs_size, 0, mes_addrs_size);

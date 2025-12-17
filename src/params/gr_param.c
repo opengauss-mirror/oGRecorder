@@ -544,20 +544,54 @@ static status_t gr_load_delay_clean_interval(gr_config_t *inst_cfg)
 
 status_t gr_load_ser_ssl_params(gr_config_t *inst_cfg)
 {
+    const char *gr_home = getenv("GR_HOME");
+    if (gr_home == NULL) {
+        GR_RETURN_IFERR2(CM_ERROR, GR_PRINT_ERROR("Environment variant GR_HOME not found!\n"));
+    }
+    char default_path[CM_MAX_PATH_LEN];
+
     char *value = cm_get_config_value(&inst_cfg->config, "SER_SSL_CA");
-    status_t status = gr_set_cert_param("SER_SSL_CA", value);
+    const char *ca_val = value;
+    if (ca_val == NULL || ca_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/cacert.pem", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CA"));
+        }
+        ca_val = default_path;
+    }
+    status_t status = gr_set_cert_param("SER_SSL_CA", ca_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CA"));
 
     value = cm_get_config_value(&inst_cfg->config, "SER_SSL_KEY");
-    status = gr_set_cert_param("SER_SSL_KEY", value);
+    const char *key_val = value;
+    if (key_val == NULL || key_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/server.key", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_KEY"));
+        }
+        key_val = default_path;
+    }
+    status = gr_set_cert_param("SER_SSL_KEY", key_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_KEY"));
 
     value = cm_get_config_value(&inst_cfg->config, "SER_SSL_CERT");
-    status = gr_set_cert_param("SER_SSL_CERT", value);
+    const char *cert_val = value;
+    if (cert_val == NULL || cert_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/server.crt", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CERT"));
+        }
+        cert_val = default_path;
+    }
+    status = gr_set_cert_param("SER_SSL_CERT", cert_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CERT"));
 
     value = cm_get_config_value(&inst_cfg->config, "SER_SSL_CRL");
-    status = gr_set_cert_param("SER_SSL_CRL", value);
+    const char *crl_val = value;
+    if (crl_val == NULL || crl_val[0] == '\0') {
+        if (snprintf(default_path, sizeof(default_path), "%s/CA/server.crl", gr_home) >= (int)sizeof(default_path)) {
+            GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CRL"));
+        }
+        crl_val = default_path;
+    }
+    status = gr_set_cert_param("SER_SSL_CRL", crl_val);
     GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "SER_SSL_CRL"));
 
     return CM_SUCCESS;

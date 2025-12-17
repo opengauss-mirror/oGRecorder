@@ -139,6 +139,11 @@ status_t gr_extend_session(uint32_t extend_num)
         if (g_gr_session_ctrl.sessions[i] == NULL) {
             LOG_RUN_ERR("Failed to alloc memory for session %u.", i);
             GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "Failed to alloc memory for session %u.", i);
+            for (uint32_t j = old_alloc_sessions; j < i; j++) {
+                CM_FREE_PTR(g_gr_session_ctrl.sessions[j]);
+                g_gr_session_ctrl.sessions[j] = NULL;
+            }
+            g_gr_session_ctrl.alloc_sessions = old_alloc_sessions;
             return CM_ERROR;
         }
         
@@ -146,7 +151,13 @@ status_t gr_extend_session(uint32_t extend_num)
         if (err != EOK) {
             LOG_RUN_ERR("Failed to initialize session %u memory.", i);
             CM_FREE_PTR(g_gr_session_ctrl.sessions[i]);
+            g_gr_session_ctrl.sessions[i] = NULL;
             GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "Failed to initialize session %u memory.", i);
+            for (uint32_t j = old_alloc_sessions; j < i; j++) {
+                CM_FREE_PTR(g_gr_session_ctrl.sessions[j]);
+                g_gr_session_ctrl.sessions[j] = NULL;
+            }
+            g_gr_session_ctrl.alloc_sessions = old_alloc_sessions;
             return CM_ERROR;
         }
         
@@ -481,7 +492,7 @@ status_t update_file_hash(gr_session_t *session, uint32_t file_handle, const uin
     
     // Search Existing Records
     for (uint32_t i = 0; i < mgr->hash_count; i++) {
-        if (mgr->hash_items[i].file_handle == file_handle) {
+        if (SECUREC_LIKELY(mgr->hash_items[i].file_handle == file_handle)) {
             err = memcpy_s(mgr->hash_items[i].prev_hash, SHA256_DIGEST_LENGTH, 
                             mgr->hash_items[i].curr_hash, SHA256_DIGEST_LENGTH);
             if (err != EOK) {

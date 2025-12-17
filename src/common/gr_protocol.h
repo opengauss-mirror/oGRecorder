@@ -61,6 +61,7 @@ typedef enum {
     GR_CMD_CREATE_FILE,
     GR_CMD_DELETE_FILE,
     GR_CMD_WRITE_FILE,
+    GR_CMD_APPEND_FILE,
     GR_CMD_READ_FILE,
     GR_CMD_RENAME_FILE,
     GR_CMD_TRUNCATE_FILE,
@@ -115,11 +116,12 @@ typedef struct st_gr_packet_head {
 } gr_packet_head_t;
 
 typedef enum en_gr_packet_version {
-    GR_VERSION_0 = 0, /* version 0 */
+    GR_VERSION_0 = 0, /* version basic */
     GR_VERSION_1 = 1, /* version 1 */
 } gr_packet_version_e;
 
 #define GR_PROTO_VERSION GR_VERSION_1
+
 #define GR_INVALID_VERSION (int32_t)0x7FFFFFFF
 
 #define GR_PACKET_SIZE(pack) ((pack)->head->size)
@@ -341,20 +343,14 @@ static inline status_t calculate_data_hash(const void *data, size_t size, uint8_
 }
 
 // combine_hash = data_hash ^ pre_hash
+// 通过 ENABLE_ARM_NEON 编译宏控制使用ARM NEON或通用实现
+#include "gr_arm_optimized.h"
+
 static inline status_t xor_sha256_hash(const uint8_t *data_hash,
                         const uint8_t *pre_hash, uint8_t *combine_hash)
 {
-    if (data_hash == NULL || pre_hash == NULL || combine_hash == NULL) {
-        LOG_RUN_ERR("[hash]: invalid param.");
-        return CM_ERROR;
-    }
-
-    // XOR operation on bytes
-    for (size_t i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        combine_hash[i] = data_hash[i] ^ pre_hash[i];
-    }
-
-    return CM_SUCCESS;
+    // 编译时已选择实现分支，直接调用
+    return xor_sha256_hash_impl(data_hash, pre_hash, combine_hash);
 }
 
 static inline status_t gr_get_data(gr_packet_t *pack, uint32_t size, void **buf)
@@ -465,23 +461,13 @@ static inline void gr_free_packet_buffer(gr_packet_t *pack)
     }
 }
 
+// 通过 ENABLE_ARM_NEON 编译宏控制使用ARM NEON或通用实现
+// 常量时间比较可以防止通过时间差推断哈希值（安全特性）
 static inline status_t compare_sha256(
     const unsigned char *hash1, const unsigned char *hash2)
 {
-    if (hash1 == NULL || hash2 == NULL) {
-        LOG_RUN_ERR("[hash]: invalid param, failed to compare hash");
-        return CM_ERROR;
-    }
-
-    errno_t err = memcmp(hash1, hash2, SHA256_DIGEST_LENGTH);
-    
-    if (err != EOK) {
-        LOG_RUN_ERR("[hash]: failed to compare hash, errno:%d", err);
-        GR_THROW_ERROR(ERR_GR_MEM_CMP_FAILED);
-        return CM_ERROR;
-    }
-
-    return CM_SUCCESS;
+    // 编译时已选择实现分支，直接调用
+    return compare_sha256_impl(hash1, hash2);
 }
 
 status_t gr_put_text(gr_packet_t *pack, text_t *text);

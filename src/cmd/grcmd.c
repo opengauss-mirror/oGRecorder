@@ -599,65 +599,6 @@ static void create_client_certs(const char *certs_path, int days) {
     system(cmd);
 }
 
-static void create_server_conf(const char *conf_file, const char *ser_ca, const char *ser_key, const char *ser_cert, const char *ser_crl) {
-    // 如果配置文件中已存在相关键，则不重复写入
-    FILE *rf = fopen(conf_file, "r");
-    int has_ca = 0, has_key = 0, has_cert = 0, has_crl = 0, has_header = 0;
-    if (rf) {
-        char line[1024];
-        while (fgets(line, sizeof(line), rf) != NULL) {
-            if (strstr(line, "# ==================== Server SSL Configuration ====================") != NULL) {
-                has_header = 1;
-            }
-            if (strncmp(line, "SER_SSL_CA=", 11) == 0)   has_ca = 1;
-            if (strncmp(line, "SER_SSL_KEY=", 12) == 0)  has_key = 1;
-            if (strncmp(line, "SER_SSL_CERT=", 13) == 0) has_cert = 1;
-            if (strncmp(line, "SER_SSL_CRL=", 12) == 0)  has_crl = 1;
-        }
-        fclose(rf);
-    }
-    if (has_ca && has_key && has_cert && has_crl) {
-        return; // 已存在全部条目，不再写入
-    }
-    FILE *fp = fopen(conf_file, "a");
-    if (!fp) return;
-    if (!has_header) {
-        fprintf(fp, "\n# ==================== Server SSL Configuration ====================\n");
-        fprintf(fp, "# 服务端SSL配置（自动生成）\n");
-    }
-    if (!has_ca)   fprintf(fp, "SER_SSL_CA=%s\n", ser_ca);
-    if (!has_key)  fprintf(fp, "SER_SSL_KEY=%s\n", ser_key);
-    if (!has_cert) fprintf(fp, "SER_SSL_CERT=%s\n", ser_cert);
-    if (!has_crl)  fprintf(fp, "SER_SSL_CRL=%s\n", ser_crl);
-    fclose(fp);
-}
-
-static void create_client_conf(const char *conf_file, const char *cli_ca, const char *cli_key, const char *cli_cert, const char *cli_crl) {
-    // 若配置文件已有证书相关键，则不重复写入；否则按需追加缺失项
-    int has_ca = 0, has_key = 0, has_cert = 0, has_crl = 0;
-    FILE *rf = fopen(conf_file, "r");
-    if (rf) {
-        char line[1024];
-        while (fgets(line, sizeof(line), rf) != NULL) {
-            if (strncmp(line, "CLI_SSL_CA=", 11) == 0)   has_ca = 1;
-            if (strncmp(line, "CLI_SSL_KEY=", 12) == 0)  has_key = 1;
-            if (strncmp(line, "CLI_SSL_CERT=", 13) == 0) has_cert = 1;
-            if (strncmp(line, "CLI_SSL_CRL=", 12) == 0)  has_crl = 1;
-        }
-        fclose(rf);
-    }
-    if (has_ca && has_key && has_cert) {
-        return; // 已存在主要条目，不再写入
-    }
-    FILE *fp = fopen(conf_file, "a");
-    if (!fp) return;
-    if (!has_ca)   fprintf(fp, "CLI_SSL_CA=%s\n", cli_ca);
-    if (!has_key)  fprintf(fp, "CLI_SSL_KEY=%s\n", cli_key);
-    if (!has_cert) fprintf(fp, "CLI_SSL_CERT=%s\n", cli_cert);
-    if (!has_crl)  fprintf(fp, "CLI_SSL_CRL=%s\n", cli_crl);
-    fclose(fp);
-}
-
 static void check_certs_permission(const char *filename) {
     chmod(filename, GR_PERM_FILE);
 }
@@ -710,7 +651,7 @@ static status_t gencert_proc(void)
             return CM_ERROR;
         }
     }
-    char certs_path[CM_MAX_PATH_LEN], conf_file[CM_MAX_PATH_LEN];
+    char certs_path[CM_MAX_PATH_LEN];
     if (snprintf(certs_path, sizeof(certs_path), "%s/CA", gr_home) >= sizeof(certs_path)) {
         printf("certs_path too long, path buffer overflow!\n");
         return CM_ERROR;
@@ -722,10 +663,6 @@ static status_t gencert_proc(void)
     }
 
     if (strcmp(type, "client") == 0) {
-        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/gr_cli_inst.ini", gr_home) >= sizeof(conf_file)) {
-            printf("conf_file path too long!\n");
-            return CM_ERROR;
-        }
         char cli_ca[CM_MAX_PATH_LEN], cli_key[CM_MAX_PATH_LEN], cli_cert[CM_MAX_PATH_LEN], cli_crl[CM_MAX_PATH_LEN];
         if (snprintf(cli_ca, sizeof(cli_ca), "%s/cacert.pem", certs_path) >= sizeof(cli_ca) ||
             snprintf(cli_key, sizeof(cli_key), "%s/client.key", certs_path) >= sizeof(cli_key) ||
@@ -735,7 +672,6 @@ static status_t gencert_proc(void)
             return CM_ERROR;
         }
         create_client_certs(certs_path, days);
-        create_client_conf(conf_file, cli_ca, cli_key, cli_cert, cli_crl);
         if (!file_exists(cli_ca) || !file_exists(cli_key) || !file_exists(cli_cert)) {
             printf("Please check following client certs whether exist: cacert.pem, client.key, client.crt .\n");
             return CM_ERROR;
@@ -746,10 +682,6 @@ static status_t gencert_proc(void)
         check_certs_expired(cli_ca, cli_cert);
         printf("Client certs generated and checked successfully.\n");
     } else if (strcmp(type, "server") == 0) {
-        if (snprintf(conf_file, sizeof(conf_file), "%s/cfg/gr_inst.ini", gr_home) >= sizeof(conf_file)) {
-            printf("conf_file path too long!\n");
-            return CM_ERROR;
-        }
         char ser_ca[CM_MAX_PATH_LEN], ser_key[CM_MAX_PATH_LEN], ser_cert[CM_MAX_PATH_LEN], ser_crl[CM_MAX_PATH_LEN];
         if (snprintf(ser_ca, sizeof(ser_ca), "%s/cacert.pem", certs_path) >= sizeof(ser_ca) ||
             snprintf(ser_key, sizeof(ser_key), "%s/server.key", certs_path) >= sizeof(ser_key) ||
@@ -768,7 +700,6 @@ static status_t gencert_proc(void)
             prepare_certs_path(certs_path);
         }
         generate_root_cert(certs_path, days);
-        create_server_conf(conf_file, ser_ca, ser_key, ser_cert, ser_crl);
         create_server_certs(certs_path, days);
         if (!file_exists(ser_ca) || !file_exists(ser_key) || !file_exists(ser_cert)) {
             printf("Please check following server certs whether exist: cacert.pem, server.key, server.crt .\n");
