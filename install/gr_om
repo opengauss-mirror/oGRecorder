@@ -6345,31 +6345,35 @@ EOF
                             ("installation path of designated user [%s]" % user))
 
         # stop cluster
-        stop_cmd = "cm_ctl stop"
-        status, output = subprocess.getstatusoutput(stop_cmd)
-        if status != 0:
-            error_msg = f"failed to stop oGRecorder cluster. Error output:\n{output}"
-            print(f"{RED}{error_msg}{NC}")
-            raise Exception(error_msg)
-        print(f"{GREEN}Successfully stop cluster{NC}")
+        gausshome = self.__getEnvironmentParameterValue("GAUSSHOME", user)
+        if os.path.exists(os.path.join(gausshome, "bin", "cm_ctl")):
+            stop_cmd = "cm_ctl stop"
+            status, output = subprocess.getstatusoutput(stop_cmd)
+            if status != 0:
+                error_msg = f"failed to stop oGRecorder cluster. Error output:\n{output}"
+                print(f"{RED}{error_msg}{NC}")
+                raise Exception(error_msg)
+            print(f"{GREEN}Successfully stop cluster{NC}")
 
         # kill cmrestapi
-        for node in nodes:
-            node_name = node['name']
-            node_ip = node['ip']
+        cmrestapi_path = os.path.join(gausshome, "bin", "cmrestapi-7.0.0-RC2-RELEASE.jar")
+        if os.path.exists(cmrestapi_path):
+            for node in nodes:
+                node_name = node['name']
+                node_ip = node['ip']
 
-            print(f"{GREEN}[{node_name}] Starting to stop restapi...{NC}")
+                print(f"{GREEN}[{node_name}] Starting to stop restapi...{NC}")
 
-            # Build command - $2 in single quotes won't be interpreted by shell
-            cmd = f"ps aux | grep 'cmrestapi-7.0.0-RC2-RELEASE.jar' | grep -v grep | awk '{{print $2}}' | xargs kill -9 2>/dev/null"
-            if node_ip == socket.gethostbyname(socket.gethostname()):
-                # Local node
-                status, output = subprocess.getstatusoutput(cmd)
-            else:
-                # Remote node - escape single quotes for SSH
-                escaped_cmd = cmd.replace("'", "'\\''")
-                ssh_cmd = f"ssh -q -o ConnectTimeout=5 {user}@{node_ip} '{escaped_cmd}'"
-                status, output = subprocess.getstatusoutput(ssh_cmd)
+                # Build command - $2 in single quotes won't be interpreted by shell
+                cmd = f"ps aux | grep 'cmrestapi-7.0.0-RC2-RELEASE.jar' | grep -v grep | awk '{{print $2}}' | xargs kill -9 2>/dev/null"
+                if node_ip == socket.gethostbyname(socket.gethostname()):
+                    # Local node
+                    status, output = subprocess.getstatusoutput(cmd)
+                else:
+                    # Remote node - escape single quotes for SSH
+                    escaped_cmd = cmd.replace("'", "'\\''")
+                    ssh_cmd = f"ssh -q -o ConnectTimeout=5 {user}@{node_ip} '{escaped_cmd}'"
+                    status, output = subprocess.getstatusoutput(ssh_cmd)
 
         # Clean directories on each node
         for node in nodes:
