@@ -825,7 +825,7 @@ status_t gr_get_disk_usage_impl(gr_conn_t *conn, gr_disk_usage_info_t *info)
     info->total_bytes = ack_info.total_bytes;
     info->used_bytes = ack_info.used_bytes;
     info->usage_percent = ack_info.usage_percent;
-    LOG_DEBUG_INF("gr get disk usage leave, total:%lld, used:%lld, avail:%lld",
+    LOG_DEBUG_INF("gr get disk usage leave, total:%lu, used:%lu, avail:%lu",
         info->total_bytes, info->used_bytes, info->available_bytes);
     return CM_SUCCESS;
 }
