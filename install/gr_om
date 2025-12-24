@@ -4643,23 +4643,23 @@ class dbClusterInfo():
         # 修改配置文件
         for i, dbNode in enumerate(clusterInfo.dbNodes):
             config_content = (
-                f"INST_ID={i}\n"
-                f"LOG_LEVEL=255\n"
-                f"gr_nodes_list={clusterInfo.gr_nodes_list}\n"
-                f"LISTEN_ADDR={dbNode.listen_addr}\n"
-                f"IP_WHITE_LIST={ip_white_list}\n"
-                f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
-                f"SER_SSL_CA={clusterInfo.wormPath}/CA/cacert.pem\n"
-                f"SER_SSL_KEY={clusterInfo.wormPath}/CA/server.key\n"
-                f"SER_SSL_CERT={clusterInfo.wormPath}/CA/server.crt\n"
-                f"SER_SSL_CRL={clusterInfo.wormPath}/CA/server.crl\n"
+                f"INST_ID = {i}\n"
+                f"LOG_LEVEL = 255\n"
+                f"GR_NODES_LIST = {clusterInfo.gr_nodes_list}\n"
+                f"LISTEN_ADDR = {dbNode.listen_addr}\n"
+                f"IP_WHITE_LIST = {ip_white_list}\n"
+                f"DATA_FILE_PATH = {clusterInfo.wormPath}\n"
+                f"SER_SSL_CA = {clusterInfo.wormPath}/CA/cacert.pem\n"
+                f"SER_SSL_KEY = {clusterInfo.wormPath}/CA/server.key\n"
+                f"SER_SSL_CERT = {clusterInfo.wormPath}/CA/server.crt\n"
+                f"SER_SSL_CRL = {clusterInfo.wormPath}/CA/server.crl\n"
             )
 
             cli_config_content = (
-                f"CLI_SSL_CA={clusterInfo.wormPath}/CA/cacert.pem\n"
-                f"CLI_SSL_KEY={clusterInfo.wormPath}/CA/client.key\n"
-                f"CLI_SSL_CERT={clusterInfo.wormPath}/CA/client.crt\n"
-                f"CLI_SSL_CRL={clusterInfo.wormPath}/CA/client.crl\n"
+                f"CLI_SSL_CA = {clusterInfo.wormPath}/CA/cacert.pem\n"
+                f"CLI_SSL_KEY = {clusterInfo.wormPath}/CA/client.key\n"
+                f"CLI_SSL_CERT = {clusterInfo.wormPath}/CA/client.crt\n"
+                f"CLI_SSL_CRL = {clusterInfo.wormPath}/CA/client.crl\n"
             )
             cmd = f"mkdir -p {parent_dir} && " \
                   f"printf \"%s\" \"{config_content}\" > {cfg_path} && " \

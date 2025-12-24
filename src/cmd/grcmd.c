@@ -1013,7 +1013,7 @@ static status_t get_ssl_path(const char *config_file_path, char *ssl_conf_path, 
     }
     FILE *fp = fopen(config_file_path, "r");
     if (fp == NULL) {
-        printf("Failed to open config file: %s\n", config_file_path);
+        GR_PRINT_ERROR("Failed to open config file: %s\n", config_file_path);
         return CM_ERROR;
     }
     char line[1024];
@@ -1024,25 +1024,33 @@ static status_t get_ssl_path(const char *config_file_path, char *ssl_conf_path, 
             continue;
         }
 
-        if (strncmp(line, "CLI_SSL_CA=", 11) == 0) {
-            char *value = line + 11;
-            /* Skip leading whitespace */
-            while (*value == ' ' || *value == '\t') {
-                value++;
+        /* Match CLI_SSL_CA with flexible format: "CLI_SSL_CA = value" or "CLI_SSL_CA=value" */
+        if (strstr(line, "CLI_SSL_CA") != NULL) {
+            char *equal_sign = strchr(line, '=');
+            if (equal_sign != NULL) {
+                char *value = equal_sign + 1;
+                /* Skip leading whitespace */
+                while (*value == ' ' || *value == '\t') {
+                    value++;
+                }
+                strncpy(file_path, value, sizeof(file_path) - 1);
+                file_path[sizeof(file_path) - 1] = '\0';
+                break;
             }
-            strncpy(file_path, value, sizeof(file_path) - 1);
-            file_path[sizeof(file_path) - 1] = '\0';
-            break;
         }
-        if (strncmp(line, "SER_SSL_CA=", 11) == 0) {
-            char *value = line + 11;
-            /* Skip leading whitespace */
-            while (*value == ' ' || *value == '\t') {
-                value++;
+        /* Match SER_SSL_CA with flexible format: "SER_SSL_CA = value" or "SER_SSL_CA=value" */
+        if (strstr(line, "SER_SSL_CA") != NULL) {
+            char *equal_sign = strchr(line, '=');
+            if (equal_sign != NULL) {
+                char *value = equal_sign + 1;
+                /* Skip leading whitespace */
+                while (*value == ' ' || *value == '\t') {
+                    value++;
+                }
+                strncpy(file_path, value, sizeof(file_path) - 1);
+                file_path[sizeof(file_path) - 1] = '\0';
+                break;
             }
-            strncpy(file_path, value, sizeof(file_path) - 1);
-            file_path[sizeof(file_path) - 1] = '\0';
-            break;
         }
     }
     fclose(fp);
@@ -1108,6 +1116,7 @@ static status_t create_client_certs_entry(const char *ssl_path, int days) {
     char root_ssl_path[CM_MAX_PATH_LEN] = {0};
     if (get_ssl_path(root_certs_path, root_ssl_path, sizeof(root_ssl_path)) != CM_SUCCESS ||
         root_ssl_path[0] == '\0') {
+        GR_PRINT_ERROR("Failed to get ssl path from config file.\n");
         return CM_ERROR;
     }
 
