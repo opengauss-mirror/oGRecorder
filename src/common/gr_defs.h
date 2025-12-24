@@ -43,6 +43,8 @@ extern "C" {
 #define GR_DISK_USAGE_MIN 0
 #define GR_DISK_USAGE_MAX 100
 
+#define GR_DEFAULT_CERT_TIME 3650
+
 /* invalid id */
 #define GR_INVALID_INT8 ((int8)(-1))
 #define GR_INVALID_ID8 (uint8)0xFF
@@ -237,6 +239,14 @@ extern "C" {
             hook3;                                      \
             return _status_;                            \
         }                                               \
+    } while (0)
+
+#define GR_RETURN_IFERR5(ret)           \
+    do {                                \
+        int _status_ = (ret);           \
+        if (_status_ < 0) {             \
+            return;                     \
+        }                               \
     } while (0)
 
 #define GR_RETURN_IF_FALSE3(ret, hook1, hook2)   \

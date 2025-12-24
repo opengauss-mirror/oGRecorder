@@ -103,6 +103,9 @@ static void gr_clean_server()
     }
     CM_FREE_PTR(cm_log_param_instance()->log_compress_buf);
     gr_uninit_zero_buf();
+    if (g_gr_session_ctrl.sessions == NULL) {
+        return;
+    }
     for (uint32_t i = 0; i < g_gr_session_ctrl.alloc_sessions; i++) {
         if (g_gr_session_ctrl.sessions[i] != NULL) {
             CM_FREE_PTR(g_gr_session_ctrl.sessions[i]);

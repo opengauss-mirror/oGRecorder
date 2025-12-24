@@ -4582,16 +4582,16 @@ class dbClusterInfo():
         else:
             # 如果包名中没有版本，使用时间戳
             version_str = time.strftime("%Y%m%d_%H%M%S")
-        
+
         # 创建版本化目录结构：APP -> APP_VERSION
         install_base = clusterInfo.installPath
         app_link_name = "APP"
         app_version_dir = f"APP_{version_str}"
         app_link_path = os.path.join(install_base, app_link_name)
         app_version_path = os.path.join(install_base, app_version_dir)
-        
+
         self.logger.log(f"Creating versioned directory structure: {app_link_name} -> {app_version_dir}")
-        
+
         # 创建版本化目录和软链接
         for dbNode in clusterInfo.dbNodes:
             # 创建版本化目录
@@ -4600,36 +4600,37 @@ class dbClusterInfo():
                 dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
             if status != 0:
                 raise Exception(f"Failed to create versioned directory on {dbNode.name}: {output}")
-            
+
             # 只复制bin、lib、share到版本化目录（这些需要版本隔离）
             cmd = f"cp -r {clusterInfo.toolPath}/bin {clusterInfo.toolPath}/lib {app_version_path}/"
             status, output = self.execute_on_node(
                 dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
             if status != 0:
                 raise Exception(f"Failed to copy bin/lib to versioned directory on {dbNode.name}: {output}")
-            
+
             # 如果解压包中有share目录，也复制过去（在远程节点检查并复制）
             cmd = f"if [ -d {clusterInfo.toolPath}/share ]; then cp -r {clusterInfo.toolPath}/share {app_version_path}/; fi"
             status, output = self.execute_on_node(
                 dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
             if status != 0:
                 self.logger.warn(f"Failed to copy share to versioned directory on {dbNode.name}: {output}")
-            
+
             # 创建或更新APP软链接指向新版本
             cmd = f"ln -sfn {app_version_dir} {app_link_path}"
             status, output = self.execute_on_node(
                 dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
             if status != 0:
                 raise Exception(f"Failed to create/update APP symlink on {dbNode.name}: {output}")
-        
+
         self.logger.log(f"Successfully created versioned directory: {app_version_dir} and symlink: {app_link_name}")
         clusterInfo.appSoftPath = app_link_path
         clusterInfo.appPath = app_version_path
         
         # cfg目录在共享位置，不在版本化目录中
         cfg_path = os.path.join(clusterInfo.grPath, "cfg", "gr_inst.ini")
+        cli_cfg_path = os.path.join(clusterInfo.grPath, "cfg", "gr_cli_inst.ini")
         parent_dir = os.path.dirname(cfg_path)
-        
+
         # 收集所有节点的 IP 地址用于白名单
         all_node_ips = []
         for node in clusterInfo.dbNodes:
@@ -4638,7 +4639,7 @@ class dbClusterInfo():
         all_node_ips.append("127.0.0.1")
         ip_white_list = ",".join(all_node_ips)
         self.logger.log(f"IP white list for all nodes: {ip_white_list}")
-        
+
         # 修改配置文件
         for i, dbNode in enumerate(clusterInfo.dbNodes):
             config_content = (
@@ -4648,8 +4649,21 @@ class dbClusterInfo():
                 f"LISTEN_ADDR={dbNode.listen_addr}\n"
                 f"IP_WHITE_LIST={ip_white_list}\n"
                 f"DATA_FILE_PATH={clusterInfo.wormPath}\n"
+                f"SER_SSL_CA={clusterInfo.wormPath}/CA/cacert.pem\n"
+                f"SER_SSL_KEY={clusterInfo.wormPath}/CA/server.key\n"
+                f"SER_SSL_CERT={clusterInfo.wormPath}/CA/server.crt\n"
+                f"SER_SSL_CRL={clusterInfo.wormPath}/CA/server.crl\n"
             )
-            cmd = f"mkdir -p {parent_dir} && printf \"%s\" \"{config_content}\" > {cfg_path}"
+
+            cli_config_content = (
+                f"CLI_SSL_CA={clusterInfo.wormPath}/CA/cacert.pem\n"
+                f"CLI_SSL_KEY={clusterInfo.wormPath}/CA/client.key\n"
+                f"CLI_SSL_CERT={clusterInfo.wormPath}/CA/client.crt\n"
+                f"CLI_SSL_CRL={clusterInfo.wormPath}/CA/client.crl\n"
+            )
+            cmd = f"mkdir -p {parent_dir} && " \
+                  f"printf \"%s\" \"{config_content}\" > {cfg_path} && " \
+                  f"printf \"%s\" \"{cli_config_content}\" > {cli_cfg_path}"
             status, output = self.execute_on_node(
                 dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
             if status != 0:
@@ -4731,7 +4745,7 @@ class dbClusterInfo():
                     raise Exception(f"failed to create gr_res.sh file, Error output:\n{output}")
         self.logger.log("Successfully create gr_res.sh file.")
 
-        # 生成证书（grcmd会在配置文件中添加证书相关配置）
+        # 生成证书
         envfile = self.__getEnvironmentParameterValue("MPPDB_ENV_SEPARATE_PATH", user)
         ca_path = clusterInfo.grPath
         if not ca_path.endswith("CA"):
@@ -4742,23 +4756,14 @@ class dbClusterInfo():
             "grcmd",
         )
         
-        # 1. 先在本地节点生成证书
-        cmd = f'source {envfile} && "{grcmd_bin}" gencert -t server -d 1000 && "{grcmd_bin}" gencert -t client -d 1000'
+        # 通过grcmd命令升生成证书
+        cmd = f'source {envfile} && "{grcmd_bin}" gencert -t ca -d 1000 && "{grcmd_bin}" gencert -t server -d 1000 && "{grcmd_bin}" gencert -t client -d 1000'
         status, output = subprocess.getstatusoutput(cmd)
         if status != 0:
             raise Exception(f"Failed to create gr cert on local node, Error output:\n{output}, cmd is {cmd}")
         self.logger.log("Successfully create gr cert on local node.")
-        
-        # 2. 分发证书到其他节点
-        for dbNode in clusterInfo.dbNodes:
-            if dbNode.name != GetHostIpOrName():
-                cmd = f"scp -r {ca_path}/ {dbNode.sshIps[0]}:{ca_path}"
-                status, output = subprocess.getstatusoutput(cmd)
-                if status != 0:
-                    raise Exception(f"Failed to distribute gr cert to {dbNode.name}, Error output:\n{output}")
-                self.logger.log(f"Successfully distribute gr cert to {dbNode.name}.")
 
-        self.logger.log("Successfully create and distribute gr cert.")
+        self.logger.log("Successfully create gr cert.")
 
         # 分发脚本和工具
         bin_path = os.path.join(clusterInfo.appPath, "bin")
@@ -6379,12 +6384,12 @@ EOF
         for node in nodes:
             node_name = node['name']
             node_ip = node['ip']
-            
+
             print(f"{GREEN}[{node_name}] Starting to clean node...{NC}")
-            
+
             # Build cleanup command
             cmd = f'rm -rf {install_path}/* {install_path}/log/* {envfile}'
-            
+
             # Execute cleanup command
             if node_ip == socket.gethostbyname(socket.gethostname()):
                 # Local node
@@ -6393,14 +6398,14 @@ EOF
                 # Remote node
                 ssh_cmd = f"ssh -q -o ConnectTimeout=5 {user}@{node_ip} '{cmd}'"
                 status, output = subprocess.getstatusoutput(ssh_cmd)
-            
+
             if status != 0:
                 error_msg = f"failed to clean oGRecorder directory on {node_name}. Error output:\n{output}"
                 print(f"{RED}{error_msg}{NC}")
                 raise Exception(error_msg)
-            
+
             print(f"{GREEN}[{node_name}] Node cleanup completed{NC}")
-        
+
         self.logger.log("Successfully uninstall oGRecorder.")
         print(f"{GREEN}oGRecorder uninstallation completed!{NC}")
 
@@ -6460,7 +6465,7 @@ EOF
         # Generate certificates
         logger.log("Start generate gr certs.")
         logger.log(f"Certificate path: {ca_path}")
-        gen_cert_cmd = f"source {envFile} && grcmd gencert -t server -d 1000 && grcmd gencert -t client -d 1000"
+        gen_cert_cmd = f"source {envFile} && grcmd gencert -t ca -d 1000 && grcmd gencert -t server -d 1000 && grcmd gencert -t client -d 1000"
         status, output = subprocess.getstatusoutput(gen_cert_cmd)
         if status != 0:
             logger.logExit(f"failed to create gr cert, Error output:\n{output}")
