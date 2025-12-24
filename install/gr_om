@@ -7663,6 +7663,46 @@ server.ssl.trust-store-type=JKS
             
             self.logger.log("Successfully distribute rest_ssl.properties to all nodes.")
 
+        if os.path.exists(self.restpkg):
+            target_path = os.path.join(self.gaussHome, "bin")
+            for host in self.hostnames:
+                if host == self.localhostName:
+                    cmd = "cp {restpkg} {target_path}/".format(
+                        restpkg=self.restpkg, target_path=target_path)
+                    status, output = subprocess.getstatusoutput(cmd)
+                    if status != 0:
+                        errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (cmd, status, output)
+                        self.logger.debug(errorDetail)
+                        self.logger.logExit("Failed to distribute restpkg.")
+                    continue
+
+                ssh_ip = host
+                try:
+                    if hasattr(self, 'clusterInfo') and self.clusterInfo:
+                        for dbNode in self.clusterInfo.dbNodes:
+                            if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
+                                ssh_ip = dbNode.sshIps[0]
+                                break
+                except:
+                    pass
+
+                # Determine if the host is an IPv6 address and format accordingly
+                if ":" in ssh_ip:
+                    formatted_host = "[{}]".format(ssh_ip)
+                else:
+                    formatted_host = ssh_ip
+
+                # 分发配置文件到目标节点的 bin 目录
+                scpCmd = "scp {restpkg} {host}:{target_path}/".format(
+                    restpkg=self.restpkg, host=formatted_host, target_path=target_path)
+                status, output = subprocess.getstatusoutput(scpCmd)
+                if status != 0:
+                    errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (scpCmd, status, output)
+                    self.logger.debug(errorDetail)
+                    self.logger.logExit("Failed to distribute restpkg to %s." % host)
+            
+            self.logger.log("Successfully distribute restpkg to all nodes.")
+
     def createCMCA(self):
         self.logger.log("Creating CM ca files.")
         self._createCMCALocal()
