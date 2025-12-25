@@ -982,6 +982,9 @@ class dbClusterInfo():
         # oGRecorder
         self.gr_nodes_list = ""
         self.grPath = ""
+        self.caPath = ""
+        self.wormPath = ""
+        self.installPath = ""
 
     def __str__(self):
         """
@@ -2218,6 +2221,9 @@ class dbClusterInfo():
         self.wormPath = self.__read_and_check_config_item(xmlRootNode, "wormPath", "cluster", False)
         if not self.wormPath:
             self.wormPath = os.path.join(self.installPath, "data")
+        self.caPath = self.__read_and_check_config_item(xmlRootNode, "caPath", "cluster", False)
+        if not self.caPath:
+            self.caPath = os.path.join(self.wormPath, "CA")
 
         if not self.logPath:
             self.logPath = "/var/log/gaussdb"
@@ -4640,6 +4646,11 @@ class dbClusterInfo():
         ip_white_list = ",".join(all_node_ips)
         self.logger.log(f"IP white list for all nodes: {ip_white_list}")
 
+        # 设置 ca_path，如果未设置则使用默认值
+        ca_path = clusterInfo.caPath
+        if not ca_path:
+            # 如果未设置，使用默认路径：wormPath/CA
+            ca_path = "CA"
         # 修改配置文件
         for i, dbNode in enumerate(clusterInfo.dbNodes):
             config_content = (
@@ -4649,17 +4660,17 @@ class dbClusterInfo():
                 f"LISTEN_ADDR = {dbNode.listen_addr}\n"
                 f"IP_WHITE_LIST = {ip_white_list}\n"
                 f"DATA_FILE_PATH = {clusterInfo.wormPath}\n"
-                f"SER_SSL_CA = {clusterInfo.wormPath}/CA/cacert.pem\n"
-                f"SER_SSL_KEY = {clusterInfo.wormPath}/CA/server.key\n"
-                f"SER_SSL_CERT = {clusterInfo.wormPath}/CA/server.crt\n"
-                f"SER_SSL_CRL = {clusterInfo.wormPath}/CA/server.crl\n"
+                f"SER_SSL_CA = {os.path.join(clusterInfo.wormPath, ca_path, 'cacert.pem')}\n"
+                f"SER_SSL_KEY = {os.path.join(clusterInfo.wormPath, ca_path, 'server.key')}\n"
+                f"SER_SSL_CERT = {os.path.join(clusterInfo.wormPath, ca_path, 'server.crt')}\n"
+                f"SER_SSL_CRL = {os.path.join(clusterInfo.wormPath, ca_path, 'server.crl')}\n"
             )
 
             cli_config_content = (
-                f"CLI_SSL_CA = {clusterInfo.wormPath}/CA/cacert.pem\n"
-                f"CLI_SSL_KEY = {clusterInfo.wormPath}/CA/client.key\n"
-                f"CLI_SSL_CERT = {clusterInfo.wormPath}/CA/client.crt\n"
-                f"CLI_SSL_CRL = {clusterInfo.wormPath}/CA/client.crl\n"
+                f"CLI_SSL_CA = {os.path.join(clusterInfo.wormPath, ca_path, 'cacert.pem')}\n"
+                f"CLI_SSL_KEY = {os.path.join(clusterInfo.wormPath, ca_path, 'client.key')}\n"
+                f"CLI_SSL_CERT = {os.path.join(clusterInfo.wormPath, ca_path, 'client.crt')}\n"
+                f"CLI_SSL_CRL = {os.path.join(clusterInfo.wormPath, ca_path, 'client.crl')}\n"
             )
             cmd = f"mkdir -p {parent_dir} && " \
                   f"printf \"%s\" \"{config_content}\" > {cfg_path} && " \
@@ -6141,6 +6152,7 @@ class dbClusterInfo():
         # Set paths based on JSON configuration
         install_path = cluster_config.get('install_path', '')
         worm_path = cluster_config.get('worm_path', '')
+        ca_path = cluster_config.get('ca_path', '')
         clusterInfo.installPath = install_path
         clusterInfo.toolPath = os.path.join(install_path, "tool")
         clusterInfo.grPath = os.path.join(install_path, "gr")
@@ -6148,7 +6160,8 @@ class dbClusterInfo():
         clusterInfo.appSoftPath = clusterInfo.appPath
         clusterInfo.logPath = os.path.join(install_path, "log")
         clusterInfo.tmpPath = os.path.join(install_path, "tmp")
-        clusterInfo.wormPath = worm_path  # 保存worm_path到clusterInfo中
+        clusterInfo.wormPath = worm_path
+        clusterInfo.caPath = ca_path
         datadnPath = os.path.join(install_path, "data/dn") # cm need "dn" to check disk, maybe need to change
         logger.log("Start preinstall oGRecorder.")
         
@@ -8488,6 +8501,7 @@ def json_to_xml(json_file):
         <PARAM name="backIp1s" value="{','.join(back_ips)}"/>
         <PARAM name="gr_nodes_list" value="{','.join(gr_nodes_list)}"/>
         <PARAM name="wormPath" value="{config['cluster'].get('worm_path', '/tmp/')}"/>
+        <PARAM name="caPath" value="{config['cluster'].get('ca_path', 'CA')}"/>
     </CLUSTER>
     <DEVICELIST>'''
     
