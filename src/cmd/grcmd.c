@@ -1185,15 +1185,16 @@ static status_t create_server_certs_entry(const char *ssl_path, int days) {
 static status_t generate_root_cert_entry(const char *ssl_path, int days) {
     char demoCA_path[CM_MAX_PATH_LEN];
     char ca_file[CM_MAX_PATH_LEN];
-    if (snprintf_s(ca_file, sizeof(ca_file), sizeof(ca_file) - 1, "%s/cacert.pem", ssl_path) == -1) {
-        GR_PRINT_ERROR("ca_file too long!\n");
+    char ca_key[CM_MAX_PATH_LEN];
+    char ca_enc_key[CM_MAX_PATH_LEN];
+    if (snprintf_s(ca_file, sizeof(ca_file), sizeof(ca_file) - 1, "%s/cacert.pem", ssl_path) == -1 ||
+        snprintf_s(demoCA_path, sizeof(demoCA_path), sizeof(demoCA_path) - 1, "%s/demoCA", ssl_path) == -1 ||
+        snprintf_s(ca_key, sizeof(ca_key), sizeof(ca_key) - 1, "%s/demoCA/private/cakey.pem", ssl_path) == -1 ||
+        snprintf_s(ca_enc_key, sizeof(ca_enc_key), sizeof(ca_enc_key) - 1, "%s/ca.pass.enc", ssl_path) == -1) {
+        GR_PRINT_ERROR("Failed to get path by snprintf_s!\n");
         return CM_ERROR;
     }
-    if (snprintf_s(demoCA_path, sizeof(demoCA_path), sizeof(demoCA_path) - 1, "%s/demoCA", ssl_path) == -1) {
-        GR_PRINT_ERROR("demoCA_path too long!\n");
-        return CM_ERROR;
-    }
-    if (file_exists(demoCA_path) || file_exists(ca_file)) {
+    if (file_exists(demoCA_path) || file_exists(ca_file) || file_exists(ca_enc_key)) {
         GR_PRINT_ERROR("CA already exists, failed to gencert.\n");
         return CM_ERROR;
     }
@@ -1201,6 +1202,10 @@ static status_t generate_root_cert_entry(const char *ssl_path, int days) {
         return CM_ERROR;
     }
     if (generate_root_cert(ssl_path, days) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
+    if (check_certs_permission(ca_file) != CM_SUCCESS || check_certs_permission(ca_key) != CM_SUCCESS ||
+        check_certs_permission(ca_enc_key) != CM_SUCCESS) {
         return CM_ERROR;
     }
     GR_PRINT_INF("CA certs generated successfully.\n");
