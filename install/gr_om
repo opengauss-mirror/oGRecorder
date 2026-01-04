@@ -167,6 +167,76 @@ LOG_WARNING = 2.1
 LOG_ERROR = 3
 LOG_FATAL = 4
 
+class PackageVerificationError(Exception):
+    """
+    自定义异常：安装包验证失败
+    
+    用于在包类型不匹配、包损坏或包不存在时抛出详细错误信息
+    """
+    
+    # 错误码定义
+    ERR_PKG_NOT_FOUND = 101        # 包文件不存在
+    ERR_PKG_EXTRACT_FAILED = 102   # 包解压失败
+    ERR_PKG_TYPE_MISMATCH = 103    # 包类型不匹配
+    ERR_PKG_INVALID_GR = 104       # 无效的 GR 包
+    ERR_PKG_INVALID_CM = 105       # 无效的 CM 包
+    ERR_PKG_UNKNOWN_TYPE = 106     # 未知的包类型
+    
+    def __init__(self, message, error_code=0, pkg_path=None, expected_type=None, detected_type=None):
+        self.message = message
+        self.error_code = error_code
+        self.pkg_path = pkg_path
+        self.expected_type = expected_type
+        self.detected_type = detected_type
+        super().__init__(self.message)
+    
+    def __str__(self):
+        return f"[ERROR {self.error_code}] {self.message}"
+    
+    def get_user_friendly_message(self):
+        """返回用户友好的错误信息"""
+        lines = [
+            "=" * 60,
+            "PACKAGE VERIFICATION FAILED",
+            "=" * 60,
+            "",
+            f"Error Code: {self.error_code}",
+            f"Error Message: {self.message}",
+        ]
+        if self.pkg_path:
+            lines.append(f"Package Path: {self.pkg_path}")
+        if self.expected_type:
+            lines.append(f"Expected Type: {self.expected_type.upper()}")
+        if self.detected_type:
+            lines.append(f"Detected Type: {self.detected_type.upper()}")
+        
+        lines.extend([
+            "",
+            "Suggestions:",
+        ])
+        
+        if self.error_code == self.ERR_PKG_NOT_FOUND:
+            lines.append("  - Check if the package file exists")
+            lines.append("  - Verify the file path is correct")
+        elif self.error_code == self.ERR_PKG_EXTRACT_FAILED:
+            lines.append("  - The package may be corrupted, try re-downloading")
+            lines.append("  - Check if you have read permission for the file")
+        elif self.error_code == self.ERR_PKG_TYPE_MISMATCH:
+            lines.append(f"  - You specified --{self.expected_type}pkg but provided a {self.detected_type.upper()} package")
+            lines.append(f"  - Use --{self.detected_type}pkg for this package instead")
+            lines.append(f"  - Or provide the correct {self.expected_type.upper()} package")
+        elif self.error_code in (self.ERR_PKG_INVALID_GR, self.ERR_PKG_INVALID_CM):
+            lines.append("  - The package does not contain expected signature files")
+            lines.append("  - Ensure you are using the correct oGRecorder installation package")
+        
+        lines.extend([
+            "",
+            "=" * 60,
+        ])
+        
+        return "\n".join(lines)
+
+
 class CMLog:
     """
     Class to handle log file operations.
@@ -4398,6 +4468,146 @@ class dbClusterInfo():
         
         return success_count
 
+    def _verify_package_type(self, pkg_path, expected_type):
+        """
+        验证安装包的类型是否与预期匹配
+        
+        通过解压包并检查特征文件来判断包类型：
+        - GR包: 应包含 bin/grcmd, bin/grserver 等 GR 相关二进制
+        - CM包: 应包含 bin/cm_server, bin/cm_agent 等 CM 相关二进制
+        
+        Args:
+            pkg_path: 安装包路径
+            expected_type: 预期的包类型 ('gr' 或 'cm')
+        
+        Returns:
+            True 如果验证通过
+        
+        Raises:
+            PackageVerificationError 如果包类型不匹配或包损坏
+        """
+        import tempfile
+        import shutil
+        
+        # 检查包文件是否存在
+        if not os.path.exists(pkg_path):
+            raise PackageVerificationError(
+                message=f"Package file not found: {pkg_path}",
+                error_code=PackageVerificationError.ERR_PKG_NOT_FOUND,
+                pkg_path=pkg_path,
+                expected_type=expected_type
+            )
+        
+        # GR包特征文件（必须包含至少一个）
+        GR_SIGNATURE_FILES = [
+            'bin/grcmd',
+            'bin/grserver',
+            'bin/gr_ctl',
+            'lib/libgr.so',
+        ]
+        
+        # CM包特征文件（必须包含至少一个）
+        CM_SIGNATURE_FILES = [
+            'bin/cm_server',
+            'bin/cm_agent',
+            'bin/cm_ctl',
+            'lib/libcm_common.so',
+        ]
+        
+        # 创建临时目录解压包
+        temp_dir = tempfile.mkdtemp(prefix='pkg_verify_')
+        try:
+            # 解压包
+            cmd = f"tar -zxf {pkg_path} -C {temp_dir} 2>&1"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                raise PackageVerificationError(
+                    message=f"Failed to extract package: {output}",
+                    error_code=PackageVerificationError.ERR_PKG_EXTRACT_FAILED,
+                    pkg_path=pkg_path,
+                    expected_type=expected_type
+                )
+            
+            # 检查包内容
+            has_gr_signature = False
+            has_cm_signature = False
+            gr_found_files = []
+            cm_found_files = []
+            
+            # 检查 GR 特征文件
+            for sig_file in GR_SIGNATURE_FILES:
+                check_path = os.path.join(temp_dir, sig_file)
+                if os.path.exists(check_path):
+                    has_gr_signature = True
+                    gr_found_files.append(sig_file)
+            
+            # 检查 CM 特征文件
+            for sig_file in CM_SIGNATURE_FILES:
+                check_path = os.path.join(temp_dir, sig_file)
+                if os.path.exists(check_path):
+                    has_cm_signature = True
+                    cm_found_files.append(sig_file)
+            
+            # 获取包内顶层文件列表（用于错误提示）
+            cmd = f"ls -la {temp_dir}"
+            _, content_list = subprocess.getstatusoutput(cmd)
+            
+            # 验证包类型
+            pkg_name = os.path.basename(pkg_path)
+            
+            if expected_type == 'gr':
+                if has_cm_signature and not has_gr_signature:
+                    raise PackageVerificationError(
+                        message=f"Package type mismatch! Expected GR package but found CM package.\n"
+                                f"  CM signature files found: {', '.join(cm_found_files)}",
+                        error_code=PackageVerificationError.ERR_PKG_TYPE_MISMATCH,
+                        pkg_path=pkg_path,
+                        expected_type='gr',
+                        detected_type='cm'
+                    )
+                if not has_gr_signature:
+                    raise PackageVerificationError(
+                        message=f"Invalid GR package! Package does not contain GR signature files.\n"
+                                f"  Expected files: {', '.join(GR_SIGNATURE_FILES)}\n"
+                                f"  Package contents:\n{content_list}",
+                        error_code=PackageVerificationError.ERR_PKG_INVALID_GR,
+                        pkg_path=pkg_path,
+                        expected_type='gr'
+                    )
+            elif expected_type == 'cm':
+                if has_gr_signature and not has_cm_signature:
+                    raise PackageVerificationError(
+                        message=f"Package type mismatch! Expected CM package but found GR package.\n"
+                                f"  GR signature files found: {', '.join(gr_found_files)}",
+                        error_code=PackageVerificationError.ERR_PKG_TYPE_MISMATCH,
+                        pkg_path=pkg_path,
+                        expected_type='cm',
+                        detected_type='gr'
+                    )
+                if not has_cm_signature:
+                    raise PackageVerificationError(
+                        message=f"Invalid CM package! Package does not contain CM signature files.\n"
+                                f"  Expected files: {', '.join(CM_SIGNATURE_FILES)}\n"
+                                f"  Package contents:\n{content_list}",
+                        error_code=PackageVerificationError.ERR_PKG_INVALID_CM,
+                        pkg_path=pkg_path,
+                        expected_type='cm'
+                    )
+            else:
+                raise PackageVerificationError(
+                    message=f"Unknown package type: {expected_type}",
+                    error_code=PackageVerificationError.ERR_PKG_UNKNOWN_TYPE,
+                    pkg_path=pkg_path,
+                    expected_type=expected_type
+                )
+            
+            return True
+            
+        finally:
+            # 清理临时目录
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
     def _check_gr_status(self, user, nodes_to_check, check_phase="pre-upgrade"):
         """
         检查每个节点的 GR 状态，确保 grcmd getstatus 命令执行成功且状态为 open
@@ -4977,16 +5187,20 @@ class dbClusterInfo():
         self.logger.log("Pre-distributing package to remote nodes...")
         for dbNode in nodes_to_upgrade:
             if dbNode.name != GetHostIpOrName():
-                cmd = f"test -f {PkgPath}"
+                # 在远程节点检测包是否已存在（使用远程路径）
+                remote_pkg_path = os.path.join(clusterInfo.toolPath, pkgName)
+                cmd = f"test -f {remote_pkg_path}"
                 status, output = self.execute_on_node(
                     dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
                 if status != 0:
-                    self.logger.log(f"Distributing package to {dbNode.name}")
-                    cmd = f"scp {PkgPath} {dbNode.sshIps[0]}:{clusterInfo.toolPath}/"
+                    self.logger.log(f"Distributing package to {dbNode.name}: {remote_pkg_path}")
+                    cmd = f"scp {PkgPath} {dbNode.sshIps[0]}:{remote_pkg_path}"
                     status, output = subprocess.getstatusoutput(cmd)
                     if status != 0:
                         raise Exception(f"Failed to distribute package to {dbNode.name}: {output}")
                     self.logger.log(f"Package distributed to {dbNode.name}")
+                else:
+                    self.logger.log(f"Package already exists on {dbNode.name}: {remote_pkg_path}")
         
         # 升级成功的节点列表
         upgraded_nodes = []
@@ -5265,30 +5479,41 @@ class dbClusterInfo():
                 # 该节点升级失败，执行回滚
                 self.logger.log("")
                 self.logger.log("=" * 60)
-                self.logger.log(f"NODE {dbNode.name} UPGRADE FAILED! Starting rollback...")
+                self.logger.log(f"NODE {dbNode.name} UPGRADE FAILED! Starting full rollback...")
                 self.logger.log("=" * 60)
                 self.logger.log(f"Error: {str(e)}")
                 
+                # 需要回滚的节点：所有已升级成功的节点 + 当前失败的节点
+                nodes_to_rollback = upgraded_nodes + [dbNode]
+                self.logger.log(f"Nodes to rollback: {[n.name for n in nodes_to_rollback]}")
+                
                 try:
-                    # 只回滚当前失败的节点
-                    self._rollback_upgrade(clusterInfo, [dbNode], node_rollback_info, 
+                    # 回滚所有已升级的节点和当前失败的节点
+                    self._rollback_upgrade(clusterInfo, nodes_to_rollback, node_rollback_info, 
                                           cm_ctl_path, user, version_str, install_base, app_link_path)
+                    self.logger.log("Rollback completed successfully")
                 except Exception as rollback_error:
-                    self.logger.log(f"[{dbNode.name}] Rollback failed: {str(rollback_error)}")
-                    self.logger.log(f"[{dbNode.name}] Manual intervention required!")
+                    self.logger.log("=" * 60)
+                    self.logger.log("ROLLBACK FAILED! Manual intervention required!")
+                    self.logger.log("=" * 60)
+                    self.logger.log(f"Rollback error: {str(rollback_error)}")
+                    self.logger.log(f"Please manually restore the following nodes:")
+                    for n in nodes_to_rollback:
+                        info = node_rollback_info.get(n.name, {})
+                        self.logger.log(f"  {n.name}: old_version={info.get('old_version_dir', 'UNKNOWN')}")
                 
                 # 停止升级，不继续处理后续节点
                 self.logger.log("")
                 self.logger.log("=" * 60)
-                self.logger.log("ROLLING UPGRADE ABORTED!")
+                self.logger.log("ROLLING UPGRADE ABORTED AND ROLLED BACK!")
                 self.logger.log("=" * 60)
-                self.logger.log(f"Successfully upgraded nodes: {[n.name for n in upgraded_nodes]}")
+                self.logger.log(f"Rolled back nodes: {[n.name for n in nodes_to_rollback]}")
                 self.logger.log(f"Failed node: {dbNode.name}")
                 remaining_nodes = nodes_to_upgrade[node_index + 1:]
                 if remaining_nodes:
                     self.logger.log(f"Remaining nodes (not upgraded): {[n.name for n in remaining_nodes]}")
                 
-                raise Exception(f"Rolling upgrade failed at node {dbNode.name}: {str(e)}")
+                raise Exception(f"Rolling upgrade failed at node {dbNode.name}, all upgraded nodes rolled back: {str(e)}")
         
         # 所有节点升级成功
         self.logger.log("")
@@ -5545,11 +5770,19 @@ class dbClusterInfo():
                 local_cm_pkg = cmPkgPath
                 if dbNode.name != GetHostIpOrName():
                     target_pkg_path = os.path.join(clusterInfo.toolPath, cm_pkg_name)
-                    # 如果远端不存在该包，则分发
-                    cmd = f"test -f {target_pkg_path} || scp {cmPkgPath} {dbNode.sshIps[0]}:{target_pkg_path}"
-                    status, output = subprocess.getstatusoutput(cmd)
+                    # 在远程节点检测包是否存在
+                    cmd = f"test -f {target_pkg_path}"
+                    status, _ = self.execute_on_node(
+                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
                     if status != 0:
-                        raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
+                        # 远端不存在该包，进行分发
+                        self.logger.log(f"  Distributing CM package to {dbNode.name}: {target_pkg_path}")
+                        cmd = f"scp {cmPkgPath} {dbNode.sshIps[0]}:{target_pkg_path}"
+                        status, output = subprocess.getstatusoutput(cmd)
+                        if status != 0:
+                            raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
+                    else:
+                        self.logger.log(f"  CM package already exists on {dbNode.name}: {target_pkg_path}")
                     local_cm_pkg = target_pkg_path
 
                 # 在远端临时目录解压 cm 包
@@ -8698,6 +8931,39 @@ def main():
         elif args.command == 'gr_certs':
             clusterInfo.distribute_gr_certs(args.config_file, args.envFile)
         elif args.command == 'upgrade':
+            # ========== 包合法性验证 ==========
+            # 在执行升级前验证传入的包类型是否正确
+            print("=" * 60)
+            print("PACKAGE VERIFICATION")
+            print("=" * 60)
+            try:
+                if args.gr_package:
+                    print(f"  [1/2] Verifying GR package: {args.gr_package}")
+                    clusterInfo._verify_package_type(args.gr_package, 'gr')
+                    print("        ✓ GR package verification passed.")
+                else:
+                    print("  [1/2] GR package: Not specified (skip)")
+                    
+                if args.cm_package:
+                    print(f"  [2/2] Verifying CM package: {args.cm_package}")
+                    clusterInfo._verify_package_type(args.cm_package, 'cm')
+                    print("        ✓ CM package verification passed.")
+                else:
+                    print("  [2/2] CM package: Not specified (skip)")
+                    
+                print("=" * 60)
+                print("All package verifications passed!")
+                print("=" * 60)
+                print()
+                
+            except PackageVerificationError as e:
+                print()
+                print(e.get_user_friendly_message())
+                print()
+                print("Upgrade aborted due to package verification failure.")
+                sys.exit(e.error_code)
+            
+            # ========== 升级流程 ==========
             # 整体升级模式：指定 --cmpkg 时进入集群升级流程
             if args.cm_package:
                 if args.target_nodeids:
