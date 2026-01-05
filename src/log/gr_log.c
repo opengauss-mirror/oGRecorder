@@ -100,7 +100,8 @@ const char *g_gr_error_desc[GR_ERROR_COUNT] = {
     [ERR_GR_READONLY] = "GR is in read-only mode, operation not allowed, cannot %s.",
     [ERR_GR_WHITELIST_INVALID] = "GR handshake rejected: IP %s not in whitelist",
     [ERR_GR_CALL_SERVER_FAILED] = "gr client call server failed.",
-    [ERR_GR_HASH_AUTH_FAILED] = "Hash authentication failed: %s"
+    [ERR_GR_HASH_AUTH_FAILED] = "Hash authentication failed: %s",
+    [ERR_GR_NOT_MASTER] = "Current node is not master: %s"
 };
 
 gr_log_def_t g_gr_cmd_log[] = {

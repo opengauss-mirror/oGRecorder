@@ -87,6 +87,7 @@ typedef enum {
     GR_CMD_QUERY_HOTPATCH,
     GR_CMD_QUERY_END,
     GR_CMD_EXCHANGE_KEY,
+    GR_CMD_RELOAD_CFG,
     GR_CMD_END  // must be the last item
 } gr_cmd_type_e;
 
@@ -100,7 +101,7 @@ char *gr_get_cmd_desc(gr_cmd_type_e cmd_type);
 static inline bool32 gr_can_cmd_type_no_open(gr_cmd_type_e type)
 {
     return ((type == GR_CMD_GET_INST_STATUS) || (type == GR_CMD_HANDSHAKE) || (type == GR_CMD_STOP_SERVER) ||
-            (type == GR_CMD_SETCFG) || (type == GR_CMD_GETCFG));
+            (type == GR_CMD_SETCFG) || (type == GR_CMD_GETCFG) || (type == GR_CMD_RELOAD_CFG));
 }
 
 typedef struct st_gr_packet_head {

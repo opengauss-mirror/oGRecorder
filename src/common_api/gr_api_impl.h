@@ -253,6 +253,7 @@ status_t gr_get_inst_status_on_server(gr_conn_t *conn, gr_server_status_t *gr_st
 status_t gr_get_time_stat_on_server(gr_conn_t *conn, gr_stat_item_t *time_stat, uint64 size);
 status_t gr_set_main_inst_impl(gr_conn_t *conn);
 status_t gr_reload_certs_impl(gr_conn_t *conn);
+status_t gr_reload_cfg_impl(gr_conn_t *conn);
 status_t gr_get_disk_usage_impl(gr_conn_t *conn, gr_disk_usage_info_t *info);
 
 #define GR_SET_PTR_VALUE_IF_NOT_NULL(ptr, value) \

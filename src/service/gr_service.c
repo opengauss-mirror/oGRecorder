@@ -876,17 +876,18 @@ static status_t gr_process_setcfg(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY, "%s", name));
     GR_LOG_DEBUG_OP("Begin to set cfg, name:%s, value:%s, scope:%s", name, value, scope);
 
-    // Forward sync parameters to master on standby node, non-sync parameters are processed locally
+    // sync parameter modification is not allowed on standby node
     gr_config_t *inst_cfg = gr_get_inst_cfg();
     uint32_t curr_id = (uint32_t)inst_cfg->params.inst_id;
     uint32_t master_id = gr_get_master_id();
     if (curr_id != master_id && gr_is_sync_param(name)) {
-        return gr_process_remote(session);
+        GR_THROW_ERROR(ERR_GR_NOT_MASTER, "Sync parameter modification is not allowed on standby node");
+        return CM_ERROR;
     }
 
     // Set configuration parameter (memory/file/both)
     status_t status = gr_set_cfg_param(name, value, scope);
-    if (status != GR_SUCCESS) {
+    if (status != CM_SUCCESS) {
         LOG_RUN_ERR("set cfg param failed, name=%s, value=%s, scope=%s, ret=%d.", name, value, scope, status);
         return status;
     }
@@ -896,7 +897,7 @@ static status_t gr_process_setcfg(gr_session_t *session)
     if (gr_is_sync_param(name)) {
         // Write to WORM storage for sync param when scope involves disk (pfile/both)
         status = gr_write_config_to_worm(inst_cfg);
-        if (status != GR_SUCCESS) {
+        if (status != CM_SUCCESS) {
             // WORM write failure does not affect current instance, but return error to notify the caller
             LOG_RUN_ERR("write config to WORM failed after setcfg, name=%s, value=%s, ret=%d.", name, value, status);
             return status;
@@ -904,11 +905,49 @@ static status_t gr_process_setcfg(gr_session_t *session)
 
         // Trigger parameter broadcast for sync param after setcfg
         status = gr_trigger_param_broadcast();
-        if (status != GR_SUCCESS) {
+        if (status != CM_SUCCESS) {
             // Broadcast failure does not affect local config and WORM write
             LOG_RUN_ERR("Failed to trigger parameter broadcast after setcfg, ret: %d", status);
+            return status;
         }
     }
+    return status;
+}
+
+static status_t gr_process_reload_cfg(gr_session_t *session)
+{
+    gr_config_t *inst_cfg = gr_get_inst_cfg();
+    if (inst_cfg == NULL) {
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "inst_cfg");
+        return CM_ERROR;
+    }
+    uint32_t self_id = (uint32_t)inst_cfg->params.inst_id;
+    uint32_t master_id = gr_get_master_id();
+    if (master_id == GR_INVALID_ID32) {
+        GR_THROW_ERROR(ERR_GR_NOT_MASTER, "reload not allowed: master is unknown (not joined cluster)");
+        return CM_ERROR;
+    }
+    if (self_id != master_id) {
+        GR_THROW_ERROR(ERR_GR_NOT_MASTER, "reload only allowed on master");
+        return CM_ERROR;
+    }
+
+    status_t status = gr_apply_cfg_to_memory(inst_cfg, CM_FALSE, CM_FALSE, CM_FALSE);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("reload failed to apply reserved local cfg to memory, ret=%d", status);
+        return status;
+    }
+    status = gr_apply_cfg_to_memory(inst_cfg, CM_FALSE, CM_FALSE, CM_TRUE);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("reload failed to apply synced local cfg to memory, ret=%d", status);
+        return status;
+    }
+    status = gr_write_config_to_worm(inst_cfg);
+    if (status != CM_SUCCESS) {
+        LOG_RUN_ERR("reload failed to write config to WORM, ret=%d", status);
+        return status;
+    }
+    (void)gr_trigger_param_broadcast();
     return status;
 }
 
@@ -1174,6 +1213,7 @@ static gr_cmd_hdl_t g_gr_cmd_handle[GR_CMD_TYPE_OFFSET(GR_CMD_END)] = {
         CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_RELOAD_CERTS)] = {GR_CMD_RELOAD_CERTS, gr_process_reload_certs, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_GET_DISK_USAGE)] = {GR_CMD_GET_DISK_USAGE, gr_process_get_disk_usage, NULL, CM_FALSE},
+    [GR_CMD_TYPE_OFFSET(GR_CMD_RELOAD_CFG)] = {GR_CMD_RELOAD_CFG, gr_process_reload_cfg, NULL, CM_FALSE},
     // query
     [GR_CMD_TYPE_OFFSET(GR_CMD_HANDSHAKE)] = {GR_CMD_HANDSHAKE, gr_process_handshake, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_EXIST)] = {GR_CMD_EXIST, gr_process_exist, NULL, CM_FALSE},

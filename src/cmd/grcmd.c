@@ -50,7 +50,7 @@
 #include "gr_api_impl.h"
 #include "gr_cli_conn.h"
 #include "gr_args_parse.h"
-
+#include "gr_param_sync.h"
 #ifndef WIN32
 #include "config.h"
 #endif
@@ -1258,9 +1258,42 @@ static status_t gencert_proc(void)
     return ret;
 }
 
+// add reload for handle server config write to WORM storage
+static gr_args_set_t cmd_reload_args_set = {
+    NULL,
+    0,
+    NULL,
+};
+
+static void reload_help(const char *prog_name, int print_flag)
+{
+    (void)printf("\nUsage:%s reload\n", prog_name);
+    (void)printf("[server command] write current config to WORM storage\n");
+    if (print_flag == GR_HELP_SIMPLE) {
+        return;
+    }
+}
+
+static status_t reload_proc(void)
+{
+    gr_conn_t *conn = gr_get_connection_for_cmd();
+    if (conn == NULL) {
+        return CM_ERROR;
+    }
+    status_t status = gr_reload_cfg_impl(conn);
+    if (status != CM_SUCCESS) {
+        GR_PRINT_ERROR("Failed to reload (write config to WORM).\n");
+    } else {
+        GR_PRINT_INF("Succeed to reload (config written to WORM).\n");
+    }
+    gr_disconnect_ex(conn);
+    return status;
+}
+
 static gr_args_t cmd_datausage_args[] = {
     {'i', "addr", CM_FALSE, CM_TRUE, check_server_addr_format, NULL, NULL, 0, NULL, NULL, 0},
 };
+
 static gr_args_set_t cmd_datausage_args_set = {
     cmd_datausage_args,
     sizeof(cmd_datausage_args) / sizeof(gr_args_t),
@@ -1325,6 +1358,7 @@ gr_admin_cmd_t g_gr_admin_cmd[] = {
     {"switchover", switchover_help, switchover_proc, &cmd_switchover_args_set, true},
     {"reload_certs", reload_certs_help, reload_certs_proc, &cmd_reload_certs_args_set, false},
     {"gencert", gencert_help, gencert_proc, &cmd_gencert_args_set, true},
+    {"reload", reload_help, reload_proc, &cmd_reload_args_set, true},
     {"datausage", datausage_help, datausage_proc, &cmd_datausage_args_set, true},
 };
 

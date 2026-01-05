@@ -816,6 +816,11 @@ status_t gr_reload_certs_impl(gr_conn_t *conn)
     return status;
 }
 
+status_t gr_reload_cfg_impl(gr_conn_t *conn)
+{
+    return gr_msg_interact(conn, GR_CMD_RELOAD_CFG, NULL, NULL);
+}
+
 status_t gr_get_disk_usage_impl(gr_conn_t *conn, gr_disk_usage_info_t *info)
 {
     LOG_DEBUG_INF("gr get disk usage entry");
@@ -1234,6 +1239,7 @@ gr_packet_proc_t g_gr_packet_proc[GR_CMD_END] =
     [GR_CMD_GET_INST_STATUS] = {NULL, gr_decode_get_inst_status, "get inst status"},
     [GR_CMD_GET_TIME_STAT] = {NULL, gr_decode_get_time_stat, "get time stat"},
     [GR_CMD_GET_DISK_USAGE] = {NULL, gr_decode_get_disk_usage, "get disk usage"},
+    [GR_CMD_RELOAD_CFG] = {NULL, NULL, "reload cfg"},
 };
 
 status_t gr_decode_packet(gr_packet_proc_t *make_proc, gr_packet_t *ack_pack, void *ack)
