@@ -6575,7 +6575,12 @@ EOF
         cluster_name = config['cluster'].get('name', 'cluster')
         install_path = config['cluster'].get('install_path', '/home/czk/install/')
         nodes = config['cluster']['nodes']
-        
+
+        if 'worm_path' not in config['cluster']:
+            print(f"{RED}Missing worm_path configuration in cluster section!{NC}")
+            sys.exit(1)
+        worm_path = config['cluster']['worm_path']
+
         if not nodes:
             print(f"{RED}Node list is empty!{NC}")
             sys.exit(1)
@@ -6605,6 +6610,15 @@ EOF
                 print(f"{RED}{error_msg}{NC}")
                 raise Exception(error_msg)
             print(f"{GREEN}Successfully stop cluster{NC}")
+
+        # rm sharedisk and votingdisk
+        cmd = f"rm -rf {worm_path}/sharedisk {worm_path}/votingdisk"
+        status, output = subprocess.getstatusoutput(cmd)
+        if status != 0:
+            error_msg = f"failed to delete cm file. Error output:\n{output}"
+            print(f"{RED}{error_msg}{NC}")
+            raise Exception(error_msg)
+        print(f"{GREEN}Successfully delete cm file{NC}")
 
         # kill cmrestapi
         cmrestapi_path = os.path.join(gausshome, "bin", "cmrestapi-7.0.0-RC2-RELEASE.jar")
