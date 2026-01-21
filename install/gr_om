@@ -5187,20 +5187,14 @@ class dbClusterInfo():
         self.logger.log("Pre-distributing package to remote nodes...")
         for dbNode in nodes_to_upgrade:
             if dbNode.name != GetHostIpOrName():
-                # 在远程节点检测包是否已存在（使用远程路径）
+                # 始终分发新包到远端（覆盖旧版本）
                 remote_pkg_path = os.path.join(clusterInfo.toolPath, pkgName)
-                cmd = f"test -f {remote_pkg_path}"
-                status, output = self.execute_on_node(
-                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                self.logger.log(f"Distributing package to {dbNode.name}: {remote_pkg_path}")
+                cmd = f"scp {PkgPath} {dbNode.sshIps[0]}:{remote_pkg_path}"
+                status, output = subprocess.getstatusoutput(cmd)
                 if status != 0:
-                    self.logger.log(f"Distributing package to {dbNode.name}: {remote_pkg_path}")
-                    cmd = f"scp {PkgPath} {dbNode.sshIps[0]}:{remote_pkg_path}"
-                    status, output = subprocess.getstatusoutput(cmd)
-                    if status != 0:
-                        raise Exception(f"Failed to distribute package to {dbNode.name}: {output}")
-                    self.logger.log(f"Package distributed to {dbNode.name}")
-                else:
-                    self.logger.log(f"Package already exists on {dbNode.name}: {remote_pkg_path}")
+                    raise Exception(f"Failed to distribute package to {dbNode.name}: {output}")
+                self.logger.log(f"Package distributed to {dbNode.name}")
         
         # 升级成功的节点列表
         upgraded_nodes = []
@@ -5770,19 +5764,12 @@ class dbClusterInfo():
                 local_cm_pkg = cmPkgPath
                 if dbNode.name != GetHostIpOrName():
                     target_pkg_path = os.path.join(clusterInfo.toolPath, cm_pkg_name)
-                    # 在远程节点检测包是否存在
-                    cmd = f"test -f {target_pkg_path}"
-                    status, _ = self.execute_on_node(
-                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    # 始终分发新包到远端（覆盖旧版本）
+                    self.logger.log(f"  Distributing CM package to {dbNode.name}: {target_pkg_path}")
+                    cmd = f"scp {cmPkgPath} {dbNode.sshIps[0]}:{target_pkg_path}"
+                    status, output = subprocess.getstatusoutput(cmd)
                     if status != 0:
-                        # 远端不存在该包，进行分发
-                        self.logger.log(f"  Distributing CM package to {dbNode.name}: {target_pkg_path}")
-                        cmd = f"scp {cmPkgPath} {dbNode.sshIps[0]}:{target_pkg_path}"
-                        status, output = subprocess.getstatusoutput(cmd)
-                        if status != 0:
-                            raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
-                    else:
-                        self.logger.log(f"  CM package already exists on {dbNode.name}: {target_pkg_path}")
+                        raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
                     local_cm_pkg = target_pkg_path
 
                 # 在远端临时目录解压 cm 包
@@ -6082,29 +6069,21 @@ class dbClusterInfo():
             self.logger.log("Step 1: Distributing packages to all nodes...")
             for dbNode in nodes_to_upgrade:
                 if dbNode.name != GetHostIpOrName():
-                    # 分发 GR 包
+                    # 分发 GR 包（始终覆盖，确保使用新版本）
                     gr_target = os.path.join(clusterInfo.toolPath, gr_pkg_name)
-                    cmd = f"test -f {gr_target}"
-                    status, _ = self.execute_on_node(
-                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    self.logger.log(f"  Distributing GR package to {dbNode.name}")
+                    cmd = f"scp {grPkgPath} {dbNode.sshIps[0]}:{gr_target}"
+                    status, output = subprocess.getstatusoutput(cmd)
                     if status != 0:
-                        self.logger.log(f"  Distributing GR package to {dbNode.name}")
-                        cmd = f"scp {grPkgPath} {dbNode.sshIps[0]}:{gr_target}"
-                        status, output = subprocess.getstatusoutput(cmd)
-                        if status != 0:
-                            raise Exception(f"Failed to distribute GR package to {dbNode.name}: {output}")
+                        raise Exception(f"Failed to distribute GR package to {dbNode.name}: {output}")
                     
-                    # 分发 CM 包
+                    # 分发 CM 包（始终覆盖，确保使用新版本）
                     cm_target = os.path.join(clusterInfo.toolPath, cm_pkg_name)
-                    cmd = f"test -f {cm_target}"
-                    status, _ = self.execute_on_node(
-                        dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                    self.logger.log(f"  Distributing CM package to {dbNode.name}")
+                    cmd = f"scp {cmPkgPath} {dbNode.sshIps[0]}:{cm_target}"
+                    status, output = subprocess.getstatusoutput(cmd)
                     if status != 0:
-                        self.logger.log(f"  Distributing CM package to {dbNode.name}")
-                        cmd = f"scp {cmPkgPath} {dbNode.sshIps[0]}:{cm_target}"
-                        status, output = subprocess.getstatusoutput(cmd)
-                        if status != 0:
-                            raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
+                        raise Exception(f"Failed to distribute CM package to {dbNode.name}: {output}")
             self.logger.log("  Package distribution completed")
 
             # ===== Step 2: 停止整个集群 =====
@@ -6335,6 +6314,14 @@ class dbClusterInfo():
         # 3. 重启整个集群
         self.logger.log("Restarting cluster after rollback...")
         if cm_ctl_path:
+
+            cmd = f"{env_source}{cm_ctl_path} stop"
+            status, output = subprocess.getstatusoutput(cmd)
+            if status != 0:
+                self.logger.warn(f"Failed to stop cluster: {output}")
+            else:
+                self.logger.log("Cluster stopped successfully")
+
             cmd = f"{env_source}{cm_ctl_path} start"
             status, output = subprocess.getstatusoutput(cmd)
             if status != 0:
