@@ -1055,6 +1055,8 @@ class dbClusterInfo():
         self.caPath = ""
         self.wormPath = ""
         self.installPath = ""
+        # oGRecorder rest
+        self.rest_nodes_list = ""
 
     def __str__(self):
         """
@@ -2340,6 +2342,8 @@ class dbClusterInfo():
         # Read gr info
         status, self.gr_nodes_list = self.readOneClusterConfigItem(
             xmlRootNode, "gr_nodes_list", "cluster")
+        status, self.rest_nodes_list = self.readOneClusterConfigItem(
+            xmlRootNode, "rest_nodes_list", "cluster")
 
     def get_cluster_back_ip1s(self):
         # Read cluster backIp1s
@@ -5067,6 +5071,20 @@ class dbClusterInfo():
                 raise Exception(f"failed to distribute rest_ssl.properties, Error output:\n{output}")
             self.logger.log("Successfully distribute rest_ssl.properties.")
 
+            rest_ip_map = {}
+            for item in clusterInfo.rest_nodes_list.split(','):
+                parts = item.split(':')
+                if len(parts) >= 2:
+                    rest_ip_map[int(parts[0])] = parts[1]
+            for dbNode in clusterInfo.dbNodes:
+                rest_ip = rest_ip_map.get(dbNode.id - 1, "")
+                cmd = 'echo "server.address=%s" >> %s/bin/rest_ssl.properties' % (rest_ip, clusterInfo.appPath)
+                status, output = self.execute_on_node(
+                    dbNode.name, cmd, local_name=GetHostIpOrName(), ssh_ip=dbNode.sshIps[0])
+                if status != 0:
+                    raise Exception(f"failed to set server.address in rest_ssl.properties, Error output:\n{output}")
+            self.logger.log("Successfully set server.address in rest_ssl.properties.")
+
         # py_pstree.py脚本
         self.distribute_file("py_pstree.py", script_path, clusterInfo.dbNodes, set_executable=True)
         self.logger.log("Successfully distribute py_pstree.py.")
@@ -7736,58 +7754,21 @@ class InstallImpl:
         if status != 0:
             self.logger.logExit(f"Failed to create truststore.jks.\n" + output)
 
-        # 创建或更新rest_ssl.properties配置文件
         rest_ssl_conf = os.path.join(self.gaussHome, "bin/rest_ssl.properties")
-        rest_ssl_template = os.path.join(os.path.dirname(__file__), "rest_ssl.properties")
-        
-        # 如果模板文件存在，读取模板；否则创建默认配置
-        if os.path.exists(rest_ssl_template):
-            with open(rest_ssl_template, 'r', encoding='utf-8') as f:
-                ssl_config_content = f.read()
-        else:
-            # 创建默认配置内容
-            ssl_config_content = """# SSL Configuration for CM-RestAPI
-# This file contains SSL/TLS configuration parameters
+        escaped_passwd = passwd.replace('\\', '\\\\').replace('#', '\\#').replace('&', '\\&')
+        sed_cmd = f"sed -i 's#^server\\.ssl\\.trust-store-password=.*#server.ssl.trust-store-password={escaped_passwd}#' {rest_ssl_conf}"
 
-# Server port
-server.port=8443
-
-# SSL enabled
-server.ssl.enabled=true
-
-# Keystore configuration (server certificate)
-server.ssl.key-store=${GAUSSHOME}/share/sslcert/restapi/server.p12
-server.ssl.key-store-password=
-server.ssl.key-store-type=PKCS12
-server.ssl.key-alias=rest-server
-
-# Truststore configuration (client certificate verification)
-server.ssl.client-auth=need
-server.ssl.trust-store=${GAUSSHOME}/share/sslcert/restapi/truststore.jks
-server.ssl.trust-store-password=
-server.ssl.trust-store-type=JKS
-"""
-        
-        # 替换信任库密码
-        ssl_config_content = ssl_config_content.replace(
-            'server.ssl.trust-store-password=',
-            f'server.ssl.trust-store-password={passwd}'
-        )
-        
-        # 确保目录存在
-        os.makedirs(os.path.dirname(rest_ssl_conf), exist_ok=True)
-        
-        # 写入配置文件
-        with open(rest_ssl_conf, 'w', encoding='utf-8') as f:
-            f.write(ssl_config_content)
-        
-        self.logger.log(f"Successfully created/updated {rest_ssl_conf} with truststore password.")
-        
-        # 设置配置文件权限（只读）
-        chmod_conf_cmd = f'chmod 600 {rest_ssl_conf}'
-        status, output = subprocess.getstatusoutput(chmod_conf_cmd)
-        if status != 0:
-            self.logger.logExit(f"Failed to set permissions for {rest_ssl_conf}.\n" + output)
+        for host in self.hostnames:
+            if host == self.localhostName:
+                status, output = subprocess.getstatusoutput(sed_cmd)
+                if status != 0:
+                    self.logger.logExit(f"Failed to update rest_ssl.properties on {host}.\n" + output)
+                self.logger.log(f"Successfully updated {rest_ssl_conf} with truststore password on {host}.")
+            else:
+                status, output = self.executeCmdOnHost(host, sed_cmd)
+                if status != 0:
+                    self.logger.logExit(f"Failed to update rest_ssl.properties on {host}.\n" + output)
+                self.logger.log(f"Successfully updated {rest_ssl_conf} with truststore password on {host}.")
 
         # 密码置空
         passwd = ""
@@ -7874,41 +7855,6 @@ server.ssl.trust-store-type=JKS
                 errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (scpCmd, status, output)
                 self.logger.debug(errorDetail)
                 self.logger.logExit("Failed to create CA for RestAPI.")
-        
-        # 分发rest_ssl.properties配置文件到各个节点
-        rest_ssl_conf = os.path.join(self.gaussHome, "bin/rest_ssl.properties")
-        if os.path.exists(rest_ssl_conf):
-            for host in self.hostnames:
-                if host == self.localhostName:
-                    continue
-                
-                ssh_ip = host
-                try:
-                    if hasattr(self, 'clusterInfo') and self.clusterInfo:
-                        for dbNode in self.clusterInfo.dbNodes:
-                            if dbNode.name == host and hasattr(dbNode, 'sshIps') and dbNode.sshIps:
-                                ssh_ip = dbNode.sshIps[0]
-                                break
-                except:
-                    pass
-                
-                # Determine if the host is an IPv6 address and format accordingly
-                if ":" in ssh_ip:
-                    formatted_host = "[{}]".format(ssh_ip)
-                else:
-                    formatted_host = ssh_ip
-                
-                # 分发配置文件到目标节点的 bin 目录
-                target_path = os.path.join(self.gaussHome, "bin")
-                scpCmd = "scp {config_file} {host}:{target_path}/rest_ssl.properties".format(
-                    config_file=rest_ssl_conf, host=formatted_host, target_path=target_path)
-                status, output = subprocess.getstatusoutput(scpCmd)
-                if status != 0:
-                    errorDetail = "\nCommand: %s\nStatus: %s\nOutput: %s" % (scpCmd, status, output)
-                    self.logger.debug(errorDetail)
-                    self.logger.logExit("Failed to distribute rest_ssl.properties to %s." % host)
-            
-            self.logger.log("Successfully distribute rest_ssl.properties to all nodes.")
 
         if os.path.exists(self.restpkg):
             target_path = os.path.join(self.gaussHome, "bin")
@@ -8721,10 +8667,15 @@ def json_to_xml(json_file):
     # 构建节点列表字符串
     node_names = [node['name'] for node in config['cluster']['nodes']]
     back_ips = [node['ip'] for node in config['cluster']['nodes']]
+    back_rest_ips = [node.get('rest_ip', '') for node in config['cluster']['nodes']]
     gr_nodes_list = []
+    rest_nodes_list = []
     for i, node in enumerate(config['cluster']['nodes']):
         gr_nodes_list.append(f"{i}:{node['ip']}:{node['gr_port']}")
-    
+        rest_ip = node.get('rest_ip', '')
+        rest_port = node.get('rest_port', '')
+        if rest_ip and rest_port:
+            rest_nodes_list.append(f"{i}:{rest_ip}:{rest_port}")
     # 创建临时XML文件
     xml_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <ROOT>
@@ -8733,7 +8684,9 @@ def json_to_xml(json_file):
         <PARAM name="nodeNames" value="{','.join(node_names)}"/>
         <PARAM name="installPath" value="{config['cluster']['install_path']}"/>
         <PARAM name="backIp1s" value="{','.join(back_ips)}"/>
+        <PARAM name="backRestIp1s" value="{','.join(back_rest_ips)}"/>
         <PARAM name="gr_nodes_list" value="{','.join(gr_nodes_list)}"/>
+        <PARAM name="rest_nodes_list" value="{','.join(rest_nodes_list)}"/>
         <PARAM name="wormPath" value="{config['cluster'].get('worm_path', '/tmp/')}"/>
         <PARAM name="caPath" value="{config['cluster'].get('ca_path', 'CA')}"/>
     </CLUSTER>
