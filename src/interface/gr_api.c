@@ -523,6 +523,35 @@ int gr_file_delete(gr_vfs_handle vfs_handle, const char *name, unsigned long lon
     return (int)ret;
 }
 
+int gr_vfs_exist(gr_instance_handle inst_handle, const char *vfs_name, bool *is_exist)
+{
+    if (validate_instance_handle(inst_handle, "gr_vfs_exist") != GR_SUCCESS ||
+        validate_string_param(vfs_name, "vfs_name", "gr_vfs_exist") != GR_SUCCESS ||
+        validate_pointer_param(is_exist, "is_exist", "gr_vfs_exist") != GR_SUCCESS) {
+        return GR_ERROR;
+    }
+
+    st_gr_instance_handle *hdl = (st_gr_instance_handle*)(inst_handle);
+    if (hdl->conn == NULL) {
+        LOG_RUN_ERR("gr_vfs_exist get conn error.");
+        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
+        return GR_ERROR;
+    }
+
+    bool32 exist = false;
+    gft_item_type_t type;
+    status_t ret = gr_exist_impl(hdl->conn, vfs_name, &exist, &type);
+    if (ret != CM_SUCCESS) {
+        *is_exist = false;
+        LOG_DEBUG_INF("gr_vfs_exist: failed to check vfs existence for %s", vfs_name);
+        return GR_ERROR;
+    }
+
+    /* VFS must be a directory (GFT_PATH) */
+    *is_exist = (exist && type == GFT_PATH);
+    return GR_SUCCESS;
+}
+
 int gr_file_exist(gr_vfs_handle vfs_handle, const char *name, bool *is_exist)
 {
     if (validate_vfs_handle(vfs_handle, "gr_file_exist") != GR_SUCCESS ||

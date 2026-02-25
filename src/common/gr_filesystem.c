@@ -49,7 +49,7 @@
 extern "C" {
 #endif
 
-// 统一错误处理宏
+// Unified error handling macros
 #define CHECK_FS_ERROR_RETURN(condition, error_code, error_msg, ...) \
     do { \
         if (!(condition)) { \
@@ -64,24 +64,39 @@ extern "C" {
 
 static void gr_get_fs_path(const char *name, char *buf, size_t buf_size)
 {
-        int ret = snprintf_s(buf, buf_size, buf_size - 1, "%s/%s", 
-                         g_inst_cfg->params.data_file_path, name);
-        if (ret < 0) {
-            LOG_RUN_ERR("[FS] gr_get_fs_path snprintf_s failed: %d", ret);
-            if (buf_size > 0) {
-                buf[0] = '\0';
-            }
+    if (name == NULL || buf == NULL || buf_size == 0) {
+        if (buf != NULL && buf_size > 0) {
+            buf[0] = '\0';
         }
+        return;
+    }
+    
+    if (g_inst_cfg == NULL || g_inst_cfg->params.data_file_path == NULL) {
+        LOG_RUN_ERR("[FS] gr_get_fs_path: g_inst_cfg is NULL or data_file_path is NULL");
+        if (buf_size > 0 && buf != NULL) {
+            buf[0] = '\0';
+        }
+        return;
+    }
+    
+    int ret = snprintf_s(buf, buf_size, buf_size - 1, "%s/%s",
+                         g_inst_cfg->params.data_file_path, name);
+    if (ret < 0) {
+        LOG_RUN_ERR("[FS] gr_get_fs_path snprintf_s failed: %d", ret);
+        if (buf_size > 0 && buf != NULL) {
+            buf[0] = '\0';
+        }
+    }
 }
 
 typedef struct gr_dir_map_item {
     hash_node_t node;
     uint64_t handle;
     DIR *dir;
-    pthread_mutex_t lock;  // 句柄级别的锁，保护 DIR* 的并发访问
+    pthread_mutex_t lock;  // Per-handle lock to protect concurrent access to DIR*
 } gr_dir_map_item_t;
 
-#define MAX_DIR_HANDLE_COUNT 10000  // 增加到10000个句柄
+#define MAX_DIR_HANDLE_COUNT 10000  // Maximum number of directory handles
 #define DIR_MAP_LOCK_TIMEOUT_MS 500
 #define DIR_MAP_BUCKET_COUNT 256
 
@@ -170,12 +185,12 @@ void gr_dir_map_cleanup(void) {
         if (item->dir) {
             closedir(item->dir);
         }
-        pthread_mutex_destroy(&item->lock);  // 销毁句柄锁
+        pthread_mutex_destroy(&item->lock);  // Destroy per-handle lock
         free(item);
         curr = next;
     }
     
-    // Free buckets
+    // Free hash buckets
     if (g_dir_map.buckets) {
         free(g_dir_map.buckets);
         g_dir_map.buckets = NULL;
@@ -202,11 +217,11 @@ uint64_t gr_dir_map_insert(DIR *dir) {
     
     uint64_t handle = 0;
     
-    // 优先重用已释放的句柄
+    // Prefer to reuse freed handles first
     if (g_freed_handle_count > 0) {
         handle = g_freed_handles[--g_freed_handle_count];
     } else {
-        // 如果没有可重用的句柄，分配新的
+        // If there are no reusable handles, allocate a new one
         if (g_next_dir_handle >= MAX_DIR_HANDLE_COUNT) {
             pthread_mutex_unlock(&g_dir_map_lock);
             LOG_RUN_ERR("[FS] Directory handle limit exceeded: %lu (max: %d)", g_next_dir_handle, MAX_DIR_HANDLE_COUNT);
@@ -217,7 +232,7 @@ uint64_t gr_dir_map_insert(DIR *dir) {
     
     gr_dir_map_item_t *item = calloc(1, sizeof(gr_dir_map_item_t));
     if (item == NULL) {
-        // 如果分配失败，将句柄放回重用池
+        // If allocation fails, put the handle back into the reuse pool
         if (g_freed_handle_count < MAX_DIR_HANDLE_COUNT) {
             g_freed_handles[g_freed_handle_count++] = handle;
         }
@@ -228,13 +243,13 @@ uint64_t gr_dir_map_insert(DIR *dir) {
     
     item->handle = handle;
     item->dir = dir;
-    pthread_mutex_init(&item->lock, NULL);  // 初始化句柄锁
+    pthread_mutex_init(&item->lock, NULL);  // Initialize per-handle lock
     
     // Insert into CBB hash map
     if (cm_hmap_insert(&g_dir_map, &g_dir_map_funcs, (hash_node_t*)item) != CM_TRUE) {
         pthread_mutex_destroy(&item->lock);
         free(item);
-        // 如果插入失败，将句柄放回重用池
+        // If insertion fails, put the handle back into the reuse pool
         if (g_freed_handle_count < MAX_DIR_HANDLE_COUNT) {
             g_freed_handles[g_freed_handle_count++] = handle;
         }
@@ -268,7 +283,7 @@ DIR *gr_dir_map_get(uint64_t handle) {
     return (item != NULL) ? item->dir : NULL;
 }
 
-// 获取 DIR* 并加句柄锁（调用者必须调用 gr_dir_map_unlock 解锁）
+// Get DIR* and acquire the per-handle lock (caller must call gr_dir_map_unlock to unlock)
 DIR *gr_dir_map_get_and_lock(uint64_t handle) {
     if (handle == 0) {
         return NULL;
@@ -290,14 +305,14 @@ DIR *gr_dir_map_get_and_lock(uint64_t handle) {
         return NULL;
     }
     
-    // 先加句柄锁，再释放全局锁
+    // Acquire the per-handle lock first, then release the global lock
     pthread_mutex_lock(&item->lock);
     pthread_mutex_unlock(&g_dir_map_lock);
     
     return item->dir;
 }
 
-// 解锁句柄
+// Unlock directory handle
 void gr_dir_map_unlock(uint64_t handle) {
     if (handle == 0) {
         return;
@@ -337,10 +352,10 @@ void gr_dir_map_remove(uint64_t handle) {
     hash_node_t *node = cm_hmap_delete(&g_dir_map, &g_dir_map_funcs, &key);
     if (node != NULL) {
         gr_dir_map_item_t *item = (gr_dir_map_item_t*)node;
-        pthread_mutex_destroy(&item->lock);  // 销毁句柄锁
+        pthread_mutex_destroy(&item->lock);  // Destroy per-handle lock
         free(item);
         
-        // 将句柄放入重用池
+        // Put the handle into the reuse pool
         if (g_freed_handle_count < MAX_DIR_HANDLE_COUNT) {
             g_freed_handles[g_freed_handle_count++] = handle;
         }
@@ -383,7 +398,7 @@ status_t gr_filesystem_mkdir(const char *name, mode_t mode) {
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(name, path, sizeof(path));
     
-    CHECK_FS_ERROR_RETURN(access(path, F_OK) != 0, ERR_GR_DIR_CREATE_DUPLICATED, 
+    CHECK_FS_ERROR_RETURN(access(path, F_OK) != 0, ERR_GR_DIR_CREATE_DUPLICATED,
                           "Directory already exists: %s", name);
     
     CHECK_FS_ERROR_RETURN(mkdir(path, mode) == 0, ERR_GR_FILE_SYSTEM_ERROR,
@@ -407,7 +422,7 @@ status_t gr_filesystem_rmdir(const char *name, uint64_t flag) {
         char subpath[GR_FILE_PATH_MAX_LENGTH];
 
         while ((entry = readdir(dir)) != NULL) {
-            // "." 和 ".." 的第一个字符都是 '.'，第二个字符是 '\0' 或 '.'
+            // Both "." and ".." start with '.', second char is '\0' or '.'
             const char *entry_name = entry->d_name;
             if (entry_name[0] == '.' && (entry_name[1] == '\0' || (entry_name[1] == '.' && entry_name[2] == '\0'))) {
                 continue;
@@ -454,7 +469,7 @@ status_t gr_filesystem_opendir(const char *name, uint64_t *out_handle)
     LOG_RUN_INF("[FS] Successfully opened directory: %s", name);
     uint64_t handle = gr_dir_map_insert(dir);
     if (handle == 0) {
-        // 如果插入失败，需要关闭已打开的目录
+        // If insertion fails, close the opened directory
         closedir(dir);
         LOG_RUN_ERR("[FS] Failed to insert directory into map: %s", name);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR, "Failed to insert directory into map");
@@ -466,7 +481,7 @@ status_t gr_filesystem_opendir(const char *name, uint64_t *out_handle)
 
 status_t gr_filesystem_closedir(uint64_t handle)
 {
-    // 获取 DIR* 并加句柄锁，确保没有其他线程正在使用
+    // Get DIR* and acquire per-handle lock to ensure no other thread is using it
     DIR *dir = gr_dir_map_get_and_lock(handle);
     if (!dir) {
         LOG_RUN_ERR("[FS] Invalid directory handle: %lu", handle);
@@ -479,7 +494,7 @@ status_t gr_filesystem_closedir(uint64_t handle)
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-    // 注意：closedir 成功后不需要解锁，因为 gr_dir_map_remove 会销毁锁
+    // Note: after closedir succeeds we do not unlock, gr_dir_map_remove will destroy the lock
     gr_dir_map_remove(handle);
     LOG_RUN_INF("[FS] Successfully closed directory");
     return CM_SUCCESS;
@@ -495,7 +510,7 @@ status_t gr_filesystem_append(const char *name) {
     }
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(name, path, sizeof(path));
-    // when file is null can be changed to append mode from lock mode or expired mode
+    // When file is empty it can be changed to append mode from lock mode or expired mode
     if ((access(path, W_OK) == -1) && (end_position == 0)) {
         LOG_RUN_INF("File %s can enter into append mode.", name);
         if (chmod(path, GR_APPEND_MODE) != CM_SUCCESS) {
@@ -561,8 +576,9 @@ status_t gr_filesystem_pwrite(int handle, int64 offset, int64 size, const char *
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     } else if (*rel_size != size) {
-        LOG_RUN_WAR("[FS] Failed to write to handle: %d, offset: %lld, size: %lld, errno: %d", handle, offset, size, errno);
-    }   
+        LOG_RUN_WAR("[FS] Failed to write to handle: %d, offset: %lld, size: %lld, errno: %d",
+                    handle, offset, size, errno);
+    }
     return CM_SUCCESS;
 }
 
@@ -572,15 +588,16 @@ status_t gr_filesystem_write(int handle, int64 size, const char *buf, int64 *rel
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM);
         return CM_ERROR;
     }
-    // 文件在open时已经自动添加了O_APPEND标志，write会自动追加到文件末尾
+    // When file is opened with O_APPEND, write will automatically append at the file end
     *rel_size = write(handle, buf, size);
     if (*rel_size == -1) {
         LOG_RUN_ERR("[FS] Failed to write to handle: %d, size: %lld, errno: %d", handle, size, errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     } else if (*rel_size != size) {
-        LOG_RUN_WAR("[FS] Partial write to handle: %d, expected: %lld, actual: %lld, errno: %d", handle, size, *rel_size, errno);
-    }   
+        LOG_RUN_WAR("[FS] Partial write to handle: %d, expected: %lld, actual: %lld, errno: %d",
+                    handle, size, *rel_size, errno);
+    }
     return CM_SUCCESS;
 }
 
@@ -604,26 +621,41 @@ status_t gr_filesystem_query_file_num(uint64_t handle, uint32_t *file_num) {
         LOG_RUN_ERR("[FS] Invalid parameters: file_num is NULL");
         return CM_ERROR;
     }
-    
-    // 获取 DIR* 并加句柄锁
-    DIR *dir = gr_dir_map_get_and_lock(handle);
+    DIR *dir = gr_dir_map_get(handle);
     if (!dir) {
         LOG_RUN_ERR("[FS] Invalid directory handle: %lu", handle);
         return CM_ERROR;
     }
-    
     struct dirent *entry;
     *file_num = 0;
+
     rewinddir(dir);
     while ((entry = readdir(dir)) != NULL) {
+        /* Skip "." and ".." */
+        if (entry->d_name[0] == '.' &&
+            (entry->d_name[1] == '\0' ||
+             (entry->d_name[1] == '.' && entry->d_name[2] == '\0'))) {
+            continue;
+        }
+
+        /* Fast path: d_type is clearly a regular file */
         if (entry->d_type == DT_REG) {
             (*file_num)++;
+            continue;
+        }
+
+        /* For unreliable d_type (DT_UNKNOWN), use fstatat for accurate judgment */
+        if (entry->d_type == DT_UNKNOWN) {
+            struct stat st;
+            int dir_fd = dirfd(dir);
+            if (dir_fd >= 0) {
+                if (fstatat(dir_fd, entry->d_name, &st, 0) == 0 && S_ISREG(st.st_mode)) {
+                    (*file_num)++;
+                }
+            }
         }
     }
     rewinddir(dir);
-    
-    // 解锁句柄
-    gr_dir_map_unlock(handle);
     return CM_SUCCESS;
 }
 
@@ -633,7 +665,7 @@ status_t gr_filesystem_query_file_info(uint64_t handle, gr_file_item_t *file_ite
         return CM_ERROR;
     }
     
-    // 获取 DIR* 并加句柄锁
+    // Get DIR* and acquire per-handle lock
     DIR *dir = gr_dir_map_get_and_lock(handle);
     if (!dir) {
         LOG_RUN_ERR("[FS] Invalid directory handle: %lu", handle);
@@ -657,7 +689,7 @@ status_t gr_filesystem_query_file_info(uint64_t handle, gr_file_item_t *file_ite
         }
     }
     
-    // 解锁句柄
+    // Unlock handle
     gr_dir_map_unlock(handle);
     return CM_SUCCESS;
 }
@@ -680,21 +712,38 @@ status_t gr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
 }
 
 status_t gr_filesystem_open(const char *file_path, int flag, int *fd) {
+    if (file_path == NULL || fd == NULL) {
+        LOG_RUN_ERR("[FS] Invalid parameters: file_path or fd is NULL");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM);
+        return CM_ERROR;
+    }
+    
     if (gr_filesystem_append(file_path) != CM_SUCCESS) {
         LOG_RUN_ERR("[FS] Failed to change file %s to append mode, errno: %d", file_path, errno);
         return CM_ERROR;
     }
+    
     char path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(file_path, path, sizeof(path));
-    // 自动添加O_APPEND标志，这样无论使用pwrite还是append接口都能自动追加
-    // 只有在写模式下才添加O_APPEND（O_RDWR或O_WRONLY）
+    
+    // Check if path is valid (not empty)
+    if (path[0] == '\0') {
+        LOG_RUN_ERR("[FS] Failed to build path for file: %s", file_path);
+        GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
+        return CM_ERROR;
+    }
+    
+    // Automatically add O_APPEND so both pwrite and append interfaces can append
+    // Only add O_APPEND in write modes (O_RDWR or O_WRONLY)
     int open_flag = flag | O_SYNC;
     if ((flag & O_RDWR) || (flag & O_WRONLY)) {
         open_flag |= O_APPEND;
     }
+    
     *fd = open(path, open_flag, 0);
     if (*fd == -1) {
-        LOG_RUN_ERR("[FS] Failed to open file: %s, errno: %d", file_path, errno);
+        LOG_RUN_ERR("[FS] Failed to open file: %s (full path: %s), errno: %d (%s)",
+                    file_path, path, errno, strerror(errno));
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
@@ -794,7 +843,7 @@ status_t gr_filesystem_check_postpone_time(const char *file_name, time_t new_tim
 
     if (atime >= new_time) {
         LOG_RUN_ERR("[FS] new expire time should be later than current expire time, file %s current expire time is: %s",
-            file_name, ctime(&atime));
+                    file_name, ctime(&atime));
         return CM_ERROR;
     }
     return CM_SUCCESS;
@@ -817,7 +866,7 @@ status_t gr_filesystem_postpone(const char *file_path, const char *time)
 
     if (file_stat.st_atime >= new_time) {
         LOG_RUN_ERR("[FS] new expire time should be later than current expire time, file %s current expire time is: %s",
-            file_path, ctime(&file_stat.st_atime));
+                    file_path, ctime(&file_stat.st_atime));
         GR_THROW_ERROR(ERR_GR_FILE_INVALID_EXPIRE_TIME);
         return CM_ERROR;
     }
@@ -833,31 +882,33 @@ status_t gr_filesystem_postpone(const char *file_path, const char *time)
 
 status_t gr_filesystem_exist_item(const char *dir_path, bool32 *result, gft_item_type_t *output_type)
 {
-    if (dir_path == NULL || dir_path[0] == '\0') {
-        return CM_ERROR;
-    }
-    if (g_inst_cfg == NULL || g_inst_cfg->params.data_file_path == NULL) {
-        LOG_RUN_ERR("[FS] gr_filesystem_exist_item: g_inst_cfg or data_file_path is NULL");
-        GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR, "g_inst_cfg or data_file_path is NULL");
-        return CM_ERROR;
-    }
-
     *result = false;
     *output_type = -1;
+
+    if (dir_path == NULL || dir_path[0] == '\0') {
+        return CM_SUCCESS;
+    }
+    if (g_inst_cfg == NULL || g_inst_cfg->params.data_file_path == NULL) {
+        return CM_SUCCESS;
+    }
+
     struct stat st;
 
     static char path[GR_FILE_PATH_MAX_LENGTH];
     int err = snprintf_s(path, GR_FILE_PATH_MAX_LENGTH, GR_FILE_PATH_MAX_LENGTH - 1,
-                               "%s/%s", g_inst_cfg->params.data_file_path, (dir_path));
-    GR_SECUREC_SS_RETURN_IF_ERROR(err, CM_ERROR);
+                         "%s/%s", g_inst_cfg->params.data_file_path, (dir_path));
+    if (err < 0) {
+        return CM_SUCCESS;
+    }
 
     if (lstat(path, &st) != 0) {
-        LOG_RUN_ERR("failed to get stat for path %s, errno %d.\n", path, errno);
         if (errno == ENOENT) {
             *result = false;
             return CM_SUCCESS;
         }
-        return CM_ERROR;
+        /* For other errors, just return not exist */
+        *result = false;
+        return CM_SUCCESS;
     }
 
     if (S_ISREG(st.st_mode)) {
@@ -867,9 +918,9 @@ status_t gr_filesystem_exist_item(const char *dir_path, bool32 *result, gft_item
     } else if (S_ISLNK(st.st_mode)) {
         *output_type = GFT_LINK;
     } else {
-        LOG_RUN_ERR("file %s type is %o, not supported", path, st.st_mode);
-        *output_type = -1;
-        return CM_ERROR;
+        /* Unsupported file type, just return not exist */
+        *result = false;
+        return CM_SUCCESS;
     }
     *result = true;
 

@@ -154,6 +154,7 @@ endif()
 
 message(STATUS "Version info: ${GR_VERSION_STR}")
 
+add_compile_options(-Wno-builtin-macro-redefined)
 set(CMAKE_C_FLAGS "-std=c99 ${CMAKE_C_FLAGS} -D__FILE_NAME__='\"$(notdir $(subst .o,,$(abspath $@)))\"'" )
 
 

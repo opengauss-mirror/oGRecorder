@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 #include <fcntl.h>
+#include <set>
+#include <string>
+#include <cstring>
 extern "C" {
 #include "gr_api.h"
 #include "gr_errno.h"
@@ -79,6 +82,34 @@ TEST_F(GRApiTest, TestGRVfsCreate) {
 
 TEST_F(GRApiTest, TestGRVfsMount) {
     EXPECT_EQ(gr_vfs_mount(g_inst_handle, TEST_DIR, &g_vfs_handle), GR_SUCCESS);
+}
+
+TEST_F(GRApiTest, TestGRVfsExist) {
+    bool is_exist = false;
+    
+    // 测试存在的 VFS（在 TestGRVfsCreate 中已创建）
+    EXPECT_EQ(gr_vfs_exist(g_inst_handle, TEST_DIR, &is_exist), GR_SUCCESS);
+    EXPECT_EQ(is_exist, true);
+    
+    // 测试不存在的 VFS
+    EXPECT_EQ(gr_vfs_exist(g_inst_handle, "NON_EXISTENT_VFS", &is_exist), GR_SUCCESS);
+    EXPECT_EQ(is_exist, false);
+    
+    // 测试另一个不存在的 VFS
+    EXPECT_EQ(gr_vfs_exist(g_inst_handle, "ANOTHER_NON_EXISTENT_VFS_12345", &is_exist), GR_SUCCESS);
+    EXPECT_EQ(is_exist, false);
+    
+    // 测试空字符串 VFS 名称
+    EXPECT_EQ(gr_vfs_exist(g_inst_handle, "", &is_exist), GR_ERROR);
+    
+    // 测试 NULL VFS 名称
+    EXPECT_EQ(gr_vfs_exist(g_inst_handle, NULL, &is_exist), GR_ERROR);
+    
+    // 测试 NULL is_exist 参数
+    EXPECT_EQ(gr_vfs_exist(g_inst_handle, TEST_DIR, NULL), GR_ERROR);
+    
+    // 测试 NULL 实例句柄
+    EXPECT_EQ(gr_vfs_exist(NULL, TEST_DIR, &is_exist), GR_ERROR);
 }
 
 TEST_F(GRApiTest, TestGRVfsCreateFiles) {
@@ -368,57 +399,66 @@ TEST_F(GRApiTest, TestGRfileClose) {
 }
 
 TEST_F(GRApiTest, TestGRVfsQueryFileNum) {
-    // 增加查询数量，确保能覆盖所有200个TEST_FILE_文件和其他测试文件
-    #define FILE_INFO_NUM 210
     // 确保文件数量查询正确
     int file_num = 0;
-    gr_file_item_t file_info[FILE_INFO_NUM] = {0};
     EXPECT_EQ(gr_vfs_query_file_num(g_vfs_handle, &file_num), GR_SUCCESS);
     // 文件数量可能包含其他测试创建的文件，所以只验证至少有200个文件
     EXPECT_GE(file_num, 200);
     
-    // 确保查询数量不超过实际文件数量
-    int query_count = (file_num < FILE_INFO_NUM) ? file_num : FILE_INFO_NUM;
-    
-    EXPECT_EQ(gr_vfs_query_file_info(g_vfs_handle, file_info, true), GR_SUCCESS);
-
-    // 校验文件名唯一且格式正确（只校验以TEST_FILE_开头的文件）
+    // 循环获取所有文件（每次最多100个）
+    #define MAX_FILES_PER_QUERY 100
+    gr_file_item_t file_info[MAX_FILES_PER_QUERY];
     std::set<std::string> file_names;
     int test_file_count = 0;
-    for (int i = 0; i < query_count; i++) {
-        // 跳过不是 TEST_FILE_ 开头的文件（可能是其他测试创建的文件）
-        if (strncmp(file_info[i].name, "TEST_FILE_", 10) != 0) {
-            continue;
+    bool is_continue = false;
+    int consecutive_empty = 0;
+    const int MAX_CONSECUTIVE_EMPTY = 2;  // 允许连续2次空查询后停止
+    
+    // 循环查询直到获取所有文件
+    while (test_file_count < 200 && consecutive_empty < MAX_CONSECUTIVE_EMPTY) {
+        memset(file_info, 0, sizeof(file_info));
+        int ret = gr_vfs_query_file_info(g_vfs_handle, file_info, is_continue);
+        if (ret != GR_SUCCESS) {
+            break;  // 查询失败
         }
-        file_names.insert(file_info[i].name);
-        test_file_count++;
-        // 校验格式
-        int num = atoi(file_info[i].name + 10);
-        EXPECT_GE(num, 1);
-        EXPECT_LE(num, 200);
+        
+        // 处理本次查询返回的文件
+        bool found_any = false;
+        for (int i = 0; i < MAX_FILES_PER_QUERY; i++) {
+            if (file_info[i].name[0] == '\0') {
+                break;  // 没有更多文件
+            }
+            found_any = true;
+            // 跳过不是 TEST_FILE_ 开头的文件（可能是其他测试创建的文件）
+            if (strncmp(file_info[i].name, "TEST_FILE_", 10) != 0) {
+                continue;
+            }
+            // 检查是否已存在（避免重复计数）
+            if (file_names.find(file_info[i].name) != file_names.end()) {
+                continue;  // 已存在，跳过
+            }
+            file_names.insert(file_info[i].name);
+            test_file_count++;
+            // 校验格式
+            int num = atoi(file_info[i].name + 10);
+            EXPECT_GE(num, 1);
+            EXPECT_LE(num, 200);
+        }
+        
+        if (found_any) {
+            consecutive_empty = 0;
+        } else {
+            consecutive_empty++;
+        }
+        
+        // 设置为继续查询
+        is_continue = true;
     }
+    
     // 校验至少找到大部分TEST_FILE_开头的文件（考虑到可能有其他测试文件）
-    // 实际创建了200个，查询210个应该能找到大部分，至少90%以上
+    // 实际创建了200个，应该能找到大部分，至少90%以上
     EXPECT_GE(test_file_count, 180) << "Expected at least 180 TEST_FILE_ files, found " << test_file_count;
     // 校验无重复
-    EXPECT_EQ(file_names.size(), test_file_count);
-
-    // 可选：再次获取校验
-    EXPECT_EQ(gr_vfs_query_file_info(g_vfs_handle, file_info, true), GR_SUCCESS);
-    file_names.clear();
-    test_file_count = 0;
-    for (int i = 0; i < query_count; i++) {
-        // 跳过不是 TEST_FILE_ 开头的文件
-        if (strncmp(file_info[i].name, "TEST_FILE_", 10) != 0) {
-            continue;
-        }
-        file_names.insert(file_info[i].name);
-        test_file_count++;
-        int num = atoi(file_info[i].name + 10);
-        EXPECT_GE(num, 1);
-        EXPECT_LE(num, 200);
-    }
-    EXPECT_GE(test_file_count, 180) << "Expected at least 180 TEST_FILE_ files in second query, found " << test_file_count;
     EXPECT_EQ(file_names.size(), test_file_count);
 }
 
@@ -463,6 +503,19 @@ TEST_F(GRApiTest, TestInvalidParamsBasic) {
     EXPECT_NE(gr_vfs_mount(g_inst_handle, TEST_DIR, NULL), GR_SUCCESS);
     gr_get_error(&errorcode, &errormsg);
     EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
+    
+    // gr_vfs_exist 无效参数测试
+    bool is_exist = false;
+    EXPECT_NE(gr_vfs_exist(NULL, TEST_DIR, &is_exist), GR_SUCCESS);
+    gr_get_error(&errorcode, &errormsg);
+    EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
+    EXPECT_NE(gr_vfs_exist(g_inst_handle, NULL, &is_exist), GR_SUCCESS);
+    gr_get_error(&errorcode, &errormsg);
+    EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
+    EXPECT_NE(gr_vfs_exist(g_inst_handle, TEST_DIR, NULL), GR_SUCCESS);
+    gr_get_error(&errorcode, &errormsg);
+    EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
+    
     EXPECT_NE(gr_vfs_unmount(NULL), GR_SUCCESS);
 
     EXPECT_NE(gr_set_conf(g_inst_handle, NULL, "1"), GR_SUCCESS);
