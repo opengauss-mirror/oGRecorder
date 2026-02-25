@@ -185,6 +185,7 @@ GR_DECLARE int gr_vfs_create(gr_instance_handle inst_handle, const char *vfs_nam
 GR_DECLARE int gr_vfs_delete(gr_instance_handle inst_handle, const char *vfs_name, unsigned long long attrFlag);
 GR_DECLARE int gr_vfs_mount(gr_instance_handle inst_handle, const char *vfs_name, gr_vfs_handle *vfs_handle);
 GR_DECLARE int gr_vfs_unmount(gr_vfs_handle *vfs_handle);
+GR_DECLARE int gr_vfs_exist(gr_instance_handle inst_handle, const char *vfs_name, bool *is_exist);
 GR_DECLARE int gr_vfs_query_file_info(gr_vfs_handle vfs_handle, gr_file_item_t *result, bool is_continue);
 GR_DECLARE int gr_vfs_query_file_num(gr_vfs_handle vfs_handle, int *file_num);
 
