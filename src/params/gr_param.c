@@ -76,48 +76,50 @@ static config_item_t g_gr_params[] = {
     // ==================== Basic Configuration ====================
     {"INST_ID", CM_TRUE, ATTR_READONLY, "0", NULL, NULL, "-", "[0,64)", "GS_TYPE_INTEGER",
         NULL, 0, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1:1622", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+    {"LISTEN_ADDR", CM_TRUE, ATTR_READONLY, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 1, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
-    {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+    {"LISTEN_PORT", CM_TRUE, ATTR_READONLY, "1622", NULL, NULL, "-", "[1,65535]", "GS_TYPE_INTEGER",
         NULL, 2, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"DATA_FILE_PATH", CM_TRUE, ATTR_READONLY, "/tmp", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Logging Configuration ====================
     {"LOG_HOME", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 3, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 4, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"LOG_LEVEL", CM_TRUE, ATTR_NONE, "255", NULL, NULL, "-", "[0,16375]", "GS_TYPE_INTEGER",
-        NULL, 4, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
+        NULL, 5, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_level, gr_notify_log_level, NULL, NULL},
     {"LOG_FILE_COUNT", CM_TRUE, ATTR_NONE, "20", NULL, NULL, "-", "[0,128]", "GS_TYPE_INTEGER",
-        NULL, 5, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
+        NULL, 6, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_log_backup_file_count, gr_notify_log_backup_file_count, NULL, NULL},
     {"LOG_COMPRESSED", CM_TRUE, ATTR_READONLY, "FALSE", NULL, NULL, "-", "[FALSE,TRUE]", "GS_TYPE_BOOLEAN",
-        NULL, 6, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== SSL Security Configuration ====================
     {"HASH_AUTH_ENABLE", CM_TRUE, ATTR_NONE, "TRUE", NULL, NULL, "-", "FALSE,TRUE", "GS_TYPE_BOOLEAN",
-        NULL, 7, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 8, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Server SSL Configuration ====================
     {"SER_SSL_CA", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 12, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 9, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SER_SSL_KEY", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 13, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 10, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SER_SSL_CERT", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 14, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
     {"SER_SSL_CRL", CM_TRUE, ATTR_READONLY, "", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 15, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 12, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Network and Cluster Configuration ====================
     {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 8, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
+        NULL, 13, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
     {"IP_WHITE_LIST", CM_TRUE, ATTR_READONLY, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 9, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 14, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Performance and Thread Configuration ====================
     {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
-        NULL, 10, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+        NULL, 15, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
 
     // ==================== Message and Memory Configuration ====================
     {"RECV_MSG_POOL_SIZE", CM_TRUE, ATTR_READONLY, "48M", NULL, NULL, "-", "[9M,1G]", "GS_TYPE_INTEGER",
-        NULL, 11, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL}
+        NULL, 16, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL}
 };
 
 static const char *g_gr_config_file = (const char *)"gr_inst.ini";
@@ -261,35 +263,37 @@ static status_t gr_load_mes_params(gr_config_t *inst_cfg)
 
 static status_t gr_load_listen_addr(gr_config_t *inst_cfg)
 {
-    char *value = cm_get_config_value(&inst_cfg->config, "LISTEN_ADDR");
-    if (value == NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LISTEN_ADDR is not set");
-        return CM_ERROR;
+    // LISTEN_ADDR: comma-separated IP list, e.g. "10.0.0.1,10.0.0.2"
+    // Use default value "127.0.0.1" if not set in config file
+    char *addr_value = cm_get_config_value(&inst_cfg->config, "LISTEN_ADDR");
+    if (addr_value == NULL || addr_value[0] == '\0') {
+        addr_value = "127.0.0.1";  // Use default value
     }
 
-    char buffer[GR_MAX_PATH_BUFFER_SIZE];
-    strncpy(buffer, value, sizeof(buffer) - 1);
-    buffer[sizeof(buffer) - 1] = '\0';
-
-    char *colon_pos = strchr(buffer, ':');
-    if (colon_pos == NULL) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LISTEN_ADDR format is invalid, expected IP:Port");
-        return CM_ERROR;
+    // LISTEN_PORT: single port, e.g. "18001"
+    // Use default value "1622" if not set in config file
+    char *port_value = cm_get_config_value(&inst_cfg->config, "LISTEN_PORT");
+    if (port_value == NULL || port_value[0] == '\0') {
+        port_value = "1622";  // Use default value
     }
 
-    *colon_pos = '\0';
-    char *ip = buffer;
-    char *port_str = colon_pos + 1;
-
-    int port = atoi(port_str);
+    int port = atoi(port_value);
     if (port <= 0 || port > 65535) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "Port number is invalid");
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "LISTEN_PORT is invalid: %s", port_value);
         return CM_ERROR;
     }
 
-    strncpy(inst_cfg->params.listen_addr.host, ip, sizeof(inst_cfg->params.listen_addr.host) - 1);
+    // Save the raw LISTEN_ADDR string (which may contain multiple IPs separated by ',')
+    errno_t err = strncpy_s(inst_cfg->params.listen_addr.host,
+                            sizeof(inst_cfg->params.listen_addr.host),
+                            addr_value,
+                            sizeof(inst_cfg->params.listen_addr.host) - 1);
+    if (SECUREC_UNLIKELY(err != EOK)) {
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "copy LISTEN_ADDR failed");
+        return CM_ERROR;
+    }
     inst_cfg->params.listen_addr.host[sizeof(inst_cfg->params.listen_addr.host) - 1] = '\0';
-    inst_cfg->params.listen_addr.port = port;
+    inst_cfg->params.listen_addr.port = (uint16)port;
 
     return CM_SUCCESS;
 }

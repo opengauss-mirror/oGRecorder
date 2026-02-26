@@ -792,6 +792,7 @@ class dbNodeInfo():
         # gr
         self.grIp1 = ""
         self.listen_addr = ""
+        self.listen_port = ""
 
     def __cmp__(self, target):
         """
@@ -2662,6 +2663,14 @@ class dbClusterInfo():
                             % ("azPriority", dbNode.azPriority))
         dbNode.grIp1 = self.__readNodeStrValue(dbNode.name, "grIp1")
         dbNode.listen_addr = self.__readNodeStrValue(dbNode.name, "listen_addr")
+        # 读取 listen_port，如果不存在则从 listen_addr 解析（兼容旧格式）
+        dbNode.listen_port = self.__readNodeStrValue(dbNode.name, "listen_port", True, "")
+        if not dbNode.listen_port and dbNode.listen_addr and ":" in dbNode.listen_addr:
+            # 兼容旧格式：从 listen_addr 解析端口
+            _, port_part = dbNode.listen_addr.split(":", 1)
+            dbNode.listen_port = port_part
+            # 更新 listen_addr 为只有 IP
+            dbNode.listen_addr = dbNode.listen_addr.split(":", 1)[0]
 
     def __getCmsCountFromWhichConfiguredNode(self, masterNode):
         """
@@ -4867,11 +4876,18 @@ class dbClusterInfo():
             ca_path = "CA"
         # 修改配置文件
         for i, dbNode in enumerate(clusterInfo.dbNodes):
+            # 直接使用分开的 listen_addr 和 listen_port
+            if not dbNode.listen_addr:
+                raise Exception(f"listen_addr is not set for instance {i}")
+            if not dbNode.listen_port:
+                raise Exception(f"listen_port is not set for instance {i}")
+            
             config_content = (
                 f"INST_ID = {i}\n"
                 f"LOG_LEVEL = 255\n"
                 f"GR_NODES_LIST = {clusterInfo.gr_nodes_list}\n"
                 f"LISTEN_ADDR = {dbNode.listen_addr}\n"
+                f"LISTEN_PORT = {dbNode.listen_port}\n"
                 f"IP_WHITE_LIST = {ip_white_list}\n"
                 f"DATA_FILE_PATH = {clusterInfo.wormPath}\n"
                 f"SER_SSL_CA = {os.path.join(clusterInfo.wormPath, ca_path, 'cacert.pem')}\n"
@@ -8703,7 +8719,8 @@ def json_to_xml(json_file):
             <PARAM name="sshIp1" value="{node['ip']}"/>
             <PARAM name="cmDir" value="{config['cluster']['install_path']}cm"/>
             <PARAM name="grIp1" value="{node['ip']}"/>
-            <PARAM name="listen_addr" value="{node['ip']}:{node['gr_port'] + 10}"/>'''
+            <PARAM name="listen_addr" value="{node['ip']}"/>
+            <PARAM name="listen_port" value="{node['gr_port'] + 10}"/>'''
         
         # 为第一个节点添加额外的CM参数
         if i == 0:
