@@ -84,8 +84,45 @@ gr_conn_t *gr_get_connection_for_cmd()
 {
     gr_config_t *inst_cfg = gr_get_g_inst_cfg();
     char server_path[CM_MAX_IP_LEN] = {0};
-    errno_t err = sprintf_s(server_path, CM_MAX_IP_LEN, "%s:%u",
-                            inst_cfg->params.listen_addr.host, inst_cfg->params.listen_addr.port);
+    const char *addr_str = inst_cfg->params.listen_addr.host;
+    char addr_buf[CM_MAX_IP_LEN] = {0};
+    char first_ip[CM_MAX_IP_LEN] = {0};
+
+    // Copy LISTEN_ADDR into local buffer to tokenize (may be "ip1,ip2,...")
+    errno_t err = strncpy_s(addr_buf, sizeof(addr_buf), addr_str, sizeof(addr_buf) - 1);
+    if (SECUREC_UNLIKELY(err != EOK)) {
+        GR_PRINT_ERROR("Failed to copy LISTEN_ADDR.\n");
+        return NULL;
+    }
+
+    char *saveptr = NULL;
+    char *token = strtok_r(addr_buf, ",", &saveptr);
+    if (token == NULL) {
+        GR_PRINT_ERROR("LISTEN_ADDR is empty.\n");
+        return NULL;
+    }
+
+    // Trim leading/trailing spaces
+    while (*token == ' ' || *token == '\t') {
+        token++;
+    }
+    size_t len = strlen(token);
+    while (len > 0 && (token[len - 1] == ' ' || token[len - 1] == '\t')) {
+        token[--len] = '\0';
+    }
+    if (len == 0) {
+        GR_PRINT_ERROR("LISTEN_ADDR contains only spaces.\n");
+        return NULL;
+    }
+
+    err = strncpy_s(first_ip, sizeof(first_ip), token, sizeof(first_ip) - 1);
+    if (SECUREC_UNLIKELY(err != EOK)) {
+        GR_PRINT_ERROR("Failed to copy first LISTEN_ADDR IP.\n");
+        return NULL;
+    }
+
+    err = sprintf_s(server_path, CM_MAX_IP_LEN, "%s:%u",
+                    first_ip, inst_cfg->params.listen_addr.port);
     if (SECUREC_UNLIKELY(err < 0)) {
         GR_PRINT_ERROR("Failed to get server_path.\n");
         return NULL;
@@ -1007,67 +1044,43 @@ static status_t get_config_file_path(const char *type, char *config_file_path, s
 }
 
 static status_t get_ssl_path(const char *config_file_path, char *ssl_conf_path, size_t ssl_conf_path_len) {
-    if (config_file_path == NULL || ssl_conf_path == NULL || ssl_conf_path_len == 0) {
+    (void)config_file_path;  // unused, kept for backward compatibility
+
+    if (ssl_conf_path == NULL || ssl_conf_path_len == 0) {
         printf("Invalid buffer parameter.\n");
         return CM_ERROR;
     }
-    FILE *fp = fopen(config_file_path, "r");
-    if (fp == NULL) {
-        GR_PRINT_ERROR("Failed to open config file: %s\n", config_file_path);
+
+    gr_config_t *inst_cfg = gr_get_g_inst_cfg();
+    const char *gr_home = getenv("GR_HOME");
+    if (gr_home == NULL) {
+        GR_PRINT_ERROR("Environment variant GR_HOME not found!\n");
         return CM_ERROR;
     }
-    char line[1024];
+
+    /* Prefer SER_SSL_CA from already loaded server config (gr_load_config) */
     char file_path[CM_MAX_PATH_LEN] = {0};
-    while (fgets(line, sizeof(line), fp) != NULL) {
-        /* Skip comments and empty lines */
-        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') {
-            continue;
+    char *ser_ca = cm_get_config_value(&inst_cfg->config, "SER_SSL_CA");
+    if (ser_ca != NULL && ser_ca[0] != '\0') {
+        /* Use configured server CA path */
+        strncpy(file_path, ser_ca, sizeof(file_path) - 1);
+        file_path[sizeof(file_path) - 1] = '\0';
+    } else {
+        /* Fallback to default CA path, same as gr_load_ser_ssl_params/gr_load_cli_ssl_params */
+        int ret = snprintf(file_path, sizeof(file_path), "%s/CA/cacert.pem", gr_home);
+        if (ret < 0 || ret >= (int)sizeof(file_path)) {
+            GR_PRINT_ERROR("SSL CA path too long.\n");
+            return CM_ERROR;
         }
-
-        /* Match CLI_SSL_CA with flexible format: "CLI_SSL_CA = value" or "CLI_SSL_CA=value" */
-        if (strstr(line, "CLI_SSL_CA") != NULL) {
-            char *equal_sign = strchr(line, '=');
-            if (equal_sign != NULL) {
-                char *value = equal_sign + 1;
-                /* Skip leading whitespace */
-                while (*value == ' ' || *value == '\t') {
-                    value++;
-                }
-                strncpy(file_path, value, sizeof(file_path) - 1);
-                file_path[sizeof(file_path) - 1] = '\0';
-                break;
-            }
-        }
-        /* Match SER_SSL_CA with flexible format: "SER_SSL_CA = value" or "SER_SSL_CA=value" */
-        if (strstr(line, "SER_SSL_CA") != NULL) {
-            char *equal_sign = strchr(line, '=');
-            if (equal_sign != NULL) {
-                char *value = equal_sign + 1;
-                /* Skip leading whitespace */
-                while (*value == ' ' || *value == '\t') {
-                    value++;
-                }
-                strncpy(file_path, value, sizeof(file_path) - 1);
-                file_path[sizeof(file_path) - 1] = '\0';
-                break;
-            }
-        }
-    }
-    fclose(fp);
-
-    if (file_path[0] == '\0') {
-        return CM_ERROR;
-    }
-
-    /* Remove trailing newline, carriage return, and whitespace */
-    size_t len = strlen(file_path);
-    while (len > 0 && (file_path[len - 1] == '\n' || file_path[len - 1] == '\r' || 
-                       file_path[len - 1] == ' ' || file_path[len - 1] == '\t')) {
-        file_path[len - 1] = '\0';
-        len--;
     }
 
     /* Extract directory path from file path */
+    size_t len = strlen(file_path);
+    while (len > 0 && (file_path[len - 1] == '\n' || file_path[len - 1] == '\r' ||
+                       file_path[len - 1] == ' '  || file_path[len - 1] == '\t')) {
+        file_path[--len] = '\0';
+    }
+
     char *last_slash = strrchr(file_path, '/');
     if (last_slash != NULL) {
         size_t dir_len = last_slash - file_path;
