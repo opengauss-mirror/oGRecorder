@@ -54,6 +54,12 @@ typedef struct st_gr_stat_ctx {
     gr_wait_event_e wait_event;
 } gr_stat_ctx_t;
 
+/* Number of histogram buckets (for latency distribution statistics) */
+#define GR_STAT_HIST_BUCKETS 6
+
+/* Exposed for read-only use by other modules */
+extern atomic_t g_gr_stat_hist[GR_EVT_COUNT][GR_STAT_HIST_BUCKETS];
+
 static inline void gr_begin_stat(timeval_t *begin_tv)
 {
     (void)cm_gettimeofday(begin_tv);
@@ -92,6 +98,12 @@ static inline void gr_unset_stat(gr_stat_ctx_t *stat_ctx)
 const char *gr_get_stat_event(gr_wait_event_e event);
 
 void gr_end_instance_stat(timeval_t *begin_tv, gr_wait_event_e event);
+
+/* Update the latency histogram for the specified event */
+void gr_update_stat_hist(gr_wait_event_e event, uint64 usecs);
+
+/* Dump the current histogram to the log (does not reset; reset policy is decided by the caller) */
+void gr_dump_stat_hist_to_log(void);
 
 #ifdef __cplusplus
 }

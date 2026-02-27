@@ -39,7 +39,7 @@
 extern "C" {
 #endif
 
-// for most time, standby nodes rerad meta from primary
+// For most cases, standby nodes read metadata from the primary
 #define GR_WORK_THREAD_LOAD_DATA_PERCENT 0.5
 
 #define GR_MES_MAX_WAIT_TIMEOUT 30000  // 30s
@@ -132,26 +132,26 @@ static inline char *gr_get_cfg_dir(gr_config_t *inst_cfg)
 }
 
 /*
- * @brief set ssl relevant param
- * @[in] param name(SSL_CA、SSL_KEY、SSL_PWD_PLAINTEXT、SSL_CERT).
- * @[in] param value--ssl cert or ssl key
- * @* @return CM_SUCCESS - success;otherwise: failed
+ * @brief Set SSL-related parameter.
+ * @[in] param_name: parameter name (SSL_CA, SSL_KEY, SSL_PWD_PLAINTEXT, SSL_CERT).
+ * @[in] param_value: SSL certificate or SSL key.
+ * @return CM_SUCCESS on success; otherwise CM_ERROR.
  */
 status_t gr_set_ssl_param(const char *param_name, const char *param_value);
 
 /*
- * @brief check if client IP is in whitelist
- * @[in] client_ip - client IP address string
- * @return CM_TRUE - IP is allowed; CM_FALSE - IP is rejected
+ * @brief Check if client IP is in the whitelist.
+ * @[in] client_ip: client IP address string.
+ * @return CM_TRUE if IP is allowed; CM_FALSE if IP is rejected.
  */
 bool32 gr_check_ip_whitelist(const char *client_ip);
 
 /*
- * @brief get ssl relevant param
- * @[in] param name(SSL_CA、SSL_KEY、SSL_PWD_PLAINTEXT、SSL_CERT).
- * @[in]size--ssl cert or ssl key size
- * @[out]param value--ssl cert or ssl key
- * @* @return CM_SUCCESS - success;otherwise: failed
+ * @brief Get SSL-related parameter.
+ * @[in]  param_name: parameter name (SSL_CA, SSL_KEY, SSL_PWD_PLAINTEXT, SSL_CERT).
+ * @[in]  size: buffer size for the output value.
+ * @[out] param_value: buffer to store SSL certificate or key.
+ * @return CM_SUCCESS on success; otherwise CM_ERROR.
  */
 inline status_t gr_get_ssl_param(const char *param_name, char *param_value, uint32_t size)
 {
@@ -169,8 +169,8 @@ status_t gr_set_cert_param(const char *param_name, const char *param_value);
 void gr_get_param_items(config_item_t **items, uint32 *count);
 
 /*
- * @brief 获取hash认证开关状态
- * @return CM_TRUE - hash认证开启; CM_FALSE - hash认证关闭
+ * @brief Get the status of the hash authentication switch.
+ * @return CM_TRUE if hash authentication is enabled; CM_FALSE otherwise.
  */
 bool32 gr_get_hash_auth_enable(void);
 

@@ -64,8 +64,8 @@ const char *gr_reserve_param[] = {
 
 #define GR_SYNC_PARAM_COUNT    (sizeof(gr_sync_param) / sizeof(char *))
 #define GR_RESERVE_PARAM_COUNT (sizeof(gr_reserve_param) / sizeof(char *))
-#define GR_WORM_MEMORY_CFG_NAME "gr_memory_sync.ini"  // 主节点内存参数快照
-#define GR_WORM_PFILE_CFG_NAME  "gr_pfile_sync.ini"   // 主节点 pfile 参数快照
+#define GR_WORM_MEMORY_CFG_NAME "gr_memory_sync.ini"  // Master node in-memory parameter snapshot
+#define GR_WORM_PFILE_CFG_NAME  "gr_pfile_sync.ini"   // Master node pfile parameter snapshot
 #define GR_WORM_FILE_PERMISSION 0644
 // Sync context
 gr_config_sync_context_t g_config_sync_ctx = {0};
@@ -198,7 +198,7 @@ status_t gr_apply_cfg_to_memory(gr_config_t *inst_cfg, bool8 is_worm, bool8 is_m
         text_t name_txt;
         cm_str2text(name_buf, &name_txt);
         config_item_t *item = cm_get_config_item(&apply_config, &name_txt, CM_FALSE);
-        if (item == NULL || item->effect == EFFECT_REBOOT) {  // 跳过需要重启的参数
+        if (item == NULL || item->effect == EFFECT_REBOOT) {  // skip parameters that require restart
             continue;
         }
 
@@ -421,11 +421,23 @@ status_t gr_write_config_to_worm(gr_config_t *inst_cfg)
         return CM_ERROR;
     }
 
+    /* Open WORM pfile */
     pfile_file = fopen(worm_pfile_file, "w");
+    if (pfile_file == NULL) {
+        LOG_RUN_ERR("failed to open WORM pfile for write, file=%s, errno=%d, err=%s",
+                    worm_pfile_file, errno, strerror(errno));
+        GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
+        gr_free_config_items(&local_config, local_items);
+        return CM_ERROR;
+    }
+
+    /* Open WORM memory file */
     mem_file = fopen(worm_mem_file, "w");
-    if (pfile_file == NULL || mem_file == NULL) {
-        LOG_RUN_ERR("failed to open worm files for write, pfile=%p, memory=%p, errno=%d",
-            (void *)pfile_file, (void *)mem_file, errno);
+    if (mem_file == NULL) {
+        LOG_RUN_ERR("failed to open WORM memory file for write, file=%s, errno=%d, err=%s",
+                    worm_mem_file, errno, strerror(errno));
+        fclose(pfile_file);
+        pfile_file = NULL;
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         gr_free_config_items(&local_config, local_items);
         return CM_ERROR;

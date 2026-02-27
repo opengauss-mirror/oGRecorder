@@ -40,6 +40,7 @@
 #include "gr_zero.h"
 #include "cm_utils.h"
 #include "gr_thv.h"
+#include "gr_config_mgr.h"
 #ifdef ENABLE_GRTEST
 #include "gr_simulation_cm.h"
 #endif
@@ -289,12 +290,13 @@ static status_t gr_lsnr_proc(tcp_lsnr_t *lsnr, cs_pipe_t *pipe)
 
 status_t gr_start_lsnr(gr_instance_t *inst)
 {
-    if (g_inst_cfg == NULL) {
-        LOG_RUN_ERR("gr_start_lsnr: g_inst_cfg is NULL");
+    gr_config_t *cfg = gr_cfg_get_server_inst();
+    if (cfg == NULL) {
+        LOG_RUN_ERR("gr_start_lsnr: instance config is NULL");
         return CM_ERROR;
     }
 
-    const char *addr_str = g_inst_cfg->params.listen_addr.host;
+    const char *addr_str = cfg->params.listen_addr.host;
     if (addr_str == NULL || addr_str[0] == '\0') {
         LOG_RUN_ERR("gr_start_lsnr: LISTEN_ADDR is empty");
         return CM_ERROR;
@@ -302,9 +304,9 @@ status_t gr_start_lsnr(gr_instance_t *inst)
 
     // Copy LISTEN_ADDR (may contain multiple IPs separated by ',') into a local buffer to tokenize
     char addr_buf[CM_MAX_IP_LEN] = {0};
-    errno_t err = strncpy_s(addr_buf, sizeof(addr_buf), addr_str, sizeof(addr_buf) - 1);
-    if (SECUREC_UNLIKELY(err != EOK)) {
-        LOG_RUN_ERR("gr_start_lsnr strncpy_s LISTEN_ADDR failed");
+    errno_t addr_err = strncpy_s(addr_buf, sizeof(addr_buf), addr_str, sizeof(addr_buf) - 1);
+    if (SECUREC_UNLIKELY(addr_err != EOK)) {
+        LOG_RUN_ERR("gr_start_lsnr strncpy_s LISTEN_ADDR failed, errno: %d", addr_err);
         return CM_ERROR;
     }
 
@@ -333,12 +335,12 @@ status_t gr_start_lsnr(gr_instance_t *inst)
             continue;
         }
 
-        errno_t err = strncpy_s(inst->lsnr.host[host_idx],
-                                sizeof(inst->lsnr.host[host_idx]),
-                                token,
-                                sizeof(inst->lsnr.host[host_idx]) - 1);
-        if (SECUREC_UNLIKELY(err != EOK)) {
-            LOG_RUN_ERR("gr_start_lsnr strncpy_s host index %d failed, errno: %d", host_idx, err);
+        errno_t host_err = strncpy_s(inst->lsnr.host[host_idx],
+                                     sizeof(inst->lsnr.host[host_idx]),
+                                     token,
+                                     sizeof(inst->lsnr.host[host_idx]) - 1);
+        if (SECUREC_UNLIKELY(host_err != EOK)) {
+            LOG_RUN_ERR("gr_start_lsnr strncpy_s host index %d failed, errno: %d", host_idx, host_err);
             return CM_ERROR;
         }
         host_idx++;
@@ -349,7 +351,7 @@ status_t gr_start_lsnr(gr_instance_t *inst)
         return CM_ERROR;
     }
 
-    inst->lsnr.port = g_inst_cfg->params.listen_addr.port;
+    inst->lsnr.port = cfg->params.listen_addr.port;
     return cs_start_tcp_lsnr(&inst->lsnr, gr_lsnr_proc);
 }
 

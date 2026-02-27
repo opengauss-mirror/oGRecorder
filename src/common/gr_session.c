@@ -30,21 +30,29 @@
 #include "cm_system.h"
 #include "gr_thv.h"
 #include "gr_filesystem.h"
+#include "gr_resource_mgr.h"
+#include "gr_error_handler.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 status_t gr_session_fd_add(gr_session_t *session, int64 fd, uint64 ftid, const char *file_name)
 {
-    gr_session_fd_entry_t *ent = (gr_session_fd_entry_t *)cm_malloc(sizeof(gr_session_fd_entry_t));
+    gr_session_fd_entry_t *ent = GR_MALLOC_STRUCT(gr_session_fd_entry_t);
     if (ent == NULL) {
-        return CM_ERROR;
+        GR_ERROR_RETURN(GR_ERR_CATEGORY_RESOURCE, ERR_GR_NO_SPACE, CM_ERROR,
+                       "Failed to allocate memory for session FD entry");
     }
     ent->fd = fd;
     ent->ftid = ftid;
     ent->next = NULL;
     if (file_name != NULL) {
-        (void)strncpy_s(ent->file_name, sizeof(ent->file_name), file_name, strlen(file_name));
+        errno_t err = strncpy_s(ent->file_name, sizeof(ent->file_name), file_name, sizeof(ent->file_name) - 1);
+        if (SECUREC_UNLIKELY(err != EOK)) {
+            cm_free(ent);
+            GR_ERROR_RETURN(GR_ERR_CATEGORY_SYSTEM, ERR_SYSTEM_CALL, CM_ERROR,
+                           "Failed to copy file name, errno: %d", err);
+        }
     } else {
         ent->file_name[0] = '\0';
     }
@@ -70,8 +78,11 @@ bool32 gr_session_fd_remove(gr_session_t *session, int64 fd)
                 prev->next = curr->next;
             }
             session->fd_count--;
+            /* push entry into freelist for reuse instead of freeing immediately */
+            curr->next = session->fd_free_list;
+            session->fd_free_list = curr;
+            session->fd_free_count++;
             cm_spin_unlock(&session->fd_lock);
-            CM_FREE_PTR(curr);
             return CM_TRUE;
         }
         prev = curr;
@@ -84,7 +95,8 @@ bool32 gr_session_fd_remove(gr_session_t *session, int64 fd)
 void gr_session_fd_close_all(gr_session_t *session)
 {
     if (session == NULL) {
-        LOG_RUN_ERR("[GR_SESSION]gr_session_fd_close_all: session is NULL");
+        GR_ERROR_HANDLE(GR_ERR_CATEGORY_SESSION, ERR_GR_SESSION_INVALID_ID,
+                      "gr_session_fd_close_all: session is NULL");
         return;
     }
 
@@ -112,8 +124,14 @@ void gr_session_fd_close_all(gr_session_t *session)
         } else {
             closed_count++;
         }
-        
-        CM_FREE_PTR(curr);
+
+        /* after closing fd, recycle entry into freelist for future reuse */
+        cm_spin_lock(&session->fd_lock, NULL);
+        curr->next = session->fd_free_list;
+        session->fd_free_list = curr;
+        session->fd_free_count++;
+        cm_spin_unlock(&session->fd_lock);
+
         curr = next;
     }
 
@@ -128,37 +146,35 @@ status_t gr_extend_session(uint32_t extend_num)
     uint32_t old_alloc_sessions = g_gr_session_ctrl.alloc_sessions;
     uint32_t new_alloc_sessions = g_gr_session_ctrl.alloc_sessions + extend_num;
     if (new_alloc_sessions > g_gr_session_ctrl.total) {
-        LOG_RUN_ERR("Failed to extend session, expect new alloc sessions %u, but max is %u.", new_alloc_sessions,
-            g_gr_session_ctrl.total);
-        GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "expect new alloc sessions %u, but max is %u.", new_alloc_sessions,
-            g_gr_session_ctrl.total);
-        return CM_ERROR;
+        GR_ERROR_RETURN(GR_ERR_CATEGORY_SESSION, ERR_GR_SESSION_EXTEND, CM_ERROR,
+                       "Failed to extend session, expect new alloc sessions %u, but max is %u",
+                       new_alloc_sessions, g_gr_session_ctrl.total);
     }
     for (uint32_t i = old_alloc_sessions; i < new_alloc_sessions; i++) {
         g_gr_session_ctrl.sessions[i] = (gr_session_t *)cm_malloc(sizeof(gr_session_t));
         if (g_gr_session_ctrl.sessions[i] == NULL) {
-            LOG_RUN_ERR("Failed to alloc memory for session %u.", i);
-            GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "Failed to alloc memory for session %u.", i);
+            GR_ERROR_RETURN(GR_ERR_CATEGORY_RESOURCE, ERR_GR_SESSION_EXTEND, CM_ERROR,
+                           "Failed to alloc memory for session %u", i);
+            // Cleanup already allocated sessions
             for (uint32_t j = old_alloc_sessions; j < i; j++) {
                 CM_FREE_PTR(g_gr_session_ctrl.sessions[j]);
                 g_gr_session_ctrl.sessions[j] = NULL;
             }
             g_gr_session_ctrl.alloc_sessions = old_alloc_sessions;
-            return CM_ERROR;
         }
         
         errno_t err = memset_s(g_gr_session_ctrl.sessions[i], sizeof(gr_session_t), 0, sizeof(gr_session_t));
         if (err != EOK) {
-            LOG_RUN_ERR("Failed to initialize session %u memory.", i);
+            GR_ERROR_RETURN(GR_ERR_CATEGORY_SYSTEM, ERR_GR_SESSION_EXTEND, CM_ERROR,
+                           "Failed to initialize session %u memory, errno: %d", i, err);
             CM_FREE_PTR(g_gr_session_ctrl.sessions[i]);
             g_gr_session_ctrl.sessions[i] = NULL;
-            GR_THROW_ERROR(ERR_GR_SESSION_EXTEND, "Failed to initialize session %u memory.", i);
+            // Cleanup already allocated sessions
             for (uint32_t j = old_alloc_sessions; j < i; j++) {
                 CM_FREE_PTR(g_gr_session_ctrl.sessions[j]);
                 g_gr_session_ctrl.sessions[j] = NULL;
             }
             g_gr_session_ctrl.alloc_sessions = old_alloc_sessions;
-            return CM_ERROR;
         }
         
         g_gr_session_ctrl.sessions[i]->id = i;
@@ -322,7 +338,30 @@ void gr_destroy_session_inner(gr_session_t *session)
     session->proto_version = GR_PROTO_VERSION;
     session->put_log = CM_FALSE;
     session->is_holding_hotpatch_latch = CM_FALSE;
+
+    /* free hash manager memory if allocated */
     CM_FREE_PTR(session->hash_mgr.hash_items);
+
+    /* free any remaining fd entries and freelist nodes to avoid leaks */
+    cm_spin_lock(&session->fd_lock, NULL);
+    gr_session_fd_entry_t *curr = session->fd_list_head;
+    session->fd_list_head = NULL;
+    session->fd_count = 0;
+    gr_session_fd_entry_t *free_curr = session->fd_free_list;
+    session->fd_free_list = NULL;
+    session->fd_free_count = 0;
+    cm_spin_unlock(&session->fd_lock);
+
+    while (curr != NULL) {
+        gr_session_fd_entry_t *next = curr->next;
+        CM_FREE_PTR(curr);
+        curr = next;
+    }
+    while (free_curr != NULL) {
+        gr_session_fd_entry_t *next = free_curr->next;
+        CM_FREE_PTR(free_curr);
+        free_curr = next;
+    }
 }
 
 void gr_destroy_session(gr_session_t *session)
@@ -348,7 +387,7 @@ gr_session_t *gr_get_session(uint32_t sid)
 bool32 gr_unlock_shm_meta_s_with_stack(gr_session_t *session, gr_shared_latch_t *shared_latch, bool32 is_try_lock)
 {
     CM_ASSERT(session != NULL);
-    // can not call checkcm_paninc_log with gr_is_server
+    // Cannot call checkcm_panic_log with gr_is_server
     CM_ASSERT(shared_latch->latch.stat != LATCH_STATUS_IDLE);
     session->latch_stack.stack_top_bak = session->latch_stack.stack_top;
     session->latch_stack.op = LATCH_SHARED_OP_UNLATCH;
@@ -381,11 +420,11 @@ bool32 gr_unlock_shm_meta_s_with_stack(gr_session_t *session, gr_shared_latch_t 
 
     cm_spin_unlock(&shared_latch->latch.lock);
 
-    // put this after the unlock to make sure:when error happen after unlock, do NOT op the unlatch-ed latch
-    // begin to change stack
+    // Put this after the unlock to make sure: when error happens after unlock, do NOT operate the unlatched latch
+    // Begin to change stack
     CM_ASSERT(session->latch_stack.stack_top);
-    // in the normal, should be stack_top-- first, then set [stack_top].typ = GR_LATCH_OFFSET_INVALID
-    // but may NOT do [stack_top].typ = GR_LATCH_OFFSET_INVALID when some error happen,
+    // In normal case, should be stack_top-- first, then set [stack_top].type = GR_LATCH_OFFSET_INVALID
+    // but may NOT do [stack_top].type = GR_LATCH_OFFSET_INVALID when some error happens,
     // so leave the stack_top-- on the second step
     session->latch_stack.latch_offset_stack[session->latch_stack.stack_top - 1].type = GR_LATCH_OFFSET_INVALID;
     session->latch_stack.stack_top--;
@@ -429,7 +468,7 @@ void gr_clean_session_latch(gr_session_t *session, bool32 is_daemon)
 
 void gr_server_session_lock(gr_session_t *session)
 {
-    // session->lock to contrl the concurrency of cleaning session latch thread
+    // session->lock to control the concurrency of cleaning session latch thread
     cm_spin_lock(&session->lock, NULL);
     while (!cm_spin_timed_lock(&session->shm_lock, GR_SERVER_SESS_TIMEOUT)) {
         bool32 alived = cm_sys_process_alived(session->cli_info.cli_pid, session->cli_info.start_time);

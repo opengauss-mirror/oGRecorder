@@ -35,6 +35,8 @@
 #include "gr_thv.h"
 #include "gr_stats.h"
 #include "gr_cli_conn.h"
+#include "gr_error_handler.h"
+#include "gr_param_validator.h"
 #include <stdint.h>
 #include <openssl/sha.h>
 
@@ -241,10 +243,8 @@ status_t gr_vfs_mount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle, unsigned 
 
 status_t gr_vfs_unmount_impl(gr_conn_t *conn, gr_vfs_handle *vfs_handle)
 {
-    if (vfs_handle == NULL || vfs_handle->vfs_name[0] == '\0') {
-        LOG_RUN_ERR("vfs handle is NULL or vfs name is empty.");
-        return CM_ERROR;
-    }
+    GR_PARAM_CHECK_RETURN(vfs_handle != NULL, ERR_GR_INVALID_PARAM, "vfs handle is NULL");
+    GR_PARAM_CHECK_RETURN(vfs_handle->vfs_name[0] != '\0', ERR_GR_INVALID_PARAM, "vfs name is empty");
     LOG_DEBUG_INF("gr unmount vfs entry, vfs_name:%s", vfs_handle->vfs_name);
     gr_mount_vfs_info_t send_info;
     send_info.dir = vfs_handle->dir_handle; 

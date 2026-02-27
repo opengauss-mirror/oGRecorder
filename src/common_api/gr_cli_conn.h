@@ -56,7 +56,7 @@ typedef struct st_gr_conn {
     pid_t conn_pid;
 #endif
     gr_cli_info_t cli_info;
-    bool32 hash_auth_enable;  // 从服务器获取的HASH_AUTH_ENABLE参数
+    bool32 hash_auth_enable;  // HASH_AUTH_ENABLE flag obtained from the server
 } gr_conn_t;
 
 typedef struct st_gr_conn_opt {
