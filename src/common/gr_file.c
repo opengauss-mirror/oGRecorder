@@ -34,6 +34,9 @@
 #include "gr_thv.h"
 #include "gr_filesystem.h"
 #include "gr_file.h"
+#include "gr_error_handler.h"
+#include "gr_param_validator.h"
+#include "gr_config_mgr.h"
 #include <pthread.h>
 #include <sys/statvfs.h>
 
@@ -49,11 +52,17 @@ gr_env_t *gr_get_env(void)
     return &g_gr_env;
 }
 
-// CAUTION: gr_admin manager command just like gr_create_vg,cannot call it,
+// CAUTION: gr_admin manager command just like gr_create_vg, cannot call it.
 gr_config_t *gr_get_inst_cfg(void)
 {
+    /*
+     * Maintain backward compatibility: server uses g_inst_cfg directly,
+     * client uses g_gr_env->inst_cfg.
+     * For more complex multi-instance/hot-reload support in the future,
+     * extend the interface in gr_config_mgr.
+     */
     if (gr_is_server()) {
-        return g_inst_cfg;
+        return gr_cfg_get_server_inst();
     } else {
         gr_env_t *gr_env = gr_get_env();
         return &gr_env->inst_cfg;
@@ -65,73 +74,48 @@ int gr_check_readwrite(const char* name)
     if (gr_is_readwrite()) {
         return CM_SUCCESS;
     } else {
-        GR_THROW_ERROR(ERR_GR_READONLY, name);
-        LOG_RUN_ERR("The instance is in read-only mode, cannot execute %s command.", name);
-        return CM_ERROR;
+        GR_ERROR_RETURN(GR_ERR_CATEGORY_RESOURCE, ERR_GR_READONLY, CM_ERROR,
+                       "The instance is in read-only mode, cannot execute %s command", name);
     }
 }
 
-//    return 1 is letter
-//    return 0 is not letter
+// return 1 if the character is a letter, 0 otherwise
 int is_letter(char c)
 {
     return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'));
 }
 
-//    return 1 is number
-//    return 0 is not number
+// return 1 if the character is a digit, 0 otherwise
 int is_number(char c)
 {
     return (c >= '0' && c <= '9');
 }
 
-static status_t gr_is_valid_name_char(char name)
-{
-    if (!is_number(name) && !is_letter(name) && name != '_' && name != '.' && name != '-') {
-        return CM_ERROR;
-    }
-    
-        return CM_SUCCESS;
-    }
-    
-static status_t gr_is_valid_path_char(char name)
-{
-    if (name != '/' && gr_is_valid_name_char(name) != CM_SUCCESS) {
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
-}
+// Use functions from gr_param_validator.h instead of local implementations.
+// gr_is_valid_name_char and gr_is_valid_path_char are now defined in gr_param_validator.c.
 
 static status_t gr_check_name_is_valid(const char *name, uint32_t path_max_size)
 {
+    GR_RETURN_IF_ERROR(gr_validate_file_name(name));
+    
     size_t name_len = strlen(name);
     if (name_len >= path_max_size) {
-        GR_RETURN_IFERR2(CM_ERROR, GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, name, ", name is too long"));
+        GR_PARAM_ERROR_RETURN(ERR_GR_FILE_PATH_ILL, "name is too long: %s (max: %u)", name, path_max_size - 1);
     }
     if (cm_str_equal(name, GR_DIR_PARENT) || cm_str_equal(name, GR_DIR_SELF)) {
-        GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, name, ", cannot be '..' or '.'");
-        return CM_ERROR;
-    }
-
-    for (uint32_t i = 0; i < name_len; i++) {
-        status_t status = gr_is_valid_name_char(name[i]);
-        GR_RETURN_IFERR2(status, GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, name, ", name should be [0~9,a~z,A~Z,-,_,.]"));
+        GR_PARAM_ERROR_RETURN(ERR_GR_FILE_PATH_ILL, "name cannot be '..' or '.': %s", name);
     }
     return CM_SUCCESS;
 }
 
 static status_t gr_check_path_is_valid(const char *path, uint32_t path_max_size)
 {
-    size_t path_len = strlen(path);
-    if (path_len >= path_max_size) {
-        GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, path, ", path is too long\n");
-        return CM_ERROR;
-    }
-
-    for (uint32_t i = 0; i < path_len; i++) {
-        if (gr_is_valid_path_char(path[i]) != CM_SUCCESS) {
-            GR_RETURN_IFERR2(
-                CM_ERROR, GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, path, ", path should be [0~9,a~z,A~Z,-,_,/,.]"));
+    GR_RETURN_IF_ERROR(gr_validate_path(path, path_max_size));
+    
+    for (uint32_t i = 0; path[i] != '\0'; i++) {
+        if (!gr_is_valid_path_char(path[i])) {
+            GR_PARAM_ERROR_RETURN(ERR_GR_FILE_PATH_ILL, 
+                                  "path contains invalid character '%c' at position %u: %s", path[i], i, path);
         }
     }
     return CM_SUCCESS;
@@ -139,11 +123,7 @@ static status_t gr_check_path_is_valid(const char *path, uint32_t path_max_size)
 
 status_t gr_check_str_not_null(const char *str, const char *desc)
 {
-    if (str == NULL || str[0] == '\0') {
-        GR_THROW_ERROR(ERR_GR_FILE_PATH_ILL, "[null]", ", %s cannot be a null or empty string.", desc);
-        return CM_ERROR;
-    }
-    return CM_SUCCESS;
+    return gr_validate_string(str, 0, desc);
 }
 
 status_t gr_check_name(const char *name)
@@ -160,13 +140,9 @@ status_t gr_check_device_path(const char *path)
 
 status_t gr_postpone_file(gr_session_t *session, const char *file, const char *time)
 {
-    status_t status;
     GR_LOG_DEBUG_OP("Begin to extend file %s expired time to %s", file, time);
-    status = gr_filesystem_postpone(file, time);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS]Failed to extend file %s expired time to %s.", file, time);
-        return CM_ERROR;
-    }
+    GR_CALL_RETURN(gr_filesystem_postpone(file, time), 
+                   "Failed to extend file %s expired time to %s", file, time);
     GR_LOG_DEBUG_OP("Succeed to extend file %s expired time to %s.", file, time);
     return CM_SUCCESS;
 }
@@ -191,13 +167,9 @@ status_t gr_exist_item(gr_session_t *session, const char *item, bool32 *result, 
 
 status_t gr_open_file(gr_session_t *session, const char *file, int32_t flag, int *fd)
 {
-    status_t status;
     GR_LOG_DEBUG_OP("Begin to open file:%s, session id:%u.", file, session->id);
-    status = gr_filesystem_open(file, flag, fd);
-    if (status != CM_SUCCESS) {
-        LOG_RUN_ERR("[FS]Failed to open file:%s.", file);
-        return CM_ERROR;
-    }
+    GR_CALL_RETURN(gr_filesystem_open(file, flag, fd), 
+                   "Failed to open file:%s", file);
     GR_LOG_DEBUG_OP("Succeed to open file:%s, fd:%d, session:%u.", file, *fd, session->id);
     return CM_SUCCESS;
 }
@@ -225,11 +197,11 @@ status_t gr_check_open_file_remote(gr_session_t *session, const char *vg_name, u
 
 void gr_clean_all_sessions_latch()
 {
-    uint64 cli_pid = 0;
-    int64 start_time = 0;
-    bool32 cli_pid_alived = 0;
+    uint64_t cli_pid = 0;
+    int64_t start_time = 0;
+    bool32 cli_pid_alive = CM_FALSE;
 
-    // check all used && connected session may occopy latch by dead client
+    // Check all used & connected sessions that may hold a latch by a dead client
     gr_session_ctrl_t *session_ctrl = gr_get_session_ctrl();
     CM_ASSERT(session_ctrl != NULL);
     
@@ -237,36 +209,37 @@ void gr_clean_all_sessions_latch()
         gr_session_t *session = gr_get_session(sid);
         CM_ASSERT(session != NULL);
         
-        // connected make sure the cli_pid and start_time are valid
+        // For connected sessions, cli_pid and start_time must be valid
         if (!session->is_used || !session->connected) {
             continue;
         }
 
-        // 优化：避免重复的进程存活检查
-        uint64 current_pid = session->cli_info.cli_pid;
-        int64 current_start_time = session->cli_info.start_time; 
+        // Optimization: avoid repeating process liveness checks
+        uint64_t current_pid = session->cli_info.cli_pid;
+        int64_t current_start_time = session->cli_info.start_time; 
         
         if (current_pid == 0) {
             continue;
         }
         
-        // 如果进程信息相同且已经检查过存活状态，直接使用之前的结果
+        // If process information is the same and we have already checked liveness, reuse the previous result
         if (current_pid == cli_pid && current_start_time == start_time) {
-            if (cli_pid_alived) {
+            if (cli_pid_alive) {
                 continue;
             }
         } else {
-            // 新的进程，需要检查存活状态
+            // New process information, need to check liveness
             cli_pid = current_pid;
             start_time = current_start_time;
-            cli_pid_alived = cm_sys_process_alived(cli_pid, start_time);
-            if (cli_pid_alived) {
+            cli_pid_alive = cm_sys_process_alived(cli_pid, start_time);
+            if (cli_pid_alive) {
                 continue;
             }
         }
-        LOG_RUN_INF("[CLEAN_LATCH]session id %u, pid %llu, start_time %lld, process name:%s, objectid %u.", session->id,
-            cli_pid, start_time, session->cli_info.process_name, session->objectid);
-        // clean the session lock and latch
+        LOG_RUN_INF("[CLEAN_LATCH]session id %u, pid %llu, start_time %lld, process name:%s, objectid %u.",
+                    session->id, (unsigned long long)cli_pid, (long long)start_time,
+                    session->cli_info.process_name, session->objectid);
+        // Clean the session lock and latch
         if (!cm_spin_try_lock(&session->lock)) {
             continue;
         }

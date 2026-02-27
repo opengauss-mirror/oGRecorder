@@ -147,7 +147,9 @@ typedef struct st_gr_session {
     // session-owned open file list for resource cleanup
     spinlock_t fd_lock;
     struct st_gr_session_fd_entry *fd_list_head;
+    struct st_gr_session_fd_entry *fd_free_list; // freelist for fd entries (memory reuse)
     uint32_t fd_count;
+    uint32_t fd_free_count;
 } gr_session_t;
 
 static inline char *gr_init_sendinfo_buf(char *input)
@@ -157,7 +159,7 @@ static inline char *gr_init_sendinfo_buf(char *input)
 
 static inline void gr_session_end_stat(gr_session_t *session, timeval_t *begin_tv, gr_wait_event_e event)
 {
-    (void)session;  // 保留参数以避免接口变更
+    (void)session;  // keep the parameter to avoid changing the interface
     gr_end_instance_stat(begin_tv, event);
 }
 

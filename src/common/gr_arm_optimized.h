@@ -14,7 +14,7 @@
  *
  * gr_arm_optimized.h
  *
- * ARM指令集优化实现（NEON SIMD、CRC32硬件加速等）
+ * ARM instruction set optimizations (NEON SIMD, CRC32 hardware acceleration, etc.)
  *
  * IDENTIFICATION
  *    src/common/gr_arm_optimized.h
@@ -36,9 +36,9 @@
 extern "C" {
 #endif
 
-// ==================== 编译宏控制 ====================
-// 通过编译宏 ENABLE_ARM_NEON 和 ENABLE_ARM_CRC32 控制ARM优化
-// 编译时指定: -DENABLE_ARM_NEON 或 -DENABLE_ARM_CRC32
+// ==================== Compile-time macro control ====================
+// ARM-specific optimizations are controlled via ENABLE_ARM_NEON and ENABLE_ARM_CRC32.
+// Enable at build time with: -DENABLE_ARM_NEON or -DENABLE_ARM_CRC32.
 
 #ifdef ENABLE_ARM_NEON
 #include <arm_neon.h>
@@ -56,18 +56,18 @@ static inline status_t xor_sha256_hash_impl(
         return CM_ERROR;
     }
 #ifdef ENABLE_ARM_NEON
-    // ARM NEON: 一次处理128位（16字节），32字节只需2次操作
-    uint8x16_t data_vec1 = vld1q_u8(data_hash);        // 加载前16字节
+    // ARM NEON: process 128 bits (16 bytes) per operation, 32 bytes need only 2 operations
+    uint8x16_t data_vec1 = vld1q_u8(data_hash);        // load first 16 bytes
     uint8x16_t pre_vec1 = vld1q_u8(pre_hash);
-    uint8x16_t result1 = veorq_u8(data_vec1, pre_vec1); // 128位XOR
-    vst1q_u8(combine_hash, result1);                    // 存储结果
+    uint8x16_t result1 = veorq_u8(data_vec1, pre_vec1); // 128-bit XOR
+    vst1q_u8(combine_hash, result1);                    // store result
     
-    uint8x16_t data_vec2 = vld1q_u8(data_hash + 16);   // 加载后16字节
+    uint8x16_t data_vec2 = vld1q_u8(data_hash + 16);   // load next 16 bytes
     uint8x16_t pre_vec2 = vld1q_u8(pre_hash + 16);
     uint8x16_t result2 = veorq_u8(data_vec2, pre_vec2);
     vst1q_u8(combine_hash + 16, result2);
 #else
-    // 使用64位整数批量XOR（通用平台）
+    // Use 64-bit integers for batch XOR on generic platforms
     const uint64_t *data64 = (const uint64_t *)data_hash;
     const uint64_t *pre64 = (const uint64_t *)pre_hash;
     uint64_t *combine64 = (uint64_t *)combine_hash;
@@ -89,20 +89,20 @@ static inline status_t compare_sha256_impl(
     }
 
 #ifdef ENABLE_ARM_NEON
-    // ARM NEON: 使用128位向量一次比较16字节
+    // ARM NEON: use 128-bit vectors to compare 16 bytes at a time
     uint8x16_t h1_vec1 = vld1q_u8(hash1);
     uint8x16_t h2_vec1 = vld1q_u8(hash2);
-    uint8x16_t diff1 = veorq_u8(h1_vec1, h2_vec1);  // XOR得到差异
+    uint8x16_t diff1 = veorq_u8(h1_vec1, h2_vec1);  // XOR to get differences
     
     uint8x16_t h1_vec2 = vld1q_u8(hash1 + 16);
     uint8x16_t h2_vec2 = vld1q_u8(hash2 + 16);
     uint8x16_t diff2 = veorq_u8(h1_vec2, h2_vec2);
     
-    // 合并两个向量的差异（常量时间操作）
+    // Merge differences from the two vectors (constant-time operation)
     uint8x16_t combined = vorrq_u8(diff1, diff2);
     
-    // 检查是否有任何非零字节（常量时间）
-    // 使用vmaxvq_u8找到最大值，如果为0则匹配
+    // Check whether there is any non-zero byte (constant time).
+    // Use vmaxvq_u8 to find the maximum value; if it is 0, hashes match.
     uint8_t max_diff = vmaxvq_u8(combined);
     
     if (max_diff != 0) {
@@ -111,7 +111,7 @@ static inline status_t compare_sha256_impl(
         return CM_ERROR;
     }
 #else
-    // 使用64位整数批量比较 + 常量时间比较
+    // Use 64-bit integers for batch comparison + constant-time semantics
     const uint64_t *h1_64 = (const uint64_t *)hash1;
     const uint64_t *h2_64 = (const uint64_t *)hash2;
     uint64_t diff = 0;
@@ -138,26 +138,26 @@ static inline void memcpy_arm_neon_impl(void *dest, const void *src, size_t n)
         const uint8_t *s = (const uint8_t *)src;
         size_t i = 0;
         
-        // 对齐到16字节边界（NEON要求）
+        // Align to 16-byte boundary (required by NEON)
         size_t align = (16 - ((uintptr_t)d % 16)) % 16;
         for (i = 0; i < align && i < n; i++) {
             d[i] = s[i];
         }
         
-        // NEON批量拷贝：一次128位（16字节）
+        // NEON bulk copy: 128 bits (16 bytes) per iteration
         size_t neon_count = (n - i) / 16;
         for (size_t j = 0; j < neon_count; j++) {
             uint8x16_t vec = vld1q_u8(s + i + j * 16);
             vst1q_u8(d + i + j * 16, vec);
         }
         
-        // 处理剩余字节
+        // Handle remaining tail bytes
         i += neon_count * 16;
         for (; i < n; i++) {
             d[i] = s[i];
         }
     } else {
-        // 小块使用标准memcpy
+        // For small blocks, use standard memcpy
         memcpy(dest, src, n);
     }
 #else

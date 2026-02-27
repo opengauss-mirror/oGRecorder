@@ -30,6 +30,8 @@
 #include "cm_log.h"
 #include "cm_timer.h"
 #include "gr_cli_conn.h"
+#include "gr_error_handler.h"
+#include "gr_param_validator.h"
 
 #ifdef _WIN64
 #if !defined(__x86_64__)
@@ -82,47 +84,32 @@ static int validate_vfs_handle(gr_vfs_handle vfs_handle, const char *func_name)
 
 static int validate_file_name(const char *name, const char *func_name)
 {
-    VALIDATE_PARAM_RETURN(name != NULL && name[0] != '\0', func_name, "file name", "is NULL or empty");
-    VALIDATE_PARAM_RETURN(strpbrk(name, "\\:*?\"<>|") == NULL, func_name, "file name", "contains invalid characters");
+    if (gr_validate_file_name(name) != CM_SUCCESS) {
+        GR_PARAM_ERROR_RETURN(ERR_GR_INVALID_PARAM, "%s: invalid file name", func_name);
+    }
     return GR_SUCCESS;
 }
 
 static int validate_string_param(const char *param, const char *param_name, const char *func_name)
 {
-    if (param == NULL) {
-        LOG_RUN_ERR("%s: %s is NULL.", func_name, param_name);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s is NULL", param_name);
-        return GR_ERROR;
-    }
-    if (strlen(param) == 0) {
-        LOG_RUN_ERR("%s: %s is empty.", func_name, param_name);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s is empty", param_name);
-        return GR_ERROR;
+    if (gr_validate_string(param, 0, param_name) != CM_SUCCESS) {
+        GR_PARAM_ERROR_RETURN(ERR_GR_INVALID_PARAM, "%s: %s validation failed", func_name, param_name);
     }
     return GR_SUCCESS;
 }
 
 static int validate_pointer_param(const void *param, const char *param_name, const char *func_name)
 {
-    if (param == NULL) {
-        LOG_RUN_ERR("%s: %s is NULL.", func_name, param_name);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s is NULL", param_name);
-        return GR_ERROR;
+    if (gr_validate_pointer(param, param_name) != CM_SUCCESS) {
+        GR_PARAM_ERROR_RETURN(ERR_GR_INVALID_PARAM, "%s: %s is NULL", func_name, param_name);
     }
     return GR_SUCCESS;
 }
 
 static int validate_size_param(long long size, const char *param_name, const char *func_name)
 {
-    if (size < 0) {
-        LOG_RUN_ERR("%s: %s is invalid: %lld.", func_name, param_name, size);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s must be a positive integer", param_name);
-        return GR_ERROR;
-    }
-    if (size > (int64_t)GR_MAX_FILE_SIZE) {
-        LOG_RUN_ERR("%s: %s exceeds maximum size: %lld.", func_name, param_name, size);
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "%s must less than GR_MAX_FILE_SIZE", param_name);
-        return GR_ERROR;
+    if (gr_validate_size(size, GR_MAX_FILE_SIZE, param_name) != CM_SUCCESS) {
+        GR_PARAM_ERROR_RETURN(ERR_GR_INVALID_PARAM, "%s: %s validation failed", func_name, param_name);
     }
     return GR_SUCCESS;
 }
@@ -212,9 +199,8 @@ static int parse_server_addresses(const char *serverAddrs, char **addresses, int
     *actual_count = 0;
     char *input_copy = strdup(serverAddrs);
     if (input_copy == NULL) {
-        LOG_RUN_ERR("failed to allocate memory for parsing server addresses");
-        GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, 0, "parse_server_addresses");
-        return GR_ERROR;
+        GR_ERROR_RETURN(GR_ERR_CATEGORY_RESOURCE, ERR_GR_ALLOC_MEMORY, GR_ERROR,
+                       "failed to allocate memory for parsing server addresses");
     }
 
     const char *delimiters = ",; ";
@@ -233,13 +219,13 @@ static int parse_server_addresses(const char *serverAddrs, char **addresses, int
         if (strlen(token) > 0) {
             addresses[*actual_count] = strdup(token);
             if (addresses[*actual_count] == NULL) {
-                LOG_RUN_ERR("failed to allocate memory for address: %s", token);
+                // Cleanup already allocated addresses
                 for (int i = 0; i < *actual_count; i++) {
                     free(addresses[i]);
                 }
                 free(input_copy);
-                GR_THROW_ERROR(ERR_GR_ALLOC_MEMORY, 0, "parse_server_addresses");
-                return GR_ERROR;
+                GR_ERROR_RETURN(GR_ERR_CATEGORY_RESOURCE, ERR_GR_ALLOC_MEMORY, GR_ERROR,
+                               "failed to allocate memory for address: %s", token);
             }
             (*actual_count)++;
         }

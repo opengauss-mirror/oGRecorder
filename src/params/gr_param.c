@@ -32,7 +32,6 @@
 #include "gr_fault_injection.h"
 #include "gr_diskgroup.h"
 #include "gr_param.h"
-#include "gr_diskgroup.h"
 
 #ifdef __cplusplus
 extern "C" {

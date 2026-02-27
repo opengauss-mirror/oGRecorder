@@ -33,7 +33,7 @@
 #include "gr_param.h"
 #include "gr_param_sync.h"
 #include "gr_stats.h"
-#include "gr_stats.h"
+#include "gr_error_handler.h"
 #include <stdint.h>
 #include <unistd.h>
 
@@ -95,9 +95,8 @@ static status_t gr_process_remote(gr_session_t *session)
     status_t remote_result = CM_ERROR;
     while (CM_TRUE) {
         if (get_instance_status_proc() == GR_STATUS_RECOVERY) {
-            GR_THROW_ERROR(ERR_GR_RECOVER_CAUSE_BREAK);
-            LOG_RUN_INF("Req break by recovery");
-            return CM_ERROR;
+            GR_ERROR_RETURN(GR_ERR_CATEGORY_SYSTEM, ERR_GR_RECOVER_CAUSE_BREAK, CM_ERROR,
+                           "Request break by recovery");
         }
 
         ret = gr_exec_sync(session, remoteid, currid, &remote_result);
@@ -111,9 +110,8 @@ static status_t gr_process_remote(gr_session_t *session)
             cm_sleep(GR_PROCESS_REMOTE_INTERVAL);
             GR_RETURN_IF_ERROR(gr_get_exec_nodeid(session, &currid, &remoteid));
             if (currid == remoteid) {
-                GR_THROW_ERROR(ERR_GR_MASTER_CHANGE);
-                LOG_RUN_INF("Req break if currid is equal to remoteid, just try again.");
-                return CM_ERROR;
+                GR_ERROR_RETURN(GR_ERR_CATEGORY_SYSTEM, ERR_GR_MASTER_CHANGE, CM_ERROR,
+                               "Request break if currid is equal to remoteid, just try again");
             }
             continue;
         }
@@ -280,7 +278,7 @@ static status_t gr_process_rmdir(gr_session_t *session)
         LOG_DEBUG_INF("Succeed to rmdir:%s", dir);
         return status;
     }
-    LOG_RUN_ERR("Failed to rmdir:%s", dir);
+    GR_FS_ERROR_RETURN(ERR_GR_DIR_REMOVE, "Failed to rmdir: %s", dir);
     return status;
 }
 
@@ -293,8 +291,7 @@ static status_t gr_process_mount_vfs(gr_session_t *session)
     GR_LOG_DEBUG_OP("Begin to mount vfs:%s", vfs_name);
     
     if (gr_filesystem_opendir(vfs_name, &handle) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to mount vfs:%s", vfs_name);
-        return CM_ERROR;
+        GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Failed to mount vfs: %s", vfs_name);
     }
     (void)gr_put_int64(&session->send_pack, (int64)handle);
     LOG_DEBUG_INF("Succeed to mount vfs:%s, handle:%llu.", vfs_name, (uint64)handle);
@@ -308,8 +305,7 @@ static status_t gr_process_unmount_vfs(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, (int64 *)&handle));
     GR_LOG_DEBUG_OP("Begin to unmount vfs, handle:%llu", (unsigned long long)handle);
     if (gr_filesystem_closedir(handle) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to unmount vfs");
-        return CM_ERROR;
+        GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Failed to unmount vfs");
     }
     return CM_SUCCESS;
 }
@@ -322,8 +318,7 @@ static status_t gr_process_query_file_num(gr_session_t *session)
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, (int64 *)&handle));
     GR_LOG_DEBUG_OP("Begin to query file num, handle:%llu", (unsigned long long)handle);
     if (gr_filesystem_query_file_num(handle, &file_num) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to query file num for vfs");
-        return CM_ERROR;
+        GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Failed to query file num for vfs");
     }
     (void)gr_put_int32(&session->send_pack, file_num);
     return CM_SUCCESS;
@@ -343,8 +338,7 @@ static status_t gr_process_query_file_info(gr_session_t *session)
     GR_LOG_DEBUG_OP("Begin to query file info, handle:%llu, is_continue:%d", (unsigned long long)handle, is_continue);
 
     if (gr_filesystem_query_file_info(handle, file_items, GR_MAX_FILE_NUM, &file_count, is_continue) != CM_SUCCESS) {
-        LOG_RUN_ERR("Failed to query file info for vfs");
-        return CM_ERROR;
+        GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Failed to query file info for vfs");
     }
 
     GR_RETURN_IF_ERROR(gr_put_int32(&session->send_pack, file_count));
@@ -793,9 +787,19 @@ static status_t gr_process_get_inst_status(gr_session_t *session)
 // Instance级别的统计函数实现
 void gr_end_instance_stat(timeval_t *begin_tv, gr_wait_event_e event)
 {
-    if (begin_tv != NULL && event < GR_EVT_COUNT) {
-        gr_end_stat_base(&g_gr_instance.gr_instance_stat[event], begin_tv);
+    if (begin_tv == NULL || event >= GR_EVT_COUNT) {
+        return;
     }
+
+    /* 先更新总时间/最大/次数 */
+    gr_end_stat_base(&g_gr_instance.gr_instance_stat[event], begin_tv);
+
+    /* 再计算本次延迟并更新直方图 */
+    timeval_t end_tv;
+    uint64 usecs;
+    (void)cm_gettimeofday(&end_tv);
+    usecs = (uint64)TIMEVAL_DIFF_US(begin_tv, &end_tv);
+    gr_update_stat_hist(event, usecs);
 }
 
 static status_t gr_process_get_time_stat(gr_session_t *session)
@@ -823,6 +827,9 @@ static status_t gr_process_get_time_stat(gr_session_t *session)
         (void)cm_atomic_set(&g_gr_instance.gr_instance_stat[j].total_wait_time, 0);
         (void)cm_atomic_set(&g_gr_instance.gr_instance_stat[j].max_single_time, 0);
     }
+
+    /* 顺带将当前直方图分布打到日志里，作为自诊断信息 */
+    gr_dump_stat_hist_to_log();
 
     return CM_SUCCESS;
 }
