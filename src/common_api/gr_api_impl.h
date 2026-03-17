@@ -106,11 +106,6 @@ typedef struct st_gr_refresh_volume_info {
     uint32_t vg_id;
 } gr_refresh_volume_info_t;
 
-typedef struct st_gr_truncate_file_info {
-    int handle;
-    int64 length;
-    int64 truncateType;
-} gr_truncate_file_info_t;
 
 typedef struct st_gr_stat_file_info {
     const char *name;
@@ -227,7 +222,6 @@ status_t gr_exist_impl(gr_conn_t *conn, const char *path, bool32 *result, gft_it
 status_t gr_check_path_exist(gr_conn_t *conn, const char *path);
 status_t gr_check_file_exist(gr_conn_t *conn, const char *path, bool *is_exist);
 status_t gr_check_file_flag(int flag);
-status_t gr_truncate_impl(gr_conn_t *conn, int handle, long long length, int truncateType);
 status_t gr_stat_file_impl(
     gr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *count, int *mode, char **time);
 status_t gr_postpone_file_time_impl(gr_conn_t *conn, const char *file_name, const char *time);

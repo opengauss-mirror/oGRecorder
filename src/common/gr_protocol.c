@@ -43,7 +43,6 @@ static char *g_gr_cmd_desc[GR_CMD_TYPE_OFFSET(GR_CMD_END)] = {
     [GR_CMD_TYPE_OFFSET(GR_CMD_APPEND_FILE)] = "append file",
     [GR_CMD_TYPE_OFFSET(GR_CMD_READ_FILE)] = "read file",
     [GR_CMD_TYPE_OFFSET(GR_CMD_RENAME_FILE)] = "rename file",
-    [GR_CMD_TYPE_OFFSET(GR_CMD_TRUNCATE_FILE)] = "truncate file",
     [GR_CMD_TYPE_OFFSET(GR_CMD_STAT_FILE)] = "stat file",
     [GR_CMD_TYPE_OFFSET(GR_CMD_LOAD_CTRL)] = "load ctrl",
     [GR_CMD_TYPE_OFFSET(GR_CMD_UPDATE_GRITTEN_SIZE)] = "update written size",

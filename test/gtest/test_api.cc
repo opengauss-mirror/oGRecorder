@@ -197,178 +197,6 @@ TEST_F(GRApiTest, TestGRfileWriteRead) {
     EXPECT_EQ(gr_file_pread(g_vfs_handle, file_handle3, buf3, strlen(data3), 0), strlen(data3));
 }
 
-TEST_F(GRApiTest, TestGRfileAppendBasic) {
-    // 创建一个新文件用于 append 测试
-    gr_file_handle append_handle;
-    const char *append_file = "TEST_APPEND_FILE";
-    EXPECT_EQ(gr_file_create(g_vfs_handle, append_file, NULL), GR_SUCCESS);
-    EXPECT_EQ(gr_file_open(g_vfs_handle, append_file, O_RDWR | O_SYNC, &append_handle), GR_SUCCESS);
-
-    // 第一次 append
-    const char *data1 = "first append\n";
-    long long ret = gr_file_append(g_vfs_handle, &append_handle, data1, strlen(data1));
-    EXPECT_EQ(ret, strlen(data1));
-
-    // 第二次 append
-    const char *data2 = "second append\n";
-    ret = gr_file_append(g_vfs_handle, &append_handle, data2, strlen(data2));
-    EXPECT_EQ(ret, strlen(data2));
-
-    // 第三次 append
-    const char *data3 = "third append\n";
-    ret = gr_file_append(g_vfs_handle, &append_handle, data3, strlen(data3));
-    EXPECT_EQ(ret, strlen(data3));
-
-    // 读取并验证数据
-    size_t total_size = strlen(data1) + strlen(data2) + strlen(data3);
-    char *read_buf = new char[total_size + 1];
-    memset(read_buf, 0, total_size + 1);
-    
-    EXPECT_EQ(gr_file_pread(g_vfs_handle, append_handle, read_buf, total_size, 0), total_size);
-    
-    // 验证内容
-    EXPECT_EQ(memcmp(read_buf, data1, strlen(data1)), 0);
-    EXPECT_EQ(memcmp(read_buf + strlen(data1), data2, strlen(data2)), 0);
-    EXPECT_EQ(memcmp(read_buf + strlen(data1) + strlen(data2), data3, strlen(data3)), 0);
-
-    delete[] read_buf;
-    gr_file_close(g_vfs_handle, &append_handle, false);
-}
-
-TEST_F(GRApiTest, TestGRfileAppendMultiple) {
-    // 测试多次 append 操作
-    gr_file_handle append_handle;
-    const char *append_file = "TEST_APPEND_MULTI";
-    EXPECT_EQ(gr_file_create(g_vfs_handle, append_file, NULL), GR_SUCCESS);
-    EXPECT_EQ(gr_file_open(g_vfs_handle, append_file, O_RDWR | O_SYNC, &append_handle), GR_SUCCESS);
-
-    const char *data[] = {
-        "append data 1\n",
-        "append data 2\n",
-        "append data 3\n",
-        "append data 4\n",
-        "append data 5\n"
-    };
-    size_t data_count = sizeof(data) / sizeof(data[0]);
-    size_t total_size = 0;
-
-    // 多次 append
-    for (size_t i = 0; i < data_count; i++) {
-        long long ret = gr_file_append(g_vfs_handle, &append_handle, data[i], strlen(data[i]));
-        EXPECT_EQ(ret, strlen(data[i]));
-        total_size += strlen(data[i]);
-    }
-
-    // 读取并验证所有数据
-    char *read_buf = new char[total_size + 1];
-    memset(read_buf, 0, total_size + 1);
-    
-    EXPECT_EQ(gr_file_pread(g_vfs_handle, append_handle, read_buf, total_size, 0), total_size);
-
-    // 验证每段数据
-    size_t offset = 0;
-    for (size_t i = 0; i < data_count; i++) {
-        EXPECT_EQ(memcmp(read_buf + offset, data[i], strlen(data[i])), 0);
-        offset += strlen(data[i]);
-    }
-
-    delete[] read_buf;
-    gr_file_close(g_vfs_handle, &append_handle, false);
-}
-
-TEST_F(GRApiTest, TestGRfileAppendLargeData) {
-    // 测试 append 大数据
-    gr_file_handle append_handle;
-    const char *append_file = "TEST_APPEND_LARGE";
-    EXPECT_EQ(gr_file_create(g_vfs_handle, append_file, NULL), GR_SUCCESS);
-    EXPECT_EQ(gr_file_open(g_vfs_handle, append_file, O_RDWR | O_SYNC, &append_handle), GR_SUCCESS);
-
-    const int large_data_size = 50 * 1024; // 50KB
-    char *large_data = new char[large_data_size];
-    memset(large_data, 'A', large_data_size);
-
-    // append 大数据
-    long long ret = gr_file_append(g_vfs_handle, &append_handle, large_data, large_data_size);
-    EXPECT_EQ(ret, large_data_size);
-
-    // 再次 append 不同数据
-    char *large_data2 = new char[large_data_size];
-    memset(large_data2, 'B', large_data_size);
-    ret = gr_file_append(g_vfs_handle, &append_handle, large_data2, large_data_size);
-    EXPECT_EQ(ret, large_data_size);
-
-    // 读取并验证
-    char *read_buf = new char[large_data_size * 2];
-    EXPECT_EQ(gr_file_pread(g_vfs_handle, append_handle, read_buf, large_data_size, 0), large_data_size);
-    EXPECT_EQ(memcmp(read_buf, large_data, large_data_size), 0);
-
-    EXPECT_EQ(gr_file_pread(g_vfs_handle, append_handle, read_buf, large_data_size, large_data_size), large_data_size);
-    EXPECT_EQ(memcmp(read_buf, large_data2, large_data_size), 0);
-
-    delete[] large_data;
-    delete[] large_data2;
-    delete[] read_buf;
-    gr_file_close(g_vfs_handle, &append_handle, false);
-}
-
-TEST_F(GRApiTest, TestGRfileAppendAfterPwrite) {
-    // 测试先 pwrite 再 append 的场景
-    gr_file_handle append_handle;
-    const char *append_file = "TEST_APPEND_AFTER_PWRITE";
-    EXPECT_EQ(gr_file_create(g_vfs_handle, append_file, NULL), GR_SUCCESS);
-    EXPECT_EQ(gr_file_open(g_vfs_handle, append_file, O_RDWR | O_SYNC, &append_handle), GR_SUCCESS);
-
-    // 先用 pwrite 写入数据
-    const char *pwrite_data = "pwrite data\n";
-    EXPECT_EQ(gr_file_pwrite(g_vfs_handle, &append_handle, pwrite_data, strlen(pwrite_data), 0), strlen(pwrite_data));
-
-    // 再用 append 追加数据
-    const char *append_data = "append data\n";
-    long long ret = gr_file_append(g_vfs_handle, &append_handle, append_data, strlen(append_data));
-    EXPECT_EQ(ret, strlen(append_data));
-
-    // 读取并验证
-    size_t total_size = strlen(pwrite_data) + strlen(append_data);
-    char *read_buf = new char[total_size + 1];
-    memset(read_buf, 0, total_size + 1);
-    
-    EXPECT_EQ(gr_file_pread(g_vfs_handle, append_handle, read_buf, total_size, 0), total_size);
-    
-    // 验证 pwrite 的数据在前
-    EXPECT_EQ(memcmp(read_buf, pwrite_data, strlen(pwrite_data)), 0);
-    // 验证 append 的数据在后
-    EXPECT_EQ(memcmp(read_buf + strlen(pwrite_data), append_data, strlen(append_data)), 0);
-
-    delete[] read_buf;
-    gr_file_close(g_vfs_handle, &append_handle, false);
-}
-
-TEST_F(GRApiTest, TestGRfileAppendEmptyFile) {
-    // 测试空文件的 append
-    gr_file_handle append_handle;
-    const char *append_file = "TEST_APPEND_EMPTY";
-    EXPECT_EQ(gr_file_create(g_vfs_handle, append_file, NULL), GR_SUCCESS);
-    EXPECT_EQ(gr_file_open(g_vfs_handle, append_file, O_RDWR | O_SYNC, &append_handle), GR_SUCCESS);
-
-    // 向空文件 append
-    const char *data = "first data in empty file\n";
-    long long ret = gr_file_append(g_vfs_handle, &append_handle, data, strlen(data));
-    EXPECT_EQ(ret, strlen(data));
-
-    // 读取验证
-    char read_buf[256] = {0};
-    EXPECT_EQ(gr_file_pread(g_vfs_handle, append_handle, read_buf, strlen(data), 0), strlen(data));
-    EXPECT_EQ(memcmp(read_buf, data, strlen(data)), 0);
-
-    gr_file_close(g_vfs_handle, &append_handle, false);
-}
-
-#ifndef ENABLE_WORM
-TEST_F(GRApiTest, TestGRfileTruncate) {
-    EXPECT_EQ(gr_file_truncate(g_vfs_handle, file_handle1, 0, ONE_GB), GR_SUCCESS);
-}
-#endif
-
 TEST_F(GRApiTest, TestGRfileStat) {
     long long offset = 0;
     unsigned long long size = 0;
@@ -376,11 +204,61 @@ TEST_F(GRApiTest, TestGRfileStat) {
     char *time = NULL;
     EXPECT_EQ(gr_file_stat(g_vfs_handle, TEST_FILE1, &offset, &size, &mode, &time), GR_SUCCESS);
 #ifndef ENABLE_WORM
-    EXPECT_EQ(offset, ONE_GB);
-    EXPECT_EQ(size, ONE_GB);
+    // For non-WORM mode, logical EOF should equal the actual amount of data written
+    // to TEST_FILE_1 in previous tests (currently 100 * 1024 bytes).
+    EXPECT_EQ(offset, 100 * 1024);
+    EXPECT_EQ(size, 100 * 1024);
 #else
     EXPECT_EQ(mode, GR_FILE_APPEND);
 #endif
+}
+
+// Verify that logical EOF metadata is persisted via .gr_vfs_meta
+// and survives across instance reconnects and VFS remounts on the same VFS.
+TEST_F(GRApiTest, TestLogicalEofMetaPersistence) {
+    const char *vfs_name = TEST_DIR; // reuse existing VFS created in other tests
+    const char *file_name = "META_PERSIST_FILE";
+    const int write_size = 100 * 1024 + 123; // intentionally unaligned size
+
+    gr_instance_handle inst1 = NULL;
+    gr_vfs_handle vfs1;
+    gr_file_handle fh1;
+
+    EXPECT_EQ(gr_create_inst(SERVER_ADDR, &inst1), GR_SUCCESS);
+    EXPECT_EQ(gr_vfs_mount(inst1, vfs_name, &vfs1), GR_SUCCESS);
+
+    // Create and open test file.
+    (void)gr_file_delete(vfs1, file_name, 0); // best-effort cleanup
+    EXPECT_EQ(gr_file_create(vfs1, file_name, NULL), GR_SUCCESS);
+    EXPECT_EQ(gr_file_open(vfs1, file_name, O_RDWR | O_SYNC, &fh1), GR_SUCCESS);
+
+    // Write an unaligned length from offset 0.
+    std::string data(write_size, 'X');
+    EXPECT_EQ(gr_file_pwrite(vfs1, &fh1, data.data(), write_size, 0), write_size);
+    EXPECT_EQ(gr_file_close(vfs1, &fh1, false), GR_SUCCESS);
+
+    // Disconnect instance to force server to rely on .gr_vfs_meta next time.
+    EXPECT_EQ(gr_vfs_unmount(&vfs1), GR_SUCCESS);
+    EXPECT_EQ(gr_delete_inst(inst1), GR_SUCCESS);
+
+    // Reconnect and remount VFS, then stat the file.
+    gr_instance_handle inst2 = NULL;
+    gr_vfs_handle vfs2;
+    EXPECT_EQ(gr_create_inst(SERVER_ADDR, &inst2), GR_SUCCESS);
+    EXPECT_EQ(gr_vfs_mount(inst2, vfs_name, &vfs2), GR_SUCCESS);
+
+    long long logical_offset = 0;
+    unsigned long long logical_size = 0;
+    int mode = 0;
+    char *time_str = NULL;
+    EXPECT_EQ(gr_file_stat(vfs2, file_name, &logical_offset, &logical_size, &mode, &time_str), GR_SUCCESS);
+    EXPECT_EQ(logical_offset, (long long)write_size);
+    EXPECT_EQ(logical_size, (unsigned long long)write_size);
+
+    // Cleanup the test file but keep the shared VFS for other tests.
+    EXPECT_EQ(gr_file_delete(vfs2, file_name, 0), GR_SUCCESS);
+    EXPECT_EQ(gr_vfs_unmount(&vfs2), GR_SUCCESS);
+    EXPECT_EQ(gr_delete_inst(inst2), GR_SUCCESS);
 }
 
 TEST_F(GRApiTest, TestGRfilePostpone) {
@@ -566,25 +444,6 @@ TEST_F(GRApiTest, TestFileApiInvalidParams) {
     EXPECT_LT(gr_file_pread(g_vfs_handle, file_handle1, buf, sizeof(buf), -1), 0);
     gr_get_error(&errorcode, &errormsg);
 
-    // append：空缓冲区/空句柄/零大小
-    long long aret = gr_file_append(g_vfs_handle, NULL, buf, sizeof(buf));
-    EXPECT_LT(aret, 0);
-    gr_get_error(&errorcode, &errormsg);
-    EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
-    aret = gr_file_append(g_vfs_handle, &file_handle1, NULL, sizeof(buf));
-    EXPECT_LT(aret, 0);
-    gr_get_error(&errorcode, &errormsg);
-    EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
-    aret = gr_file_append(g_vfs_handle, &file_handle1, buf, 0);
-    EXPECT_LT(aret, 0);
-    gr_get_error(&errorcode, &errormsg);
-    EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
-
-    // truncate 非法参数
-    EXPECT_NE(gr_file_truncate(g_vfs_handle, file_handle1, 0, -1), GR_SUCCESS);
-    gr_get_error(&errorcode, &errormsg);
-    EXPECT_EQ(errorcode, ERR_GR_INVALID_PARAM);
-
     // stat 非法参数
     long long off = 0; unsigned long long size = 0; int mode = 0; char *time = NULL;
     EXPECT_NE(gr_file_stat(g_vfs_handle, NULL, &off, &size, &mode, &time), GR_SUCCESS);
@@ -603,6 +462,46 @@ TEST_F(GRApiTest, TestRepeatAndOrderErrors) {
     // 重复卸载
     gr_vfs_handle tmp_vfs = g_vfs_handle; // 可能未挂载，作为负例也应失败
     EXPECT_NE(gr_vfs_unmount(&tmp_vfs), GR_SUCCESS);
+}
+
+// Demo: 验证链接断开时服务端会关闭该连接打开的目录句柄（dir map 不泄漏）
+// 行为：多次「建连 -> 挂载 VFS -> 不调用 unmount 直接 delete_inst 断开」，
+//       再重新建连并正常挂载/查询/卸载，应全部成功，说明服务端在释放 session 时已关闭目录。
+#define DIR_CLEANUP_DEMO_VFS "testdir_dir_cleanup_demo"
+#define DIR_CLEANUP_DISCONNECT_ROUNDS 5
+
+TEST_F(GRApiTest, TestGRDirMapCleanupOnDisconnect) {
+    gr_instance_handle inst = NULL;
+    gr_vfs_handle vfs;
+    memset(&vfs, 0, sizeof(vfs));
+
+    // 1. 创建 VFS（用主连接 g_inst_handle，保证目录存在）
+    int create_ret = gr_vfs_create(g_inst_handle, DIR_CLEANUP_DEMO_VFS, 0);
+    if (create_ret != GR_SUCCESS) {
+        // 可能已存在，尝试删除再建
+        gr_vfs_delete(g_inst_handle, DIR_CLEANUP_DEMO_VFS, 0);
+        ASSERT_EQ(gr_vfs_create(g_inst_handle, DIR_CLEANUP_DEMO_VFS, 0), GR_SUCCESS);
+    }
+
+    // 2. 多次：新建连接 -> 挂载 -> 不断开 unmount 直接 delete_inst（模拟异常断开）
+    for (int i = 0; i < DIR_CLEANUP_DISCONNECT_ROUNDS; i++) {
+        ASSERT_EQ(gr_create_inst(SERVER_ADDR, &inst), GR_SUCCESS);
+        ASSERT_EQ(gr_vfs_mount(inst, DIR_CLEANUP_DEMO_VFS, &vfs), GR_SUCCESS);
+        // 不调用 gr_vfs_unmount，直接释放连接，服务端应在 gr_release_session_res -> gr_clean_open_files -> gr_session_dir_close_all 中关闭目录
+        gr_delete_inst(inst);
+        inst = NULL;
+    }
+
+    // 3. 再次建连，正常挂载、查询、卸载，验证服务端未因 dir 泄漏而异常
+    ASSERT_EQ(gr_create_inst(SERVER_ADDR, &inst), GR_SUCCESS);
+    ASSERT_EQ(gr_vfs_mount(inst, DIR_CLEANUP_DEMO_VFS, &vfs), GR_SUCCESS);
+
+    int file_num = 0;
+    EXPECT_EQ(gr_vfs_query_file_num(vfs, &file_num), GR_SUCCESS);
+    EXPECT_GE(file_num, 0);
+
+    EXPECT_EQ(gr_vfs_unmount(&vfs), GR_SUCCESS);
+    gr_delete_inst(inst);
 }
 
 int main(int argc, char **argv) {

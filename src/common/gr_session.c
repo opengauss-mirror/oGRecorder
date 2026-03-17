@@ -268,7 +268,13 @@ static status_t gr_init_session(gr_session_t *session, const cs_pipe_t *pipe)
     // init session fd tracking
     GS_INIT_SPIN_LOCK(session->fd_lock);
     session->fd_list_head = NULL;
+    session->fd_free_list = NULL;
     session->fd_count = 0;
+    session->fd_free_count = 0;
+    // init session directory handle tracking
+    GS_INIT_SPIN_LOCK(session->dir_lock);
+    session->dir_list_head = NULL;
+    session->dir_count = 0;
     return CM_SUCCESS;
 }
 
@@ -362,6 +368,102 @@ void gr_destroy_session_inner(gr_session_t *session)
         CM_FREE_PTR(free_curr);
         free_curr = next;
     }
+
+    /* free any remaining directory entries to avoid leaks (handles should be closed already) */
+    cm_spin_lock(&session->dir_lock, NULL);
+    gr_session_dir_entry_t *dir_curr = session->dir_list_head;
+    session->dir_list_head = NULL;
+    session->dir_count = 0;
+    cm_spin_unlock(&session->dir_lock);
+
+    while (dir_curr != NULL) {
+        gr_session_dir_entry_t *next = dir_curr->next;
+        CM_FREE_PTR(dir_curr);
+        dir_curr = next;
+    }
+}
+
+status_t gr_session_dir_add(gr_session_t *session, uint64 handle)
+{
+    gr_session_dir_entry_t *ent = GR_MALLOC_STRUCT(gr_session_dir_entry_t);
+    if (ent == NULL) {
+        GR_ERROR_RETURN(GR_ERR_CATEGORY_RESOURCE, ERR_GR_NO_SPACE, CM_ERROR,
+                       "Failed to allocate memory for session DIR entry");
+    }
+    ent->handle = handle;
+    ent->next = NULL;
+
+    cm_spin_lock(&session->dir_lock, NULL);
+    ent->next = session->dir_list_head;
+    session->dir_list_head = ent;
+    session->dir_count++;
+    cm_spin_unlock(&session->dir_lock);
+    return CM_SUCCESS;
+}
+
+bool32 gr_session_dir_remove(gr_session_t *session, uint64 handle)
+{
+    cm_spin_lock(&session->dir_lock, NULL);
+    gr_session_dir_entry_t *prev = NULL;
+    gr_session_dir_entry_t *curr = session->dir_list_head;
+    while (curr != NULL) {
+        if (curr->handle == handle) {
+            if (prev == NULL) {
+                session->dir_list_head = curr->next;
+            } else {
+                prev->next = curr->next;
+            }
+            session->dir_count--;
+            cm_spin_unlock(&session->dir_lock);
+            CM_FREE_PTR(curr);
+            return CM_TRUE;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    cm_spin_unlock(&session->dir_lock);
+    return CM_FALSE;
+}
+
+void gr_session_dir_close_all(gr_session_t *session)
+{
+    if (session == NULL) {
+        GR_ERROR_HANDLE(GR_ERR_CATEGORY_SESSION, ERR_GR_SESSION_INVALID_ID,
+                      "gr_session_dir_close_all: session is NULL");
+        return;
+    }
+
+    LOG_DEBUG_INF("[GR_SESSION]session %u starting to close all directory handles", session->id);
+
+    cm_spin_lock(&session->dir_lock, NULL);
+    gr_session_dir_entry_t *curr = session->dir_list_head;
+    uint32_t dir_count = session->dir_count;
+    session->dir_list_head = NULL;
+    session->dir_count = 0;
+    cm_spin_unlock(&session->dir_lock);
+
+    LOG_DEBUG_INF("[GR_SESSION]session %u found %u directory handles to close", session->id, dir_count);
+
+    uint32_t closed_count = 0;
+    while (curr != NULL) {
+        gr_session_dir_entry_t *next = curr->next;
+        LOG_DEBUG_INF("[GR_SESSION]session %u closing dir handle %llu (entry %u/%u)",
+                     session->id, (unsigned long long)curr->handle, closed_count + 1, dir_count);
+
+        status_t close_status = gr_filesystem_closedir(curr->handle);
+        if (close_status != CM_SUCCESS) {
+            LOG_RUN_WAR("[GR_SESSION]session %u failed to close dir handle %llu, status: %d",
+                       session->id, (unsigned long long)curr->handle, close_status);
+        } else {
+            closed_count++;
+        }
+
+        CM_FREE_PTR(curr);
+        curr = next;
+    }
+
+    LOG_RUN_INF("[GR_SESSION]session %u completed closing directory handles: %u/%u closed successfully",
+               session->id, closed_count, dir_count);
 }
 
 void gr_destroy_session(gr_session_t *session)

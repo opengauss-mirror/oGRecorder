@@ -195,7 +195,6 @@ GR_DECLARE int gr_file_delete(gr_vfs_handle vfs_handle, const char *name, unsign
 GR_DECLARE int gr_file_exist(gr_vfs_handle vfs_handle, const char *name, bool *is_exist);
 GR_DECLARE int gr_file_open(gr_vfs_handle vfs_handle, const char *name, int flag, gr_file_handle *file_handle);
 GR_DECLARE int gr_file_close(gr_vfs_handle vfs_handle, gr_file_handle *file_handle, bool need_lock);
-GR_DECLARE int gr_file_truncate(gr_vfs_handle vfs_handle, gr_file_handle file_handle, int truncateType, long long offset);
 GR_DECLARE long long int gr_file_pwrite(gr_vfs_handle vfs_handle,
                                         gr_file_handle *file_handle, const void *buf, unsigned long long count, long long offset);
 GR_DECLARE long long int gr_file_append(gr_vfs_handle vfs_handle,

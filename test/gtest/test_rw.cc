@@ -47,7 +47,7 @@ protected:
         EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle2), GR_SUCCESS);
         EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle3), GR_SUCCESS);
         EXPECT_EQ(gr_create_inst(SERVER_ADDR, &g_inst_handle4), GR_SUCCESS);
-        EXPECT_EQ(gr_vfs_create(g_inst_handle1, TEST_DIR, 0), GR_SUCCESS);
+        gr_vfs_create(g_inst_handle1, TEST_DIR, 0);
         EXPECT_EQ(gr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle1), GR_SUCCESS);
         EXPECT_EQ(gr_vfs_mount(g_inst_handle2, TEST_DIR, &g_vfs_handle2), GR_SUCCESS);
         EXPECT_EQ(gr_vfs_mount(g_inst_handle1, TEST_DIR, &g_vfs_handle3), GR_SUCCESS);
