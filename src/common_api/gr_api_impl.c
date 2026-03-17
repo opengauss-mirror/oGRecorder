@@ -600,31 +600,6 @@ int64 gr_pread_file_impl(gr_conn_t *conn, int handle, const void *buf, unsigned 
     return total_size;
 }
 
-status_t gr_truncate_impl(gr_conn_t *conn, int handle, long long length, int truncateType)
-{
-    LOG_DEBUG_INF("gr truncate file entry, handle:%d, length:%lld, truncateType:%d", handle, length, truncateType);
-    if (length < 0) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "length must be a positive integer");
-        LOG_RUN_ERR("File length is invalid:%lld.", length);
-        return CM_ERROR;
-    }
-
-    if (length > (int64)GR_MAX_FILE_SIZE) {
-        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "length must less than GR_MAX_FILE_SIZE");
-        LOG_RUN_ERR("File length is invalid:%lld.", length);
-        return CM_ERROR;
-    }
-
-    gr_truncate_file_info_t send_info;
-    send_info.handle = handle;
-    send_info.length = length;
-    send_info.truncateType = truncateType;
-
-    status_t status = gr_msg_interact(conn, GR_CMD_TRUNCATE_FILE, (void *)&send_info, NULL);
-    LOG_DEBUG_INF("gr truncate file leave, status:%d", status);
-    return status;
-}
-
 status_t gr_stat_file_impl(
     gr_conn_t *conn, const char *fileName, long long *offset, unsigned long long *size, int *mode, char **time)
 {
@@ -1083,15 +1058,6 @@ static status_t gr_decode_get_disk_usage(gr_packet_t *ack_pack, void *ack)
     return CM_SUCCESS;
 }
 
-static status_t gr_encode_truncate_file(gr_conn_t *conn, gr_packet_t *pack, void *send_info)
-{
-    gr_truncate_file_info_t *info = (gr_truncate_file_info_t *)send_info;
-    CM_RETURN_IFERR(gr_put_int64(pack, info->length));
-    CM_RETURN_IFERR(gr_put_int32(pack, info->handle));
-    CM_RETURN_IFERR(gr_put_int64(pack, info->truncateType));
-    return CM_SUCCESS;
-}
-
 static status_t gr_encode_stat_file(gr_conn_t *conn, gr_packet_t *pack, void *send_info)
 {
     gr_stat_file_info_t *info = (gr_stat_file_info_t *)send_info;
@@ -1227,7 +1193,6 @@ gr_packet_proc_t g_gr_packet_proc[GR_CMD_END] =
     [GR_CMD_APPEND_FILE] = {gr_encode_append_file, gr_decode_append_file, "append file"},
     [GR_CMD_READ_FILE] = {gr_encode_read_file, gr_decode_read_file, "read file"},
     [GR_CMD_RENAME_FILE] = {gr_encode_rename_file, NULL, "rename file"},
-    [GR_CMD_TRUNCATE_FILE] = {gr_encode_truncate_file, NULL, "truncate file"},
     [GR_CMD_STAT_FILE] = {gr_encode_stat_file, gr_decode_stat_file, "stat file"},
     [GR_CMD_STOP_SERVER] = {NULL, NULL, "stop server"},
     [GR_CMD_SETCFG] = {gr_encode_setcfg, NULL, "setcfg"},

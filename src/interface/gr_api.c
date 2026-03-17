@@ -788,22 +788,6 @@ long long int gr_file_pread(
     return ret;
 }
 
-int gr_file_truncate(gr_vfs_handle vfs_handle, gr_file_handle file_handle, int truncateType, long long offset)
-{
-    if (validate_vfs_handle(vfs_handle, "gr_file_truncate") != GR_SUCCESS ||
-        validate_size_param(offset, "offset", "gr_file_truncate") != GR_SUCCESS) {
-        return GR_ERROR;
-    }
-    st_gr_instance_handle *hdl = (st_gr_instance_handle*)(vfs_handle.handle);
-    if (hdl->conn == NULL) {
-        LOG_RUN_ERR("ftruncate get conn error.");
-        GR_THROW_ERROR(ERR_GR_CONNECTION_CLOSED, "connection is NULL or closed");
-        return GR_ERROR;
-    }
-    status_t ret = gr_truncate_impl(hdl->conn, HANDLE_VALUE(file_handle.fd), offset, truncateType);
-    return (int)ret;
-}
-
 int gr_file_stat(
     gr_vfs_handle vfs_handle, const char *fileName, long long *offset, unsigned long long *count, int *mode, char **time)
 {

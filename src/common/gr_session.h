@@ -150,6 +150,10 @@ typedef struct st_gr_session {
     struct st_gr_session_fd_entry *fd_free_list; // freelist for fd entries (memory reuse)
     uint32_t fd_count;
     uint32_t fd_free_count;
+    // session-owned open directory handle list for resource cleanup
+    spinlock_t dir_lock;
+    struct st_gr_session_dir_entry *dir_list_head;
+    uint32_t dir_count;
 } gr_session_t;
 
 static inline char *gr_init_sendinfo_buf(char *input)
@@ -208,6 +212,16 @@ typedef struct st_gr_session_fd_entry {
 status_t gr_session_fd_add(gr_session_t *session, int64 fd, uint64 ftid, const char *file_name);
 bool32 gr_session_fd_remove(gr_session_t *session, int64 fd);
 void gr_session_fd_close_all(gr_session_t *session);
+
+// session directory handle tracking APIs
+typedef struct st_gr_session_dir_entry {
+    uint64 handle;
+    struct st_gr_session_dir_entry *next;
+} gr_session_dir_entry_t;
+
+status_t gr_session_dir_add(gr_session_t *session, uint64 handle);
+bool32 gr_session_dir_remove(gr_session_t *session, uint64 handle);
+void gr_session_dir_close_all(gr_session_t *session);
 
 #ifdef __cplusplus
 }

@@ -156,14 +156,14 @@ status_t gr_diag_proto_type(gr_session_t *session)
 
 static void gr_clean_open_files(gr_session_t *session)
 {
-    if (cm_sys_process_alived(session->cli_info.cli_pid, session->cli_info.start_time)) {
-        LOG_DEBUG_INF("Process:%s is alive, pid:%llu, start_time:%lld.", session->cli_info.process_name,
-            session->cli_info.cli_pid, session->cli_info.start_time);
-        return;
-    }
-    // close all fds owned by session before disconnect
+    // Always close all resources when a session is explicitly released,
+    // regardless of whether the client process is still alive.
+    // This path is only used by gr_release_session_res for active session teardown.
+    // Background orphan-session cleanup (if any) should decide separately based on cli_pid liveness.
+    // Close all fds and directory handles owned by the session before disconnect.
     gr_session_fd_close_all(session);
-    LOG_RUN_INF("Clean open files for pid:%llu.", session->cli_info.cli_pid);
+    gr_session_dir_close_all(session);
+    LOG_RUN_INF("Clean open files and directories for pid:%llu.", session->cli_info.cli_pid);
 }
 
 void gr_release_session_res(gr_session_t *session)
@@ -293,6 +293,11 @@ static status_t gr_process_mount_vfs(gr_session_t *session)
     if (gr_filesystem_opendir(vfs_name, &handle) != CM_SUCCESS) {
         GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Failed to mount vfs: %s", vfs_name);
     }
+    if (gr_session_dir_add(session, handle) != CM_SUCCESS) {
+        // roll back opened directory if tracking fails
+        (void)gr_filesystem_closedir(handle);
+        GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Failed to track mounted vfs handle for: %s", vfs_name);
+    }
     (void)gr_put_int64(&session->send_pack, (int64)handle);
     LOG_DEBUG_INF("Succeed to mount vfs:%s, handle:%llu.", vfs_name, (uint64)handle);
     return CM_SUCCESS;
@@ -304,6 +309,7 @@ static status_t gr_process_unmount_vfs(gr_session_t *session)
     gr_init_get(&session->recv_pack);
     GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, (int64 *)&handle));
     GR_LOG_DEBUG_OP("Begin to unmount vfs, handle:%llu", (unsigned long long)handle);
+    (void)gr_session_dir_remove(session, handle);
     if (gr_filesystem_closedir(handle) != CM_SUCCESS) {
         GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Failed to unmount vfs");
     }
@@ -644,21 +650,6 @@ static status_t gr_process_read_file(gr_session_t *session)
     return CM_SUCCESS;
 }
 
-static status_t gr_process_truncate_file(gr_session_t *session)
-{
-    int handle;
-    int64 length;
-    int64 truncateType;
-
-    gr_init_get(&session->recv_pack);
-    GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &length));
-    GR_RETURN_IF_ERROR(gr_get_int32(&session->recv_pack, &handle));
-    GR_RETURN_IF_ERROR(gr_get_int64(&session->recv_pack, &truncateType));
-    GR_RETURN_IF_ERROR(gr_set_audit_resource(session->audit_info.resource, GR_AUDIT_MODIFY,
-        "handle:%d, length:%ld", handle, length));
-    GR_LOG_DEBUG_OP("Begin to truncate file, handle:%d, length:%lld", handle, length);
-    return gr_filesystem_truncate(handle, length);
-}
 
 static status_t gr_process_stat_file(gr_session_t *session)
 {
@@ -1210,7 +1201,6 @@ static gr_cmd_hdl_t g_gr_cmd_handle[GR_CMD_TYPE_OFFSET(GR_CMD_END)] = {
     [GR_CMD_TYPE_OFFSET(GR_CMD_APPEND_FILE)] = {GR_CMD_APPEND_FILE, gr_process_append_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_READ_FILE)] = {GR_CMD_READ_FILE, gr_process_read_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_RENAME_FILE)] = {GR_CMD_RENAME_FILE, gr_process_rename, NULL, CM_FALSE},
-    [GR_CMD_TYPE_OFFSET(GR_CMD_TRUNCATE_FILE)] = {GR_CMD_TRUNCATE_FILE, gr_process_truncate_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_STAT_FILE)] = {GR_CMD_STAT_FILE, gr_process_stat_file, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_STOP_SERVER)] = {GR_CMD_STOP_SERVER, gr_process_stop_server, NULL, CM_FALSE},
     [GR_CMD_TYPE_OFFSET(GR_CMD_SETCFG)] = {GR_CMD_SETCFG, gr_process_setcfg, NULL, CM_FALSE},
