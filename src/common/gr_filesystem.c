@@ -58,6 +58,10 @@ typedef struct gr_dir_map_item {
     uint64_t handle;
     DIR *dir;
     pthread_mutex_t lock;  // Per-handle lock to protect concurrent access to DIR*
+    // Snapshot for globally ordered pagination (sorted file names)
+    char **sorted_names;
+    uint32_t sorted_count;
+    uint32_t cursor;
 } gr_dir_map_item_t;
 
 #define MAX_DIR_HANDLE_COUNT 10000  // Maximum number of directory handles
@@ -130,6 +134,20 @@ static int gr_dir_map_init(void) {
     return 0;
 }
 
+static void gr_dir_map_free_snapshot(gr_dir_map_item_t *item)
+{
+    if (item == NULL || item->sorted_names == NULL) {
+        return;
+    }
+    for (uint32_t i = 0; i < item->sorted_count; i++) {
+        free(item->sorted_names[i]);
+    }
+    free(item->sorted_names);
+    item->sorted_names = NULL;
+    item->sorted_count = 0;
+    item->cursor = 0;
+}
+
 // Cleanup directory map
 void gr_dir_map_cleanup(void) {
     if (!g_dir_map_initialized) {
@@ -149,6 +167,7 @@ void gr_dir_map_cleanup(void) {
         if (item->dir) {
             closedir(item->dir);
         }
+        gr_dir_map_free_snapshot(item);
         pthread_mutex_destroy(&item->lock);  // Destroy per-handle lock
         free(item);
         curr = next;
@@ -208,6 +227,9 @@ uint64_t gr_dir_map_insert(DIR *dir) {
     item->handle = handle;
     item->dir = dir;
     pthread_mutex_init(&item->lock, NULL);  // Initialize per-handle lock
+    item->sorted_names = NULL;
+    item->sorted_count = 0;
+    item->cursor = 0;
     
     // Insert into CBB hash map
     if (cm_hmap_insert(&g_dir_map, &g_dir_map_funcs, (hash_node_t*)item) != CM_TRUE) {
@@ -316,6 +338,7 @@ void gr_dir_map_remove(uint64_t handle) {
     hash_node_t *node = cm_hmap_delete(&g_dir_map, &g_dir_map_funcs, &key);
     if (node != NULL) {
         gr_dir_map_item_t *item = (gr_dir_map_item_t*)node;
+        gr_dir_map_free_snapshot(item);
         pthread_mutex_destroy(&item->lock);  // Destroy per-handle lock
         free(item);
         
@@ -326,6 +349,34 @@ void gr_dir_map_remove(uint64_t handle) {
     }
     
     pthread_mutex_unlock(&g_dir_map_lock);
+}
+
+// Get dir map item and acquire the per-handle lock (caller must call gr_dir_map_unlock)
+static gr_dir_map_item_t *gr_dir_map_get_item_and_lock(uint64_t handle)
+{
+    if (handle == 0) {
+        return NULL;
+    }
+
+    pthread_mutex_lock(&g_dir_map_lock);
+
+    if (!g_dir_map_initialized) {
+        pthread_mutex_unlock(&g_dir_map_lock);
+        return NULL;
+    }
+
+    uint64_t key = handle;
+    hash_node_t *node = cm_hmap_find(&g_dir_map, &g_dir_map_funcs, &key);
+    gr_dir_map_item_t *item = (gr_dir_map_item_t*)node;
+
+    if (item == NULL) {
+        pthread_mutex_unlock(&g_dir_map_lock);
+        return NULL;
+    }
+
+    pthread_mutex_lock(&item->lock);
+    pthread_mutex_unlock(&g_dir_map_lock);
+    return item;
 }
 
 void gr_dir_map_get_stats(uint32_t *current_count, uint32_t *max_count, uint32_t *freed_count) {
@@ -782,13 +833,13 @@ status_t gr_filesystem_opendir(const char *name, uint64_t *out_handle)
 status_t gr_filesystem_closedir(uint64_t handle)
 {
     // Get DIR* and acquire per-handle lock to ensure no other thread is using it
-    DIR *dir = gr_dir_map_get_and_lock(handle);
-    if (!dir) {
+    gr_dir_map_item_t *item = gr_dir_map_get_item_and_lock(handle);
+    if (item == NULL || item->dir == NULL) {
         LOG_RUN_ERR("[FS] Invalid directory handle: %lu", handle);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
         return CM_ERROR;
     }
-    if (closedir(dir) != 0) {
+    if (closedir(item->dir) != 0) {
         gr_dir_map_unlock(handle);
         LOG_RUN_ERR("[FS] Failed to close directory, errno: %d", errno);
         GR_THROW_ERROR(ERR_GR_FILE_SYSTEM_ERROR);
@@ -1121,35 +1172,87 @@ status_t gr_filesystem_query_file_num(uint64_t handle, uint32_t *file_num) {
     return CM_SUCCESS;
 }
 
+static int gr_cstr_name_cmp(const void *a, const void *b)
+{
+    const char *const *sa = (const char *const *)a;
+    const char *const *sb = (const char *const *)b;
+    return strcmp(*sa, *sb);
+}
+
 status_t gr_filesystem_query_file_info(uint64_t handle, gr_file_item_t *file_items, uint32_t max_files, uint32_t *file_count, bool is_continue) {
     GR_FS_CHECK_NULL_RETURN(file_items, ERR_GR_INVALID_PARAM, "file_items is NULL");
     GR_FS_CHECK_NULL_RETURN(file_count, ERR_GR_INVALID_PARAM, "file_count is NULL");
     
     // Get DIR* and acquire per-handle lock
-    DIR *dir = gr_dir_map_get_and_lock(handle);
-    if (!dir) {
+    gr_dir_map_item_t *item = gr_dir_map_get_item_and_lock(handle);
+    if (item == NULL || item->dir == NULL) {
         GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR, "Invalid directory handle: %lu", handle);
     }
     
+    // Build (or rebuild) sorted snapshot on first page.
     if (!is_continue) {
-        rewinddir(dir);
-    }
-    struct dirent *entry;
-    *file_count = 0;
-    while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_type == DT_REG) {
-            gr_file_item_t *current_item = &file_items[*file_count];
-            errno_t err = strncpy_s(current_item->name, GR_MAX_NAME_LEN, entry->d_name, GR_MAX_NAME_LEN - 1);
-            if (SECUREC_UNLIKELY(err != EOK)) {
-                LOG_RUN_ERR("[FS] Failed to copy file name, errno: %d", err);
+        gr_dir_map_free_snapshot(item);
+        item->cursor = 0;
+
+        rewinddir(item->dir);
+        struct dirent *entry;
+        uint32_t cap = 0;
+
+        while ((entry = readdir(item->dir)) != NULL) {
+            if (entry->d_type != DT_REG) {
+                continue;
+            }
+
+            if (item->sorted_count == cap) {
+                uint32_t new_cap = (cap == 0) ? 64 : (cap * 2);
+                char **new_arr = (char **)realloc(item->sorted_names, sizeof(char *) * new_cap);
+                if (new_arr == NULL) {
+                    LOG_RUN_ERR("[FS] realloc failed when building sorted file snapshot");
+                    gr_dir_map_free_snapshot(item);
+                    gr_dir_map_unlock(handle);
+                    return CM_ERROR;
+                }
+                item->sorted_names = new_arr;
+                cap = new_cap;
+            }
+
+            size_t name_len = strnlen(entry->d_name, GR_MAX_NAME_LEN - 1);
+            char *name_copy = (char *)malloc(name_len + 1);
+            if (name_copy == NULL) {
+                LOG_RUN_ERR("[FS] malloc failed when building sorted file snapshot");
+                gr_dir_map_free_snapshot(item);
                 gr_dir_map_unlock(handle);
                 return CM_ERROR;
             }
-            (*file_count)++;
-            if (*file_count >= max_files) {
-                break;
+            errno_t err = strncpy_s(name_copy, name_len + 1, entry->d_name, name_len);
+            if (SECUREC_UNLIKELY(err != EOK)) {
+                free(name_copy);
+                LOG_RUN_ERR("[FS] Failed to copy file name into snapshot, errno: %d", err);
+                gr_dir_map_free_snapshot(item);
+                gr_dir_map_unlock(handle);
+                return CM_ERROR;
             }
+            item->sorted_names[item->sorted_count++] = name_copy;
         }
+
+        if (item->sorted_count > 1) {
+            qsort(item->sorted_names, (size_t)item->sorted_count, sizeof(char *), gr_cstr_name_cmp);
+        }
+    }
+
+    // Page out from snapshot in globally sorted order.
+    *file_count = 0;
+    while (item->cursor < item->sorted_count && *file_count < max_files) {
+        gr_file_item_t *current_item = &file_items[*file_count];
+        errno_t err = strncpy_s(current_item->name, GR_MAX_NAME_LEN,
+                                item->sorted_names[item->cursor], GR_MAX_NAME_LEN - 1);
+        if (SECUREC_UNLIKELY(err != EOK)) {
+            LOG_RUN_ERR("[FS] Failed to copy file name from snapshot, errno: %d", err);
+            gr_dir_map_unlock(handle);
+            return CM_ERROR;
+        }
+        item->cursor++;
+        (*file_count)++;
     }
     
     // Unlock handle
