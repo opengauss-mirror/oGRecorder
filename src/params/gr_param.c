@@ -32,6 +32,7 @@
 #include "gr_fault_injection.h"
 #include "gr_diskgroup.h"
 #include "gr_param.h"
+#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -109,8 +110,8 @@ static config_item_t g_gr_params[] = {
     // ==================== Network and Cluster Configuration ====================
     {"GR_NODES_LIST", CM_TRUE, ATTR_NONE, "0:127.0.0.1:1611", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
         NULL, 13, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_nodes_list, gr_notify_gr_nodes_list, NULL, NULL},
-    {"IP_WHITE_LIST", CM_TRUE, ATTR_READONLY, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
-        NULL, 14, EFFECT_REBOOT, CFG_INS, NULL, NULL, NULL, NULL},
+    {"IP_WHITE_LIST", CM_TRUE, ATTR_NONE, "127.0.0.1", NULL, NULL, "-", "-", "GS_TYPE_VARCHAR",
+        NULL, 14, EFFECT_IMMEDIATELY, CFG_INS, gr_verify_ip_white_list, gr_notify_ip_white_list, NULL, NULL},
 
     // ==================== Performance and Thread Configuration ====================
     {"MAX_SESSION_NUMS", CM_TRUE, ATTR_READONLY, "8192", NULL, NULL, "-", "[16,16320]", "GS_TYPE_INTEGER",
@@ -348,7 +349,7 @@ static status_t gr_load_instance_id(gr_config_t *inst_cfg)
 #define MIN_IPV4_PREFIX_LEN 0
 
 // 工具函数：去除字符串前后空格和制表符
-static void trim_whitespace(char *str) {
+void trim_whitespace(char *str) {
     if (str == NULL) return;
     
     // 去除前导空格和制表符
@@ -382,9 +383,10 @@ typedef struct st_ip_whitelist {
     uint32 count;
 } ip_whitelist_t;
 
-static ip_whitelist_t g_ip_whitelist = {0};
+ip_whitelist_t g_ip_whitelist = {0};
+pthread_rwlock_t g_ip_whitelist_lock = PTHREAD_RWLOCK_INITIALIZER;
 
-static status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
+status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry)
 {
     char temp_str[CM_MAX_IP_LEN];
     char *slash_pos, *star_pos;
@@ -463,36 +465,47 @@ static bool32 is_ip_in_whitelist(const char *client_ip)
         LOG_RUN_WAR("[GR_WHITELIST] Invalid IPv4 address format: %s", client_ip);
         return CM_FALSE;
     }
-    
+
+    bool32 allowed = CM_FALSE;
+
+    pthread_rwlock_rdlock(&g_ip_whitelist_lock);
+
     for (uint32 i = 0; i < g_ip_whitelist.count; i++) {
         ip_whitelist_entry_t *entry = &g_ip_whitelist.entries[i];
-        
+
         if (!entry->is_range) {
             if (strcmp(client_ip, entry->ip_addr) == 0) {
-                LOG_DEBUG_INF("[GR_WHITELIST] IP %s matched exact entry: %s", 
-                             client_ip, entry->ip_addr);
-                return CM_TRUE;
+                LOG_DEBUG_INF("[GR_WHITELIST] IP %s matched exact entry: %s",
+                              client_ip, entry->ip_addr);
+                allowed = CM_TRUE;
+                break;
             }
         } else {
             struct sockaddr_in entry_addr, mask_addr;
             if (inet_pton(AF_INET, entry->ip_addr, &entry_addr.sin_addr) == 1 &&
                 inet_pton(AF_INET, entry->subnet_mask, &mask_addr.sin_addr) == 1) {
-                
+
                 uint32 client_ip_int = ntohl(client_addr.sin_addr.s_addr);
                 uint32 entry_ip_int = ntohl(entry_addr.sin_addr.s_addr);
                 uint32 mask_int = ntohl(mask_addr.sin_addr.s_addr);
-                
+
                 if ((client_ip_int & mask_int) == (entry_ip_int & mask_int)) {
-                    LOG_DEBUG_INF("[GR_WHITELIST] IP %s matched range entry: %s/%s", 
-                                 client_ip, entry->ip_addr, entry->subnet_mask);
-                    return CM_TRUE;
+                    LOG_DEBUG_INF("[GR_WHITELIST] IP %s matched range entry: %s/%s",
+                                  client_ip, entry->ip_addr, entry->subnet_mask);
+                    allowed = CM_TRUE;
+                    break;
                 }
             }
         }
     }
-    
-    LOG_DEBUG_INF("[GR_WHITELIST] IP %s not found in whitelist", client_ip);
-    return CM_FALSE;
+
+    pthread_rwlock_unlock(&g_ip_whitelist_lock);
+
+    if (!allowed) {
+        LOG_DEBUG_INF("[GR_WHITELIST] IP %s not found in whitelist", client_ip);
+    }
+
+    return allowed;
 }
 
 static status_t gr_load_ip_white_list_addrs(gr_config_t *inst_cfg)

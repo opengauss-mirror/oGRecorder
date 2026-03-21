@@ -30,6 +30,29 @@
 #include "gr_log.h"
 #include "gr_fault_injection.h"
 #include "gr_param_verify.h"
+#include <pthread.h>
+
+// keep in sync with definitions in gr_param.c
+#define GR_MAX_WHITE_LIST_COUNT 64
+
+typedef struct st_ip_whitelist_entry {
+    char ip_addr[CM_MAX_IP_LEN];
+    char subnet_mask[CM_MAX_IP_LEN];
+    bool32 is_range;
+    struct sockaddr_storage sock_addr;
+    struct sockaddr_storage mask_addr;
+} ip_whitelist_entry_t;
+
+typedef struct st_ip_whitelist {
+    ip_whitelist_entry_t entries[GR_MAX_WHITE_LIST_COUNT];
+    uint32 count;
+} ip_whitelist_t;
+
+// externs from gr_param.c
+extern void trim_whitespace(char *str);
+extern status_t parse_ip_range(const char *ip_str, ip_whitelist_entry_t *entry);
+extern ip_whitelist_t g_ip_whitelist;
+extern pthread_rwlock_t g_ip_whitelist_lock;
 
 #ifdef __cplusplus
 extern "C" {
@@ -170,6 +193,62 @@ status_t gr_verify_log_backup_file_count(void *lex, void *def)
 status_t gr_notify_log_backup_file_count(void *se, void *item, char *value)
 {
     CM_RETURN_IFERR(cm_str2uint32(value, (uint32_t *)&cm_log_param_instance()->log_backup_file_count));
+    return CM_SUCCESS;
+}
+
+status_t gr_verify_ip_white_list(void *lex, void *def)
+{
+    const char *value = (const char *)lex;
+    if (value == NULL) {
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "IP_WHITE_LIST is NULL");
+        return CM_ERROR;
+    }
+
+    size_t len = strlen(value);
+    if (len >= CM_PARAM_BUFFER_SIZE) {
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "IP_WHITE_LIST length too large");
+        return CM_ERROR;
+    }
+
+    // 只做长度校验和拷贝，具体 IP 语法在解析阶段由 parse_ip_range 再次校验
+    securec_check_ret(strcpy_sp(((gr_def_t *)def)->value, CM_PARAM_BUFFER_SIZE, value));
+    return CM_SUCCESS;
+}
+
+status_t gr_notify_ip_white_list(void *se, void *item, char *value)
+{
+    (void)se;
+    (void)item;
+
+    if (value == NULL) {
+        GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "IP_WHITE_LIST is NULL");
+        return CM_ERROR;
+    }
+
+    // 直接基于新的字符串 value 重建 g_ip_whitelist
+    pthread_rwlock_wrlock(&g_ip_whitelist_lock);
+    g_ip_whitelist.count = 0;
+
+    char temp_value[1024];
+    securec_check_ret(strcpy_s(temp_value, sizeof(temp_value), value));
+
+    char *token = strtok(temp_value, ",;");
+    while (token != NULL && g_ip_whitelist.count < GR_MAX_WHITE_LIST_COUNT) {
+        trim_whitespace(token);
+
+        if (strlen(token) > 0) {
+            if (parse_ip_range(token, &g_ip_whitelist.entries[g_ip_whitelist.count]) == CM_SUCCESS) {
+                g_ip_whitelist.count++;
+            } else {
+                LOG_RUN_WAR("Invalid IP address in whitelist (dynamic): %s", token);
+            }
+        }
+
+        token = strtok(NULL, ",;");
+    }
+
+    LOG_RUN_INF("Dynamically loaded %u IP addresses into whitelist", g_ip_whitelist.count);
+    pthread_rwlock_unlock(&g_ip_whitelist_lock);
     return CM_SUCCESS;
 }
 

@@ -75,6 +75,27 @@ TEST_F(GRApiTest, TestGRSetGetConf) {
     EXPECT_EQ(strcmp(buf, "255"), 0);
 }
 
+// 动态修改 IP_WHITE_LIST，并验证立刻生效
+TEST_F(GRApiTest, TestGRIpWhiteListDynamicUpdate) {
+    char buf[256] = {0};
+
+    // 1. 先获取当前白名单配置
+    EXPECT_EQ(gr_get_conf(g_inst_handle, "IP_WHITE_LIST", buf), GR_SUCCESS);
+    std::string original(buf);
+
+    // 2. 在原有基础上拼接一条新规则 10.0.0.1
+    std::string updated = original;
+    if (!updated.empty()) {
+        updated.append(",");
+    }
+    updated.append("10.0.0.1");
+
+    EXPECT_EQ(gr_set_conf(g_inst_handle, "IP_WHITE_LIST", updated.c_str()), GR_SUCCESS);
+    memset(buf, 0, sizeof(buf));
+    EXPECT_EQ(gr_get_conf(g_inst_handle, "IP_WHITE_LIST", buf), GR_SUCCESS);
+    EXPECT_STREQ(buf, updated.c_str());
+}
+
 TEST_F(GRApiTest, TestGRVfsCreate) {
     EXPECT_EQ(gr_vfs_create(g_inst_handle, TEST_DIR, 0), GR_SUCCESS);
     EXPECT_NE(gr_vfs_create(g_inst_handle, TEST_DIR, 0), GR_SUCCESS);

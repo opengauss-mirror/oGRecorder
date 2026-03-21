@@ -943,8 +943,11 @@ int gr_set_conf(gr_instance_handle inst_handle, const char *name, const char *va
         return GR_ERROR;
     }
 
-    if (cm_strcmpi(name, "LOG_LEVEL") != 0 && cm_strcmpi(name, "LOG_MAX_FILE_SIZE") != 0 &&
-        cm_strcmpi(name, "LOG_FILE_COUNT") != 0 && cm_strcmpi(name, "GR_NODES_LIST") != 0) {
+    if (cm_strcmpi(name, "LOG_LEVEL") != 0 &&
+        cm_strcmpi(name, "LOG_MAX_FILE_SIZE") != 0 &&
+        cm_strcmpi(name, "LOG_FILE_COUNT") != 0 &&
+        cm_strcmpi(name, "GR_NODES_LIST") != 0 &&
+        cm_strcmpi(name, "IP_WHITE_LIST") != 0) {
         LOG_RUN_ERR("gr_set_conf: invalid configuration name: %s", name);
         GR_THROW_ERROR(ERR_GR_INVALID_PARAM, "invalid name when set cfg");
         return GR_ERROR;

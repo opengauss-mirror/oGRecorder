@@ -44,6 +44,8 @@ status_t gr_verify_log_file_dir_name(char *log_home);
 status_t gr_verify_log_file_real_path(char *log_home);
 status_t gr_verify_log_backup_file_count(void *lex, void *def);
 status_t gr_notify_log_backup_file_count(void *se, void *item, char *value);
+status_t gr_verify_ip_white_list(void *lex, void *def);
+status_t gr_notify_ip_white_list(void *se, void *item, char *value);
 
 #ifdef __cplusplus
 }
