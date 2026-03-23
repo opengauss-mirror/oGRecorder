@@ -6503,8 +6503,8 @@ export GAUSSHOME={app_link_path}
 export GAUSSLOG={clusterInfo.logPath}
 export GR_HOME={clusterInfo.grPath}
 export PGHOST={clusterInfo.tmpPath}
-export PATH=$GAUSSHOME/bin/:{app_link_path}/bin/:$PATH
-export LD_LIBRARY_PATH=$GAUSSHOME/lib:{app_link_path}/lib:$LD_LIBRARY_PATH
+export PATH={app_link_path}/bin/:\\$PATH
+export LD_LIBRARY_PATH={app_link_path}/lib/:\\$LD_LIBRARY_PATH
 EOF"
 '''
             else:
@@ -6515,8 +6515,8 @@ export GAUSSHOME={app_link_path}
 export GAUSSLOG={clusterInfo.logPath}
 export GR_HOME={clusterInfo.grPath}
 export PGHOST={clusterInfo.tmpPath}
-export PATH=$GAUSSHOME/bin/:{app_link_path}/bin/:$PATH
-export LD_LIBRARY_PATH=$GAUSSHOME/lib:{app_link_path}/lib:$LD_LIBRARY_PATH
+export PATH={app_link_path}/bin/:\\$PATH
+export LD_LIBRARY_PATH={app_link_path}/lib/:\\$LD_LIBRARY_PATH
 EOF
 '''
             (status, output) = subprocess.getstatusoutput(cmd)
