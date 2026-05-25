@@ -429,7 +429,9 @@ void gr_dir_map_get_stats(uint32_t *current_count, uint32_t *max_count, uint32_t
  *   the current physical file size (stat), for backward compatibility.
  * - On write: after successful aligned write, we:
  *     - update in-memory logical_size for the fd
- *     - append a new record to the corresponding .gr_vfs_meta file
+ *     - append a new record to the corresponding .gr_vfs_meta file (fflush + fsync)
+ * - On close: flush the in-memory logical_size to .gr_vfs_meta again so that
+ *   a failed or omitted per-write persist cannot leave stat stale after fd unmap.
  * - On stat / logical-size queries: we prefer in-memory fd mapping when
  *   available, otherwise fall back to scanning .gr_vfs_meta and, if absent,
  *   to the physical size from stat.
@@ -530,35 +532,55 @@ static status_t gr_meta_read_logical_size_from_meta(const char *logical_path, ui
     return CM_SUCCESS;
 }
 
-static void gr_meta_append_record(const char *logical_path, uint64_t logical_size)
+static status_t gr_meta_append_record(const char *logical_path, uint64_t logical_size)
 {
     char vfs_name[GR_MAX_NAME_LEN];
     char meta_path[GR_FILE_PATH_MAX_LENGTH];
 
     if (logical_path == NULL) {
-        return;
+        GR_FS_ERROR_RETURN(ERR_GR_INVALID_PARAM, "logical_path is NULL when appending vfs meta");
     }
 
     if (gr_meta_extract_vfs_name(logical_path, vfs_name, sizeof(vfs_name)) != CM_SUCCESS) {
-        return;
+        return CM_ERROR;
     }
     if (gr_meta_build_meta_path(vfs_name, meta_path, sizeof(meta_path)) != CM_SUCCESS) {
-        return;
+        return CM_ERROR;
     }
 
     FILE *fp = fopen(meta_path, "a");
     if (fp == NULL) {
-        LOG_RUN_WAR("[FS] failed to open vfs meta file '%s' for append, errno: %d",
+        LOG_RUN_ERR("[FS] failed to open vfs meta file '%s' for append, errno: %d",
                     meta_path, errno);
-        return;
+        return CM_ERROR;
     }
 
     int ret = fprintf(fp, "%s %llu\n", logical_path, (unsigned long long)logical_size);
     if (ret < 0) {
-        LOG_RUN_WAR("[FS] failed to append record to vfs meta file '%s', errno: %d",
+        LOG_RUN_ERR("[FS] failed to append record to vfs meta file '%s', errno: %d",
                     meta_path, errno);
+        (void)fclose(fp);
+        return CM_ERROR;
     }
-    (void)fclose(fp);
+
+    if (fflush(fp) != 0) {
+        LOG_RUN_ERR("[FS] failed to fflush vfs meta file '%s', errno: %d", meta_path, errno);
+        (void)fclose(fp);
+        return CM_ERROR;
+    }
+
+    int meta_fd = fileno(fp);
+    if (meta_fd >= 0 && fsync(meta_fd) != 0) {
+        LOG_RUN_ERR("[FS] failed to fsync vfs meta file '%s', errno: %d", meta_path, errno);
+        (void)fclose(fp);
+        return CM_ERROR;
+    }
+
+    if (fclose(fp) != 0) {
+        LOG_RUN_ERR("[FS] failed to close vfs meta file '%s', errno: %d", meta_path, errno);
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
 }
 
 static status_t gr_meta_query_logical_size(const char *logical_path, uint64_t *logical_size)
@@ -685,8 +707,37 @@ static void gr_fd_meta_on_write(int fd, uint64_t new_logical_end)
     pthread_mutex_unlock(&g_fd_meta_lock);
 
     if (have_path) {
-        gr_meta_append_record(logical_path, new_logical_end);
+        status_t status = gr_meta_append_record(logical_path, new_logical_end);
+        if (status != CM_SUCCESS) {
+            LOG_RUN_ERR("[FS] failed to persist logical size %llu for '%s' after write",
+                        (unsigned long long)new_logical_end, logical_path);
+        }
     }
+}
+
+static status_t gr_fd_meta_flush(int fd)
+{
+    char logical_path[GR_FILE_PATH_MAX_LENGTH];
+    uint64_t logical_size = 0;
+    bool have_meta = false;
+
+    pthread_mutex_lock(&g_fd_meta_lock);
+    gr_fd_meta_t *ent = gr_fd_meta_find_nolock(fd);
+    if (ent != NULL) {
+        logical_size = ent->logical_size;
+        errno_t err = strncpy_s(logical_path, sizeof(logical_path),
+                                ent->logical_path, sizeof(logical_path) - 1);
+        if (SECUREC_UNLIKELY(err == EOK)) {
+            have_meta = true;
+        }
+    }
+    pthread_mutex_unlock(&g_fd_meta_lock);
+
+    if (!have_meta) {
+        return CM_SUCCESS;
+    }
+
+    return gr_meta_append_record(logical_path, logical_size);
 }
 
 static void gr_fd_meta_unregister(int fd)
@@ -922,7 +973,7 @@ status_t gr_filesystem_rm(const char *name, unsigned long long attrFlag) {
      * with the same logical name starts from an empty logical size.
      * This also avoids meta growing stale for files that are no longer present.
      */
-    gr_meta_append_record(name, 0);
+    (void)gr_meta_append_record(name, 0);
     return CM_SUCCESS;
 }
 
@@ -1305,9 +1356,6 @@ status_t gr_filesystem_open(const char *file_path, int flag, int *fd) {
     // Automatically add O_APPEND so both pwrite and append interfaces can append.
     // Only add O_APPEND in write modes (O_RDWR or O_WRONLY).
     int open_flag = flag | O_SYNC;
-    if ((flag & O_RDWR) || (flag & O_WRONLY)) {
-        open_flag |= O_APPEND;
-    }
     
     *fd = open(path, open_flag, 0);
     if (*fd == -1) {
@@ -1340,10 +1388,16 @@ status_t gr_filesystem_lock(int fd)
 }
 
 status_t gr_filesystem_close(int fd, bool32 need_lock) {
+    status_t flush_status = gr_fd_meta_flush(fd);
+    if (flush_status != CM_SUCCESS) {
+        LOG_RUN_ERR("[FS] failed to flush logical size meta for fd %d before close", fd);
+        return CM_ERROR;
+    }
+
     if (need_lock) {
         GR_CALL_RETURN(gr_filesystem_lock(fd), "Failed to change file to be lock_mode");
     }
-    // Remove fd -> logical size mapping; metadata is already persisted on each write.
+
     gr_fd_meta_unregister(fd);
     if (close(fd) == -1) {
         GR_SYS_ERROR_RETURN("Failed to close file descriptor: %d", fd);
