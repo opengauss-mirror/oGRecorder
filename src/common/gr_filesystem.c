@@ -415,26 +415,23 @@ void gr_dir_map_get_stats(uint32_t *current_count, uint32_t *max_count, uint32_t
  * logical size that may be smaller than the physical file size.
  *
  * Design:
- * - On disk, each VFS directory has a single metadata file:
+ * - Primary on-disk store: hidden per-file sidecar
+ *     <dir>/.<basename>.gr_logical_meta
+ *   (not visible to query_file_num / query_file_info).
+ *   containing a single logical size (O(1) read/write).
+ * - Legacy fallback: append-only VFS log
  *     <vfs_root>/.gr_vfs_meta
- *   which contains append-only records of the form:
- *     <logical_path> <logical_size>\n
- *   where logical_path is the GR logical path (e.g. "vfs_name/file").
- * - In memory, we keep a lightweight mapping from fd -> (logical_path, logical_size)
- *   for files opened through gr_filesystem_open. This allows pwrite/pread to
- *   compute logical EOF without knowing the original path at call sites.
+ *   scanned only when sidecar is absent (migration / old deployments).
+ * - In-memory: fd -> (logical_path, logical_size) plus a path cache keyed
+ *   by sidecar mtime to avoid repeated disk reads on hot pread paths.
  *
  * Persistence semantics:
- * - On open: logical_size is initialized from meta if present; otherwise from
- *   the current physical file size (stat), for backward compatibility.
- * - On write: after successful aligned write, we:
- *     - update in-memory logical_size for the fd
- *     - append a new record to the corresponding .gr_vfs_meta file (fflush + fsync)
- * - On close: flush the in-memory logical_size to .gr_vfs_meta again so that
- *   a failed or omitted per-write persist cannot leave stat stale after fd unmap.
- * - On stat / logical-size queries: we prefer in-memory fd mapping when
- *   available, otherwise fall back to scanning .gr_vfs_meta and, if absent,
- *   to the physical size from stat.
+ * - On open: logical_size = max(open fds, sidecar, legacy log, physical stat).
+ * - On write: update in-memory fd meta and persist to sidecar (monotonic).
+ * - On close: flush fd logical size to sidecar again.
+ * - On pread: max(open fds on path, sidecar/cache) on every read — O(1) via
+ *   sidecar mtime cache; legacy log is never scanned on the hot path.
+ * - On stat: max(open fds, sidecar/cache, legacy log).
  */
 
 typedef struct gr_fd_meta {
@@ -446,6 +443,198 @@ typedef struct gr_fd_meta {
 
 static pthread_mutex_t g_fd_meta_lock = PTHREAD_MUTEX_INITIALIZER;
 static gr_fd_meta_t *g_fd_meta_head = NULL;
+
+#define GR_LOGICAL_META_SUFFIX ".gr_logical_meta"
+
+static bool gr_fs_is_dot_or_dotdot(const char *name)
+{
+    if (name == NULL || name[0] != '.') {
+        return false;
+    }
+    if (name[1] == '\0') {
+        return true;
+    }
+    return (name[1] == '.' && name[2] == '\0');
+}
+
+/* Internal metadata entries must not appear in VFS file listing APIs. */
+static bool gr_fs_is_internal_metadata_name(const char *name)
+{
+    size_t len;
+    size_t suf_len;
+
+    if (name == NULL || name[0] == '\0') {
+        return true;
+    }
+    if (name[0] == '.') {
+        return true;
+    }
+    len = strlen(name);
+    suf_len = sizeof(GR_LOGICAL_META_SUFFIX) - 1;
+    if (len > suf_len && strcmp(name + len - suf_len, GR_LOGICAL_META_SUFFIX) == 0) {
+        return true; /* legacy non-hidden sidecar: file.gr_logical_meta */
+    }
+    return false;
+}
+
+static status_t gr_meta_build_legacy_sidecar_path(const char *logical_path, char *sidecar_path,
+    size_t sidecar_path_len)
+{
+    char fs_path[GR_FILE_PATH_MAX_LENGTH];
+
+    GR_FS_CHECK_NULL_RETURN(logical_path, ERR_GR_INVALID_PARAM, "logical_path is NULL");
+    GR_FS_CHECK_NULL_RETURN(sidecar_path, ERR_GR_INVALID_PARAM, "sidecar_path is NULL");
+
+    gr_get_fs_path(logical_path, fs_path, sizeof(fs_path));
+    if (fs_path[0] == '\0') {
+        GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR,
+                           "failed to build fs path for legacy sidecar: %s", logical_path);
+    }
+
+    int ret = snprintf_s(sidecar_path, sidecar_path_len, sidecar_path_len - 1,
+                         "%s%s", fs_path, GR_LOGICAL_META_SUFFIX);
+    if (ret < 0 || (size_t)ret >= sidecar_path_len) {
+        GR_FS_ERROR_RETURN(ERR_SYSTEM_CALL,
+                           "failed to build legacy sidecar path for: %s", logical_path);
+    }
+    return CM_SUCCESS;
+}
+
+static status_t gr_meta_build_sidecar_path(const char *logical_path, char *sidecar_path, size_t sidecar_path_len)
+{
+    char fs_path[GR_FILE_PATH_MAX_LENGTH];
+    const char *base;
+
+    GR_FS_CHECK_NULL_RETURN(logical_path, ERR_GR_INVALID_PARAM, "logical_path is NULL");
+    GR_FS_CHECK_NULL_RETURN(sidecar_path, ERR_GR_INVALID_PARAM, "sidecar_path is NULL");
+
+    gr_get_fs_path(logical_path, fs_path, sizeof(fs_path));
+    if (fs_path[0] == '\0') {
+        GR_FS_ERROR_RETURN(ERR_GR_FILE_SYSTEM_ERROR,
+                           "failed to build fs path for sidecar: %s", logical_path);
+    }
+
+    base = strrchr(fs_path, '/');
+    if (base == NULL) {
+        int ret = snprintf_s(sidecar_path, sidecar_path_len, sidecar_path_len - 1,
+                             ".%s%s", fs_path, GR_LOGICAL_META_SUFFIX);
+        if (ret < 0 || (size_t)ret >= sidecar_path_len) {
+            GR_FS_ERROR_RETURN(ERR_SYSTEM_CALL,
+                               "failed to build sidecar path for: %s", logical_path);
+        }
+        return CM_SUCCESS;
+    }
+
+    base++;
+    {
+        size_t dir_len = (size_t)(base - fs_path);
+        int ret = snprintf_s(sidecar_path, sidecar_path_len, sidecar_path_len - 1,
+                             "%.*s.%s%s", (int)dir_len, fs_path, base, GR_LOGICAL_META_SUFFIX);
+        if (ret < 0 || (size_t)ret >= sidecar_path_len) {
+            GR_FS_ERROR_RETURN(ERR_SYSTEM_CALL,
+                               "failed to build sidecar path for: %s", logical_path);
+        }
+    }
+    return CM_SUCCESS;
+}
+
+static void gr_meta_unlink_legacy_sidecar(const char *logical_path)
+{
+    char legacy_path[GR_FILE_PATH_MAX_LENGTH];
+
+    if (gr_meta_build_legacy_sidecar_path(logical_path, legacy_path, sizeof(legacy_path)) != CM_SUCCESS) {
+        return;
+    }
+    (void)unlink(legacy_path);
+}
+
+typedef struct gr_path_logical_cache {
+    char logical_path[GR_FILE_PATH_MAX_LENGTH];
+    uint64_t logical_size;
+    time_t sidecar_mtime;
+    struct gr_path_logical_cache *next;
+} gr_path_logical_cache_t;
+
+static pthread_mutex_t g_path_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+static gr_path_logical_cache_t *g_path_cache_head = NULL;
+
+static gr_path_logical_cache_t *gr_path_cache_find_nolock(const char *logical_path)
+{
+    gr_path_logical_cache_t *curr = g_path_cache_head;
+    while (curr != NULL) {
+        if (strcmp(curr->logical_path, logical_path) == 0) {
+            return curr;
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+static void gr_path_cache_put(const char *logical_path, uint64_t logical_size, time_t sidecar_mtime)
+{
+    if (logical_path == NULL) {
+        return;
+    }
+
+    pthread_mutex_lock(&g_path_cache_lock);
+    gr_path_logical_cache_t *ent = gr_path_cache_find_nolock(logical_path);
+    if (ent == NULL) {
+        ent = (gr_path_logical_cache_t *)calloc(1, sizeof(gr_path_logical_cache_t));
+        if (ent == NULL) {
+            pthread_mutex_unlock(&g_path_cache_lock);
+            LOG_RUN_WAR("[FS] failed to allocate path logical cache for '%s'", logical_path);
+            return;
+        }
+        errno_t err = strncpy_s(ent->logical_path, sizeof(ent->logical_path),
+                                logical_path, sizeof(ent->logical_path) - 1);
+        if (SECUREC_UNLIKELY(err != EOK)) {
+            free(ent);
+            pthread_mutex_unlock(&g_path_cache_lock);
+            return;
+        }
+        ent->next = g_path_cache_head;
+        g_path_cache_head = ent;
+    }
+    ent->logical_size = logical_size;
+    ent->sidecar_mtime = sidecar_mtime;
+    pthread_mutex_unlock(&g_path_cache_lock);
+}
+
+static void gr_path_cache_invalidate(const char *logical_path)
+{
+    if (logical_path == NULL) {
+        return;
+    }
+
+    pthread_mutex_lock(&g_path_cache_lock);
+    gr_path_logical_cache_t *prev = NULL;
+    gr_path_logical_cache_t *curr = g_path_cache_head;
+    while (curr != NULL) {
+        if (strcmp(curr->logical_path, logical_path) == 0) {
+            if (prev == NULL) {
+                g_path_cache_head = curr->next;
+            } else {
+                prev->next = curr->next;
+            }
+            free(curr);
+            break;
+        }
+        prev = curr;
+        curr = curr->next;
+    }
+    pthread_mutex_unlock(&g_path_cache_lock);
+}
+
+static void gr_meta_remove_sidecars(const char *logical_path)
+{
+    char sidecar_path[GR_FILE_PATH_MAX_LENGTH];
+
+    gr_meta_unlink_legacy_sidecar(logical_path);
+    if (gr_meta_build_sidecar_path(logical_path, sidecar_path, sizeof(sidecar_path)) == CM_SUCCESS) {
+        (void)unlink(sidecar_path);
+    }
+    gr_path_cache_invalidate(logical_path);
+}
 
 static status_t gr_meta_extract_vfs_name(const char *logical_path, char *vfs_name, size_t vfs_name_len)
 {
@@ -532,65 +721,165 @@ static status_t gr_meta_read_logical_size_from_meta(const char *logical_path, ui
     return CM_SUCCESS;
 }
 
-static status_t gr_meta_append_record(const char *logical_path, uint64_t logical_size)
+static status_t gr_meta_persist_logical_size(const char *logical_path, uint64_t logical_size);
+
+static status_t gr_meta_read_sidecar_at_path(const char *logical_path, const char *sidecar_path,
+    uint64_t *logical_size)
 {
-    char vfs_name[GR_MAX_NAME_LEN];
-    char meta_path[GR_FILE_PATH_MAX_LENGTH];
+    struct stat st;
+    FILE *fp = NULL;
+    char line[64];
+    unsigned long long size_val = 0;
+
+    if (stat(sidecar_path, &st) != 0) {
+        return CM_ERROR;
+    }
+
+    pthread_mutex_lock(&g_path_cache_lock);
+    gr_path_logical_cache_t *cached = gr_path_cache_find_nolock(logical_path);
+    if (cached != NULL && cached->sidecar_mtime == st.st_mtime) {
+        *logical_size = cached->logical_size;
+        pthread_mutex_unlock(&g_path_cache_lock);
+        return CM_SUCCESS;
+    }
+    pthread_mutex_unlock(&g_path_cache_lock);
+
+    fp = fopen(sidecar_path, "r");
+    if (fp == NULL) {
+        return CM_ERROR;
+    }
+
+    if (fgets(line, sizeof(line), fp) == NULL ||
+        sscanf_s(line, "%llu", &size_val) != 1) {
+        (void)fclose(fp);
+        return CM_ERROR;
+    }
+    (void)fclose(fp);
+
+    *logical_size = (uint64_t)size_val;
+    gr_path_cache_put(logical_path, *logical_size, st.st_mtime);
+    return CM_SUCCESS;
+}
+
+static status_t gr_meta_read_sidecar(const char *logical_path, uint64_t *logical_size)
+{
+    char sidecar_path[GR_FILE_PATH_MAX_LENGTH];
+    char legacy_path[GR_FILE_PATH_MAX_LENGTH];
+
+    GR_FS_CHECK_NULL_RETURN(logical_path, ERR_GR_INVALID_PARAM, "logical_path is NULL");
+    GR_FS_CHECK_NULL_RETURN(logical_size, ERR_GR_INVALID_PARAM, "logical_size is NULL");
+
+    if (gr_meta_build_sidecar_path(logical_path, sidecar_path, sizeof(sidecar_path)) == CM_SUCCESS &&
+        gr_meta_read_sidecar_at_path(logical_path, sidecar_path, logical_size) == CM_SUCCESS) {
+        return CM_SUCCESS;
+    }
+
+    if (gr_meta_build_legacy_sidecar_path(logical_path, legacy_path, sizeof(legacy_path)) == CM_SUCCESS &&
+        gr_meta_read_sidecar_at_path(logical_path, legacy_path, logical_size) == CM_SUCCESS) {
+        (void)gr_meta_persist_logical_size(logical_path, *logical_size);
+        return CM_SUCCESS;
+    }
+
+    return CM_ERROR;
+}
+
+static status_t gr_meta_persist_logical_size(const char *logical_path, uint64_t logical_size)
+{
+    char sidecar_path[GR_FILE_PATH_MAX_LENGTH];
+    FILE *fp = NULL;
+    struct stat st_after;
 
     if (logical_path == NULL) {
-        GR_FS_ERROR_RETURN(ERR_GR_INVALID_PARAM, "logical_path is NULL when appending vfs meta");
+        GR_FS_ERROR_RETURN(ERR_GR_INVALID_PARAM, "logical_path is NULL when persisting logical size");
     }
 
-    if (gr_meta_extract_vfs_name(logical_path, vfs_name, sizeof(vfs_name)) != CM_SUCCESS) {
-        return CM_ERROR;
-    }
-    if (gr_meta_build_meta_path(vfs_name, meta_path, sizeof(meta_path)) != CM_SUCCESS) {
+    if (gr_meta_build_sidecar_path(logical_path, sidecar_path, sizeof(sidecar_path)) != CM_SUCCESS) {
         return CM_ERROR;
     }
 
-    FILE *fp = fopen(meta_path, "a");
+    if (logical_size != 0) {
+        char legacy_path[GR_FILE_PATH_MAX_LENGTH];
+        uint64_t existing_size = 0;
+
+        if (gr_meta_read_sidecar_at_path(logical_path, sidecar_path, &existing_size) == CM_SUCCESS) {
+            if (logical_size < existing_size) {
+                LOG_RUN_INF("[FS] skip shrinking logical meta for '%s': proposed %llu < disk %llu",
+                            logical_path, (unsigned long long)logical_size, (unsigned long long)existing_size);
+                return CM_SUCCESS;
+            }
+            if (logical_size == existing_size) {
+                return CM_SUCCESS;
+            }
+        } else if (gr_meta_build_legacy_sidecar_path(logical_path, legacy_path, sizeof(legacy_path)) ==
+                       CM_SUCCESS &&
+                   gr_meta_read_sidecar_at_path(logical_path, legacy_path, &existing_size) == CM_SUCCESS) {
+            if (logical_size < existing_size) {
+                LOG_RUN_INF("[FS] skip shrinking logical meta for '%s': proposed %llu < disk %llu",
+                            logical_path, (unsigned long long)logical_size, (unsigned long long)existing_size);
+                return CM_SUCCESS;
+            }
+            /* legacy-only: equal size still needs migration to new sidecar path */
+        }
+    }
+
+    fp = fopen(sidecar_path, "w");
     if (fp == NULL) {
-        LOG_RUN_ERR("[FS] failed to open vfs meta file '%s' for append, errno: %d",
-                    meta_path, errno);
+        LOG_RUN_ERR("[FS] failed to open sidecar '%s' for write, errno: %d", sidecar_path, errno);
         return CM_ERROR;
     }
 
-    int ret = fprintf(fp, "%s %llu\n", logical_path, (unsigned long long)logical_size);
-    if (ret < 0) {
-        LOG_RUN_ERR("[FS] failed to append record to vfs meta file '%s', errno: %d",
-                    meta_path, errno);
+    if (fprintf(fp, "%llu\n", (unsigned long long)logical_size) < 0) {
+        LOG_RUN_ERR("[FS] failed to write sidecar '%s', errno: %d", sidecar_path, errno);
         (void)fclose(fp);
         return CM_ERROR;
     }
-
     if (fflush(fp) != 0) {
-        LOG_RUN_ERR("[FS] failed to fflush vfs meta file '%s', errno: %d", meta_path, errno);
+        LOG_RUN_ERR("[FS] failed to fflush sidecar '%s', errno: %d", sidecar_path, errno);
         (void)fclose(fp);
         return CM_ERROR;
     }
 
-    int meta_fd = fileno(fp);
-    if (meta_fd >= 0 && fsync(meta_fd) != 0) {
-        LOG_RUN_ERR("[FS] failed to fsync vfs meta file '%s', errno: %d", meta_path, errno);
+    int sidecar_fd = fileno(fp);
+    if (sidecar_fd >= 0 && fsync(sidecar_fd) != 0) {
+        LOG_RUN_ERR("[FS] failed to fsync sidecar '%s', errno: %d", sidecar_path, errno);
         (void)fclose(fp);
         return CM_ERROR;
     }
-
     if (fclose(fp) != 0) {
-        LOG_RUN_ERR("[FS] failed to close vfs meta file '%s', errno: %d", meta_path, errno);
+        LOG_RUN_ERR("[FS] failed to close sidecar '%s', errno: %d", sidecar_path, errno);
         return CM_ERROR;
     }
+
+    gr_path_cache_invalidate(logical_path);
+    if (stat(sidecar_path, &st_after) == 0) {
+        gr_path_cache_put(logical_path, logical_size, st_after.st_mtime);
+    }
+    gr_meta_unlink_legacy_sidecar(logical_path);
     return CM_SUCCESS;
+}
+
+static status_t gr_meta_append_record(const char *logical_path, uint64_t logical_size)
+{
+    return gr_meta_persist_logical_size(logical_path, logical_size);
 }
 
 static status_t gr_meta_query_logical_size(const char *logical_path, uint64_t *logical_size)
 {
-    // Try meta file first
-    if (gr_meta_read_logical_size_from_meta(logical_path, logical_size) == CM_SUCCESS) {
+    GR_FS_CHECK_NULL_RETURN(logical_path, ERR_GR_INVALID_PARAM, "logical_path is NULL");
+    GR_FS_CHECK_NULL_RETURN(logical_size, ERR_GR_INVALID_PARAM, "logical_size is NULL");
+
+    // O(1): per-file sidecar
+    if (gr_meta_read_sidecar(logical_path, logical_size) == CM_SUCCESS) {
         return CM_SUCCESS;
     }
 
-    // Fallback: use current physical file size
+    // Legacy: scan append-only log once, then migrate to sidecar
+    if (gr_meta_read_logical_size_from_meta(logical_path, logical_size) == CM_SUCCESS) {
+        (void)gr_meta_persist_logical_size(logical_path, *logical_size);
+        return CM_SUCCESS;
+    }
+
+    // Fallback: current physical file size
     char fs_path[GR_FILE_PATH_MAX_LENGTH];
     gr_get_fs_path(logical_path, fs_path, sizeof(fs_path));
     if (fs_path[0] == '\0') {
@@ -687,6 +976,135 @@ static bool gr_fd_meta_get_by_path(const char *logical_path, uint64_t *logical_s
     return found;
 }
 
+static bool gr_fd_meta_get_path(int fd, char *logical_path, size_t path_len)
+{
+    bool found = false;
+
+    if (logical_path == NULL || path_len == 0) {
+        return false;
+    }
+
+    pthread_mutex_lock(&g_fd_meta_lock);
+    gr_fd_meta_t *ent = gr_fd_meta_find_nolock(fd);
+    if (ent != NULL) {
+        errno_t err = strncpy_s(logical_path, path_len, ent->logical_path, path_len - 1);
+        if (SECUREC_UNLIKELY(err == EOK)) {
+            found = true;
+        }
+    }
+    pthread_mutex_unlock(&g_fd_meta_lock);
+
+    if (!found) {
+        logical_path[0] = '\0';
+    }
+    return found;
+}
+
+static void gr_fd_meta_update_local(int fd, uint64_t logical_size)
+{
+    if (logical_size == 0) {
+        return;
+    }
+
+    pthread_mutex_lock(&g_fd_meta_lock);
+    gr_fd_meta_t *ent = gr_fd_meta_find_nolock(fd);
+    if (ent != NULL && logical_size > ent->logical_size) {
+        ent->logical_size = logical_size;
+    }
+    pthread_mutex_unlock(&g_fd_meta_lock);
+}
+
+/*
+ * Resolve logical EOF for an open fd: max(this fd cache, any fd on same path,
+ * latest .gr_vfs_meta). Refreshes this fd's cache when a peer has grown.
+ */
+static void gr_logical_size_resolve_for_fd(int fd, uint64_t *logical_size_out)
+{
+    uint64_t resolved = 0;
+    char logical_path[GR_FILE_PATH_MAX_LENGTH];
+
+    if (logical_size_out == NULL) {
+        return;
+    }
+
+    (void)gr_fd_meta_get(fd, &resolved);
+
+    if (gr_fd_meta_get_path(fd, logical_path, sizeof(logical_path))) {
+        uint64_t path_max = 0;
+        if (gr_fd_meta_get_by_path(logical_path, &path_max) && path_max > resolved) {
+            resolved = path_max;
+        }
+
+        uint64_t meta_size = 0;
+        if (gr_meta_query_logical_size(logical_path, &meta_size) == CM_SUCCESS &&
+            meta_size > resolved) {
+            resolved = meta_size;
+        }
+    }
+
+    *logical_size_out = resolved;
+    gr_fd_meta_update_local(fd, resolved);
+}
+
+/*
+ * pread: max(in-memory peer fds, sidecar/cache). Sidecar is O(1) (mtime cache);
+ * legacy append log is not scanned here.
+ */
+static void gr_logical_size_resolve_for_read(int fd, uint64_t *logical_size_out)
+{
+    uint64_t resolved = 0;
+    char logical_path[GR_FILE_PATH_MAX_LENGTH];
+
+    if (logical_size_out == NULL) {
+        return;
+    }
+
+    logical_path[0] = '\0';
+    (void)gr_fd_meta_get(fd, &resolved);
+
+    if (gr_fd_meta_get_path(fd, logical_path, sizeof(logical_path))) {
+        uint64_t path_max = 0;
+        if (gr_fd_meta_get_by_path(logical_path, &path_max) && path_max > resolved) {
+            resolved = path_max;
+        }
+
+        uint64_t disk_size = 0;
+        if (gr_meta_read_sidecar(logical_path, &disk_size) == CM_SUCCESS &&
+            disk_size > resolved) {
+            resolved = disk_size;
+        }
+    }
+
+    *logical_size_out = resolved;
+    gr_fd_meta_update_local(fd, resolved);
+}
+
+/*
+ * Resolve logical EOF by path (no fd): max(open fd metas, .gr_vfs_meta).
+ */
+static bool gr_logical_size_resolve_for_path(const char *logical_path, uint64_t *logical_size_out)
+{
+    uint64_t resolved = 0;
+
+    if (logical_path == NULL || logical_size_out == NULL) {
+        return false;
+    }
+
+    uint64_t path_max = 0;
+    if (gr_fd_meta_get_by_path(logical_path, &path_max) && path_max > resolved) {
+        resolved = path_max;
+    }
+
+    uint64_t meta_size = 0;
+    if (gr_meta_query_logical_size(logical_path, &meta_size) == CM_SUCCESS &&
+        meta_size > resolved) {
+        resolved = meta_size;
+    }
+
+    *logical_size_out = resolved;
+    return resolved > 0;
+}
+
 static void gr_fd_meta_on_write(int fd, uint64_t new_logical_end)
 {
     char logical_path[GR_FILE_PATH_MAX_LENGTH];
@@ -781,31 +1199,6 @@ status_t gr_filesystem_mkdir(const char *name, mode_t mode) {
     }
     
     return CM_SUCCESS;
-}
-
-// Return the logical path registered for a given fd, if any.
-static bool gr_fd_meta_get_path(int fd, char *logical_path, size_t path_len)
-{
-    bool found = false;
-
-    if (logical_path == NULL || path_len == 0) {
-        return false;
-    }
-
-    pthread_mutex_lock(&g_fd_meta_lock);
-    gr_fd_meta_t *ent = gr_fd_meta_find_nolock(fd);
-    if (ent != NULL) {
-        errno_t err = strncpy_s(logical_path, path_len, ent->logical_path, path_len - 1);
-        if (SECUREC_UNLIKELY(err == EOK)) {
-            found = true;
-        }
-    }
-    pthread_mutex_unlock(&g_fd_meta_lock);
-
-    if (!found) {
-        logical_path[0] = '\0';
-    }
-    return found;
 }
 
 status_t gr_filesystem_rmdir(const char *name, uint64_t flag) {
@@ -967,13 +1360,7 @@ status_t gr_filesystem_rm(const char *name, unsigned long long attrFlag) {
         GR_SYS_ERROR_RETURN("Failed to remove file: %s", name);
     }
 
-    /*
-     * The file has been removed from the filesystem; record a logical EOF of 0
-     * in the VFS meta so that any future reopen or stat of a re-created file
-     * with the same logical name starts from an empty logical size.
-     * This also avoids meta growing stale for files that are no longer present.
-     */
-    (void)gr_meta_append_record(name, 0);
+    gr_meta_remove_sidecars(name);
     return CM_SUCCESS;
 }
 
@@ -998,18 +1385,11 @@ status_t gr_filesystem_pwrite(int handle, int64 offset, int64 size, const char *
     }
 
     // Remember original logical size (POSIX semantics: logical EOF is max(old_size, offset+size)).
-    // Prefer in-memory logical size; fall back to physical file size if not found.
     uint64_t logical_size_u64 = 0;
     int64 logical_end = offset + size;
-    if (gr_fd_meta_get(handle, &logical_size_u64)) {
-        if ((int64)logical_size_u64 > logical_end) {
-            logical_end = (int64)logical_size_u64;
-        }
-    } else {
-        struct stat st;
-        if (fstat(handle, &st) == 0 && (int64)st.st_size > logical_end) {
-            logical_end = (int64)st.st_size;
-        }
+    gr_logical_size_resolve_for_fd(handle, &logical_size_u64);
+    if ((int64)logical_size_u64 > logical_end) {
+        logical_end = (int64)logical_size_u64;
     }
 
     void *bounce = NULL;
@@ -1105,27 +1485,9 @@ status_t gr_filesystem_pread(int handle, int64 offset, int64 size, char *buf, in
      */
     const int64 align_size = 4096;  // alignment for O_DIRECT IO (page/block aligned)
 
-    // Determine logical EOF for this handle to clamp reads within logical size.
+    // max(peer fds, sidecar/cache) — O(1), safe across connections/threads.
     uint64_t logical_size_u64 = 0;
-    bool have_fd_meta = gr_fd_meta_get(handle, &logical_size_u64);
-    if (!have_fd_meta || logical_size_u64 == 0) {
-        // Try to resolve logical size via logical_path + meta file
-        char logical_path[GR_FILE_PATH_MAX_LENGTH];
-        uint64_t meta_size = 0;
-        if (gr_fd_meta_get_path(handle, logical_path, sizeof(logical_path)) &&
-            gr_meta_query_logical_size(logical_path, &meta_size) == CM_SUCCESS) {
-            if (meta_size > logical_size_u64) {
-                logical_size_u64 = meta_size;
-            }
-        } else {
-            // Fallback: use current physical file size so that concurrent
-            // readers on different fds/VFS 仍能看到已经写入的数据。
-            struct stat st;
-            if (fstat(handle, &st) == 0 && st.st_size > 0) {
-                logical_size_u64 = (uint64_t)st.st_size;
-            }
-        }
-    }
+    gr_logical_size_resolve_for_read(handle, &logical_size_u64);
     if ((uint64_t)offset >= logical_size_u64) {
         *rel_size = 0;
         return CM_SUCCESS;
@@ -1195,10 +1557,8 @@ status_t gr_filesystem_query_file_num(uint64_t handle, uint32_t *file_num) {
 
     rewinddir(dir);
     while ((entry = readdir(dir)) != NULL) {
-        /* Skip "." and ".." */
-        if (entry->d_name[0] == '.' &&
-            (entry->d_name[1] == '\0' ||
-            (entry->d_name[1] == '.' && entry->d_name[2] == '\0'))) {
+        if (gr_fs_is_dot_or_dotdot(entry->d_name) ||
+            gr_fs_is_internal_metadata_name(entry->d_name)) {
             continue;
         }
 
@@ -1250,6 +1610,9 @@ status_t gr_filesystem_query_file_info(uint64_t handle, gr_file_item_t *file_ite
         uint32_t cap = 0;
 
         while ((entry = readdir(item->dir)) != NULL) {
+            if (gr_fs_is_internal_metadata_name(entry->d_name)) {
+                continue;
+            }
             if (entry->d_type != DT_REG) {
                 continue;
             }
@@ -1316,9 +1679,7 @@ status_t gr_filesystem_get_file_end_position(const char *file_path, off_t *end_p
     GR_FS_CHECK_NULL_RETURN(end_position, ERR_GR_INVALID_PARAM, "end_position is NULL");
     
     uint64_t logical_size = 0;
-    // Prefer logical size from meta; fall back to physical file size if needed.
-    if (gr_fd_meta_get_by_path(file_path, &logical_size) ||
-        gr_meta_query_logical_size(file_path, &logical_size) == CM_SUCCESS) {
+    if (gr_logical_size_resolve_for_path(file_path, &logical_size)) {
         *end_position = (off_t)logical_size;
         return CM_SUCCESS;
     }
@@ -1362,10 +1723,13 @@ status_t gr_filesystem_open(const char *file_path, int flag, int *fd) {
         GR_SYS_ERROR_RETURN("Failed to open file: %s (full path: %s)", file_path, path);
     }
 
-    // Initialize logical EOF tracking for this fd.
+    // Initialize logical EOF: max(already-open fds on this path, persisted meta).
     uint64_t logical_size = 0;
-    if (gr_meta_query_logical_size(file_path, &logical_size) != CM_SUCCESS) {
-        logical_size = 0;
+    if (!gr_logical_size_resolve_for_path(file_path, &logical_size)) {
+        struct stat st;
+        if (fstat(*fd, &st) == 0) {
+            logical_size = (uint64_t)st.st_size;
+        }
     }
     gr_fd_meta_register(*fd, file_path, logical_size);
     return CM_SUCCESS;
@@ -1436,10 +1800,9 @@ status_t gr_filesystem_stat(const char *name, int64 *offset, int64 *size, gr_fil
         GR_SYS_ERROR_RETURN("Failed to stat file: %s", name);
     }
 
-    // Determine logical size for this file.
+    // Determine logical size: max(all open fds on path, .gr_vfs_meta), else physical.
     uint64_t logical_size_u64 = 0;
-    if (!gr_fd_meta_get_by_path(name, &logical_size_u64) &&
-        gr_meta_query_logical_size(name, &logical_size_u64) != CM_SUCCESS) {
+    if (!gr_logical_size_resolve_for_path(name, &logical_size_u64)) {
         logical_size_u64 = (uint64_t)file_stat.st_size;
     }
 
