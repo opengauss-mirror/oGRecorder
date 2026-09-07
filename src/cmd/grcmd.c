@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <sys/wait.h>
 #endif
 
 #include "cm_base.h"
@@ -41,6 +41,7 @@
 #include "cm_sec_file.h"
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "gr_errno.h"
 #include "gr_defs.h"
@@ -51,6 +52,7 @@
 #include "gr_cli_conn.h"
 #include "gr_args_parse.h"
 #include "gr_param_sync.h"
+#include "gr_param_validator.h"
 #ifndef WIN32
 #include "config.h"
 #endif
@@ -73,10 +75,21 @@
 
 #define LAST_DAY 2
 #define GR_CMD_LEN          2048
+#define GR_SHELL_QUOTED_PATH_LEN  (CM_MAX_PATH_LEN * 4 + 3)
+#define GR_CERT_CMD_LEN     (GR_SHELL_QUOTED_PATH_LEN * 12 + 1024)
 #define GR_OPENSSL_KEY_BITS 2048
+#define GR_OPENSSL_STR(x) #x
+#define GR_OPENSSL_XSTR(x) GR_OPENSSL_STR(x)
+#define GR_OPENSSL_KEY_BITS_STR GR_OPENSSL_XSTR(GR_OPENSSL_KEY_BITS)
+#define GR_OPENSSL_RAND_BYTES 32
 #define GR_ALL_PERMISSION   0777
 #define GR_PERM_DIR         0700
 #define GR_PERM_FILE        0400
+#define GR_COPY_BUF_SIZE    4096
+#define GR_CERT_PWD_MIN_LEN 8
+#define GR_DAYS_STR_LEN     16
+#define GR_EXEC_NOT_FOUND_EXIT 127
+#define GR_PASS_SUFFIX_LEN  5
 
 gr_conn_t* g_cmd_conn= NULL;  // global connection for grcmd
 
@@ -673,28 +686,16 @@ static status_t encrypt_password_file(const char *pass_file)
 
     /* Check if path ends with .pass */
     size_t pass_file_len = strlen(pass_file);
-    if (pass_file_len < 5 || strcmp(pass_file + pass_file_len - 5, ".pass") != 0) {
+    if (pass_file_len < GR_PASS_SUFFIX_LEN ||
+        strcmp(pass_file + pass_file_len - GR_PASS_SUFFIX_LEN, ".pass") != 0) {
         GR_PRINT_ERROR("Pass file path must end with .pass: %s\n", pass_file);
         return CM_ERROR;
     }
 
-    /* Construct encrypted file path:
-     * - For server.key.pass or client.key.pass: generate server.key.enc or client.key.enc
-     * - For ca.pass: generate ca.pass.enc
-     */
-    if (pass_file_len >= 10 && strcmp(pass_file + pass_file_len - 10, ".key.pass") == 0) {
-        /* Remove .pass and append .enc: server.key.pass -> server.key.enc */
-        if (snprintf_s(enc_file, sizeof(enc_file), sizeof(enc_file) - 1, "%.*s.enc",
-                (int)(pass_file_len - 5), pass_file) < 0) {
-            GR_PRINT_ERROR("Failed to construct .enc file path for %s\n", pass_file);
-            return CM_ERROR;
-        }
-    } else {
-        /* Append .enc to the .pass file: ca.pass -> ca.pass.enc */
-        if (snprintf_s(enc_file, sizeof(enc_file), sizeof(enc_file) - 1, "%s.enc", pass_file) < 0) {
-            GR_PRINT_ERROR("Failed to construct .enc file path for %s\n", pass_file);
-            return CM_ERROR;
-        }
+    /* Append .enc: ca.pass -> ca.pass.enc, server.key.pass -> server.key.pass.enc */
+    if (snprintf_s(enc_file, sizeof(enc_file), sizeof(enc_file) - 1, "%s.enc", pass_file) < 0) {
+        GR_PRINT_ERROR("Failed to construct .enc file path for %s\n", pass_file);
+        return CM_ERROR;
     }
 
     /* Read plain password from .pass file */
@@ -772,6 +773,228 @@ static status_t encrypt_password_file(const char *pass_file)
     return CM_SUCCESS;
 }
 
+static status_t write_password_file(const char *pass_file, const char *password)
+{
+    FILE *fp = NULL;
+
+    if (pass_file == NULL || password == NULL || password[0] == '\0') {
+        GR_PRINT_ERROR("Invalid parameters for write_password_file\n");
+        return CM_ERROR;
+    }
+
+    fp = fopen(pass_file, "w");
+    if (fp == NULL) {
+        GR_PRINT_ERROR("Failed to open password file %s: %s\n", pass_file, strerror(errno));
+        return CM_ERROR;
+    }
+    if (fprintf(fp, "%s", password) < 0) {
+        fclose(fp);
+        (void)unlink(pass_file);
+        GR_PRINT_ERROR("Failed to write password file %s\n", pass_file);
+        return CM_ERROR;
+    }
+    fclose(fp);
+    (void)chmod(pass_file, S_IRUSR | S_IWUSR);
+    return CM_SUCCESS;
+}
+
+#ifndef WIN32
+static status_t generate_cert_password(char *buf, size_t buf_size)
+{
+    FILE *fp = NULL;
+    char rand_cmd[64];
+    size_t len;
+
+    if (buf == NULL || buf_size < GR_CERT_PWD_MIN_LEN) {
+        return CM_ERROR;
+    }
+    (void)memset_s(buf, buf_size, 0, buf_size);
+
+    if (snprintf_s(rand_cmd, sizeof(rand_cmd), sizeof(rand_cmd) - 1,
+        "openssl rand -base64 %d", GR_OPENSSL_RAND_BYTES) < 0) {
+        return CM_ERROR;
+    }
+    fp = popen(rand_cmd, "r");
+    if (fp == NULL) {
+        GR_PRINT_ERROR("Failed to generate certificate password.\n");
+        return CM_ERROR;
+    }
+    if (fgets(buf, (int)buf_size, fp) == NULL) {
+        (void)pclose(fp);
+        GR_PRINT_ERROR("Failed to read generated certificate password.\n");
+        return CM_ERROR;
+    }
+    (void)pclose(fp);
+
+    len = strlen(buf);
+    while (len > 0 && (buf[len - 1] == '\n' || buf[len - 1] == '\r')) {
+        buf[--len] = '\0';
+    }
+    if (len == 0) {
+        GR_PRINT_ERROR("Generated certificate password is empty.\n");
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
+static status_t run_openssl_with_stdin(char *const argv[], const char *stdin_data, const char *openssl_conf)
+{
+    int pipefd[2];
+    pid_t pid;
+    int status = 0;
+
+    if (argv == NULL || argv[0] == NULL) {
+        return CM_ERROR;
+    }
+    if (pipe(pipefd) != 0) {
+        GR_PRINT_ERROR("Failed to create pipe: %s\n", strerror(errno));
+        return CM_ERROR;
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        GR_PRINT_ERROR("Failed to fork openssl process: %s\n", strerror(errno));
+        return CM_ERROR;
+    }
+    if (pid == 0) {
+        (void)close(pipefd[1]);
+        if (dup2(pipefd[0], STDIN_FILENO) < 0) {
+            _exit(GR_EXEC_NOT_FOUND_EXIT);
+        }
+        (void)close(pipefd[0]);
+        if (openssl_conf != NULL && openssl_conf[0] != '\0') {
+            (void)setenv("OPENSSL_CONF", openssl_conf, 1);
+        }
+        (void)execvp(argv[0], argv);
+        _exit(GR_EXEC_NOT_FOUND_EXIT);
+    }
+
+    (void)close(pipefd[0]);
+    if (stdin_data != NULL) {
+        size_t len = strlen(stdin_data);
+        if (len > 0 && write(pipefd[1], stdin_data, len) != (ssize_t)len) {
+            (void)close(pipefd[1]);
+            (void)waitpid(pid, &status, 0);
+            GR_PRINT_ERROR("Failed to write password to openssl stdin.\n");
+            return CM_ERROR;
+        }
+        (void)write(pipefd[1], "\n", 1);
+    }
+    (void)close(pipefd[1]);
+
+    if (waitpid(pid, &status, 0) < 0) {
+        GR_PRINT_ERROR("Failed to wait openssl process: %s\n", strerror(errno));
+        return CM_ERROR;
+    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        GR_PRINT_ERROR("openssl command failed.\n");
+        return CM_ERROR;
+    }
+    return CM_SUCCESS;
+}
+
+static status_t copy_regular_file(const char *src, const char *dst)
+{
+    FILE *in = NULL;
+    FILE *out = NULL;
+    char buf[GR_COPY_BUF_SIZE];
+    size_t n;
+
+    in = fopen(src, "rb");
+    if (in == NULL) {
+        GR_PRINT_ERROR("Failed to open %s: %s\n", src, strerror(errno));
+        return CM_ERROR;
+    }
+    out = fopen(dst, "wb");
+    if (out == NULL) {
+        fclose(in);
+        GR_PRINT_ERROR("Failed to open %s: %s\n", dst, strerror(errno));
+        return CM_ERROR;
+    }
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
+        if (fwrite(buf, 1, n, out) != n) {
+            fclose(in);
+            fclose(out);
+            GR_PRINT_ERROR("Failed to copy file to %s\n", dst);
+            return CM_ERROR;
+        }
+    }
+    fclose(in);
+    fclose(out);
+    return CM_SUCCESS;
+}
+#endif
+
+static status_t validate_certs_shell_path(const char *path)
+{
+    if (path == NULL || path[0] == '\0') {
+        GR_PRINT_ERROR("Certificate path is empty.\n");
+        return CM_ERROR;
+    }
+
+    size_t len = strlen(path);
+    if (len >= CM_MAX_PATH_LEN) {
+        GR_PRINT_ERROR("Certificate path is too long.\n");
+        return CM_ERROR;
+    }
+
+    for (size_t i = 0; i < len; i++) {
+        if (!gr_is_valid_path_char(path[i])) {
+            GR_PRINT_ERROR("Certificate path contains invalid character '%c' at position %zu: %s\n",
+                path[i], i, path);
+            return CM_ERROR;
+        }
+    }
+    return CM_SUCCESS;
+}
+
+static status_t shell_quote_path(const char *path, char *quoted, size_t quoted_size)
+{
+    if (path == NULL || quoted == NULL || quoted_size < 3) {
+        GR_PRINT_ERROR("Invalid parameter for shell path quoting.\n");
+        return CM_ERROR;
+    }
+
+    size_t pos = 0;
+    quoted[pos++] = '\'';
+    for (const char *p = path; *p != '\0'; p++) {
+        if (*p == '\'') {
+            if (pos + 4 >= quoted_size) {
+                GR_PRINT_ERROR("Quoted certificate path is too long.\n");
+                return CM_ERROR;
+            }
+            quoted[pos++] = '\'';
+            quoted[pos++] = '\\';
+            quoted[pos++] = '\'';
+            quoted[pos++] = '\'';
+        } else {
+            if (pos + 2 >= quoted_size) {
+                GR_PRINT_ERROR("Quoted certificate path is too long.\n");
+                return CM_ERROR;
+            }
+            quoted[pos++] = *p;
+        }
+    }
+
+    if (pos + 1 >= quoted_size) {
+        GR_PRINT_ERROR("Quoted certificate path is too long.\n");
+        return CM_ERROR;
+    }
+    quoted[pos++] = '\'';
+    quoted[pos] = '\0';
+    return CM_SUCCESS;
+}
+
+static status_t build_quoted_shell_path(const char *path, char *quoted, size_t quoted_size)
+{
+    if (validate_certs_shell_path(path) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
+    return shell_quote_path(path, quoted, quoted_size);
+}
+
 static bool check_root_certs_exist(const char *certs_path) {
     int ret = 0;
     char ca_file[CM_MAX_PATH_LEN] = {0};
@@ -794,15 +1017,25 @@ static bool check_root_certs_exist(const char *certs_path) {
 }
 
 static status_t prepare_certs_path(const char *certs_path) {
-    char cmd[GR_CMD_LEN];
-    snprintf(cmd, sizeof(cmd),
+    char cmd[GR_CERT_CMD_LEN];
+    char quoted_path[GR_SHELL_QUOTED_PATH_LEN];
+
+    if (build_quoted_shell_path(certs_path, quoted_path, sizeof(quoted_path)) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
+
+    int ret = snprintf(cmd, sizeof(cmd),
         "mkdir -p %s && "
         "[ -f %s/openssl.cnf ] || cp /etc/pki/tls/openssl.cnf %s/. && "
         "cd %s && mkdir -p demoCA demoCA/newcerts demoCA/private && "
         "touch demoCA/index.txt && echo '01'>demoCA/serial && "
         "if [ ! -d demoCA/private ] || [ ! -e demoCA/index.txt ]; then chmod 700 demoCA/private; fi && "
         "sed -i 's/^.*default_md.*$/default_md      = sha256/' openssl.cnf",
-        certs_path, certs_path, certs_path, certs_path);
+        quoted_path, quoted_path, quoted_path, quoted_path);
+    if (ret < 0 || ret >= (int)sizeof(cmd)) {
+        GR_PRINT_ERROR("Failed to build prepare certs command.\n");
+        return CM_ERROR;
+    }
     if (system(cmd) != 0) {
         GR_PRINT_ERROR("Failed to prepare certs path: %s\n", strerror(errno));
         return CM_ERROR;
@@ -811,114 +1044,247 @@ static status_t prepare_certs_path(const char *certs_path) {
 }
 
 static status_t generate_root_cert(const char *certs_path, int days) {
-    char cmd[GR_CMD_LEN];
+    char pass_buf[CM_PASSWD_MAX_LEN + 1] = {0};
     char pass_file[CM_MAX_PATH_LEN] = {0};
-    snprintf(cmd, sizeof(cmd),
-        "cd %s && "
-        "ca_password=$(openssl rand -base64 32); "
-        "export OPENSSL_CONF=%s/openssl.cnf; "
-        "echo $ca_password | openssl genrsa -aes256 -passout stdin -out demoCA/private/cakey.pem 2048 && "
-        "echo $ca_password | openssl req -new -x509 -passin stdin -days %d -key demoCA/private/cakey.pem -out demoCA/cacert.pem -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA\" && "
-        "cp demoCA/cacert.pem . && "
-        "echo $ca_password > ca.pass",
-        certs_path, certs_path, days);
-    if (system(cmd) != 0) {
-        GR_PRINT_ERROR("Failed to generate root cert: %s\n", strerror(errno));
+    char conf_file[CM_MAX_PATH_LEN] = {0};
+    char key_file[CM_MAX_PATH_LEN] = {0};
+    char cert_file[CM_MAX_PATH_LEN] = {0};
+    char cert_copy[CM_MAX_PATH_LEN] = {0};
+    char days_str[GR_DAYS_STR_LEN] = {0};
+    char *genrsa_argv[9];
+    char *req_argv[16];
+
+    if (validate_certs_shell_path(certs_path) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
+    if (generate_cert_password(pass_buf, sizeof(pass_buf)) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
+    if (snprintf_s(conf_file, sizeof(conf_file), sizeof(conf_file) - 1, "%s/openssl.cnf", certs_path) < 0 ||
+        snprintf_s(key_file, sizeof(key_file), sizeof(key_file) - 1, "%s/demoCA/private/cakey.pem", certs_path) < 0 ||
+        snprintf_s(cert_file, sizeof(cert_file), sizeof(cert_file) - 1, "%s/demoCA/cacert.pem", certs_path) < 0 ||
+        snprintf_s(cert_copy, sizeof(cert_copy), sizeof(cert_copy) - 1, "%s/cacert.pem", certs_path) < 0 ||
+        snprintf_s(pass_file, sizeof(pass_file), sizeof(pass_file) - 1, "%s/ca.pass", certs_path) < 0 ||
+        snprintf_s(days_str, sizeof(days_str), sizeof(days_str) - 1, "%d", days) < 0) {
+        (void)memset_s(pass_buf, sizeof(pass_buf), 0, sizeof(pass_buf));
+        GR_PRINT_ERROR("Failed to build generate root cert paths.\n");
         return CM_ERROR;
     }
 
-    /* Encrypt the CA password file: save as ca.pass.enc and remove ca.pass */
-    if (snprintf_s(pass_file, sizeof(pass_file), sizeof(pass_file) - 1, "%s/ca.pass", certs_path) >= 0) {
-        if (encrypt_password_file(pass_file) != CM_SUCCESS) {
-            (void)unlink(pass_file);
-            return CM_ERROR;
-        }
+    genrsa_argv[0] = "openssl";
+    genrsa_argv[1] = "genrsa";
+    genrsa_argv[2] = "-aes256";
+    genrsa_argv[3] = "-passout";
+    genrsa_argv[4] = "stdin";
+    genrsa_argv[5] = "-out";
+    genrsa_argv[6] = key_file;
+    genrsa_argv[7] = GR_OPENSSL_KEY_BITS_STR;
+    genrsa_argv[8] = NULL;
+    if (run_openssl_with_stdin(genrsa_argv, pass_buf, conf_file) != CM_SUCCESS) {
+        (void)memset_s(pass_buf, sizeof(pass_buf), 0, sizeof(pass_buf));
+        GR_PRINT_ERROR("Failed to generate CA key.\n");
+        return CM_ERROR;
     }
 
+    req_argv[0] = "openssl";
+    req_argv[1] = "req";
+    req_argv[2] = "-new";
+    req_argv[3] = "-x509";
+    req_argv[4] = "-passin";
+    req_argv[5] = "stdin";
+    req_argv[6] = "-days";
+    req_argv[7] = days_str;
+    req_argv[8] = "-key";
+    req_argv[9] = key_file;
+    req_argv[10] = "-out";
+    req_argv[11] = cert_file;
+    req_argv[12] = "-subj";
+    req_argv[13] = "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=CA";
+    req_argv[14] = NULL;
+    if (run_openssl_with_stdin(req_argv, pass_buf, conf_file) != CM_SUCCESS) {
+        (void)memset_s(pass_buf, sizeof(pass_buf), 0, sizeof(pass_buf));
+        GR_PRINT_ERROR("Failed to generate CA cert.\n");
+        return CM_ERROR;
+    }
+
+    if (copy_regular_file(cert_file, cert_copy) != CM_SUCCESS) {
+        (void)memset_s(pass_buf, sizeof(pass_buf), 0, sizeof(pass_buf));
+        return CM_ERROR;
+    }
+
+    if (write_password_file(pass_file, pass_buf) != CM_SUCCESS) {
+        (void)memset_s(pass_buf, sizeof(pass_buf), 0, sizeof(pass_buf));
+        return CM_ERROR;
+    }
+    (void)memset_s(pass_buf, sizeof(pass_buf), 0, sizeof(pass_buf));
+    if (encrypt_password_file(pass_file) != CM_SUCCESS) {
+        (void)unlink(pass_file);
+        return CM_ERROR;
+    }
     return CM_SUCCESS;
 }
 
 static status_t create_server_certs(const char *certs_path, int days) {
     int ret = 0;
-    char cmd[GR_CMD_LEN];
-    char key_file[CM_MAX_PATH_LEN] = {0};
     char ca_pass_file[CM_MAX_PATH_LEN] = {0};
     char ca_password[CM_PASSWD_MAX_LEN + 1] = {0};
-    char tmp_pass_file[CM_MAX_PATH_LEN] = {0};
-    FILE *tmp_fp = NULL;
+    char server_password[CM_PASSWD_MAX_LEN + 1] = {0};
+    char conf_file[CM_MAX_PATH_LEN] = {0};
+    char server_key[CM_MAX_PATH_LEN] = {0};
+    char server_csr[CM_MAX_PATH_LEN] = {0};
+    char server_crt[CM_MAX_PATH_LEN] = {0};
+    char ca_cert[CM_MAX_PATH_LEN] = {0};
+    char ca_key[CM_MAX_PATH_LEN] = {0};
+    char crl_file[CM_MAX_PATH_LEN] = {0};
+    char pass_file[CM_MAX_PATH_LEN] = {0};
+    char days_str[GR_DAYS_STR_LEN] = {0};
+    char *genrsa_argv[9];
+    char *req_argv[16];
+    char *x509_argv[20];
+    FILE *fp = NULL;
+
+    if (validate_certs_shell_path(certs_path) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
 
     if (check_root_certs_exist(certs_path) != CM_SUCCESS) {
         return CM_ERROR;
     }
 
-    /* Decrypt CA password from ca.pass.enc */
     ret = snprintf_s(ca_pass_file, sizeof(ca_pass_file), sizeof(ca_pass_file) - 1, "%s/ca.pass.enc", certs_path);
     GR_SECUREC_SS_RETURN_IF_ERROR(ret, CM_ERROR);
 
     if (decrypt_password_file(ca_pass_file, ca_password, sizeof(ca_password)) != CM_SUCCESS) {
-        GR_PRINT_ERROR("Failed to decrypt CA password from %s, trying plain ca.pass file\n", ca_pass_file);
+        GR_PRINT_ERROR("Failed to decrypt CA password from %s\n", ca_pass_file);
         return CM_ERROR;
     }
 
-    /* Create temporary password file for shell command */
-    ret = snprintf_s(tmp_pass_file, sizeof(tmp_pass_file), sizeof(tmp_pass_file) - 1, "%s/.ca_pass.tmp", certs_path);
-    GR_SECUREC_SS_RETURN_IF_ERROR(ret, CM_ERROR);
-
-    tmp_fp = fopen(tmp_pass_file, "w");
-    if (tmp_fp != NULL) {
-        if (fprintf(tmp_fp, "%s", ca_password) < 0) {
-            GR_PRINT_ERROR("Failed to write CA password to temporary file %s\n", tmp_pass_file);
-            fclose(tmp_fp);
-            (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
-            return CM_ERROR;
-        }
-        fclose(tmp_fp);
-        if (chmod(tmp_pass_file, S_IRUSR | S_IWUSR) != 0) {
-            GR_PRINT_ERROR("Failed to set permissions on temporary file %s: %s\n", tmp_pass_file, strerror(errno));
-        }
-    } else {
-        GR_PRINT_ERROR("Failed to create temporary password file %s: %s\n", tmp_pass_file, strerror(errno));
+    if (generate_cert_password(server_password, sizeof(server_password)) != CM_SUCCESS) {
         (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
         return CM_ERROR;
     }
 
-    snprintf(cmd, sizeof(cmd),
-        "cd %s && "
-        "server_password=$(openssl rand -base64 32); "
-        "ca_password=$(cat .ca_pass.tmp 2>/dev/null); "
-        "if [ -z \"$ca_password\" ]; then echo 'Error: Failed to read CA password from .ca_pass.tmp' >&2; exit 1; fi && "
-        "export OPENSSL_CONF=%s/openssl.cnf; "
-        "echo $server_password | openssl genrsa -aes256 -passout stdin -out server.key 2048 && "
-        "echo $server_password | openssl req -new -key server.key -passin stdin -out server.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=server\" && "
-        "echo $ca_password | openssl x509 -req -days %d -in server.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin stdin -CAcreateserial -out server.crt && "
-        "echo $server_password > server.key.pass && "
-        "chmod 400 server.crt server.key && echo '00' >demoCA/crlnumber && rm -f .ca_pass.tmp",
-        certs_path, certs_path, days);
-    if (system(cmd) != 0) {
-        GR_PRINT_ERROR("Failed to create server certs: %s\n", strerror(errno));
+    if (snprintf_s(conf_file, sizeof(conf_file), sizeof(conf_file) - 1, "%s/openssl.cnf", certs_path) < 0 ||
+        snprintf_s(server_key, sizeof(server_key), sizeof(server_key) - 1, "%s/server.key", certs_path) < 0 ||
+        snprintf_s(server_csr, sizeof(server_csr), sizeof(server_csr) - 1, "%s/server.csr", certs_path) < 0 ||
+        snprintf_s(server_crt, sizeof(server_crt), sizeof(server_crt) - 1, "%s/server.crt", certs_path) < 0 ||
+        snprintf_s(ca_cert, sizeof(ca_cert), sizeof(ca_cert) - 1, "%s/demoCA/cacert.pem", certs_path) < 0 ||
+        snprintf_s(ca_key, sizeof(ca_key), sizeof(ca_key) - 1, "%s/demoCA/private/cakey.pem", certs_path) < 0 ||
+        snprintf_s(crl_file, sizeof(crl_file), sizeof(crl_file) - 1, "%s/demoCA/crlnumber", certs_path) < 0 ||
+        snprintf_s(pass_file, sizeof(pass_file), sizeof(pass_file) - 1, "%s/server.key.pass", certs_path) < 0 ||
+        snprintf_s(days_str, sizeof(days_str), sizeof(days_str) - 1, "%d", days) < 0) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(server_password, sizeof(server_password), 0, sizeof(server_password));
+        GR_PRINT_ERROR("Failed to build create server certs paths.\n");
         return CM_ERROR;
     }
 
-    /* Clear CA password from memory */
-    (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+    genrsa_argv[0] = "openssl";
+    genrsa_argv[1] = "genrsa";
+    genrsa_argv[2] = "-aes256";
+    genrsa_argv[3] = "-passout";
+    genrsa_argv[4] = "stdin";
+    genrsa_argv[5] = "-out";
+    genrsa_argv[6] = server_key;
+    genrsa_argv[7] = GR_OPENSSL_KEY_BITS_STR;
+    genrsa_argv[8] = NULL;
+    if (run_openssl_with_stdin(genrsa_argv, server_password, conf_file) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(server_password, sizeof(server_password), 0, sizeof(server_password));
+        GR_PRINT_ERROR("Failed to generate server key.\n");
+        return CM_ERROR;
+    }
 
-    /* Encrypt the password file: save as server.key.enc and remove server.key.pass */
-    if (snprintf_s(key_file, sizeof(key_file), sizeof(key_file) - 1, "%s/server.key.pass", certs_path) >= 0) {
-        if (encrypt_password_file(key_file) != CM_SUCCESS) {
-            return CM_ERROR;
-        }
+    req_argv[0] = "openssl";
+    req_argv[1] = "req";
+    req_argv[2] = "-new";
+    req_argv[3] = "-key";
+    req_argv[4] = server_key;
+    req_argv[5] = "-passin";
+    req_argv[6] = "stdin";
+    req_argv[7] = "-out";
+    req_argv[8] = server_csr;
+    req_argv[9] = "-subj";
+    req_argv[10] = "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=server";
+    req_argv[11] = NULL;
+    if (run_openssl_with_stdin(req_argv, server_password, conf_file) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(server_password, sizeof(server_password), 0, sizeof(server_password));
+        GR_PRINT_ERROR("Failed to generate server CSR.\n");
+        return CM_ERROR;
+    }
+
+    x509_argv[0] = "openssl";
+    x509_argv[1] = "x509";
+    x509_argv[2] = "-req";
+    x509_argv[3] = "-days";
+    x509_argv[4] = days_str;
+    x509_argv[5] = "-in";
+    x509_argv[6] = server_csr;
+    x509_argv[7] = "-CA";
+    x509_argv[8] = ca_cert;
+    x509_argv[9] = "-CAkey";
+    x509_argv[10] = ca_key;
+    x509_argv[11] = "-passin";
+    x509_argv[12] = "stdin";
+    x509_argv[13] = "-CAcreateserial";
+    x509_argv[14] = "-out";
+    x509_argv[15] = server_crt;
+    x509_argv[16] = NULL;
+    if (run_openssl_with_stdin(x509_argv, ca_password, conf_file) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(server_password, sizeof(server_password), 0, sizeof(server_password));
+        GR_PRINT_ERROR("Failed to generate server cert.\n");
+        return CM_ERROR;
+    }
+
+    (void)chmod(server_crt, S_IRUSR);
+    (void)chmod(server_key, S_IRUSR);
+    fp = fopen(crl_file, "w");
+    if (fp != NULL) {
+        (void)fputs("00\n", fp);
+        fclose(fp);
+    }
+
+    if (write_password_file(pass_file, server_password) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(server_password, sizeof(server_password), 0, sizeof(server_password));
+        return CM_ERROR;
+    }
+    (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+    (void)memset_s(server_password, sizeof(server_password), 0, sizeof(server_password));
+    if (encrypt_password_file(pass_file) != CM_SUCCESS) {
+        (void)unlink(pass_file);
+        return CM_ERROR;
     }
     return CM_SUCCESS;
 }
 
 static status_t create_client_certs(const char *certs_path, const char *root_certs_path, int days) {
     int ret = 0;
-    char key_file[CM_MAX_PATH_LEN] = {0};
-    char cmd[GR_CMD_LEN];
     char ca_pass_file[CM_MAX_PATH_LEN] = {0};
     char ca_password[CM_PASSWD_MAX_LEN + 1] = {0};
-    char tmp_pass_file[CM_MAX_PATH_LEN] = {0};
-    FILE *tmp_fp = NULL;
+    char client_password[CM_PASSWD_MAX_LEN + 1] = {0};
+    char conf_file[CM_MAX_PATH_LEN] = {0};
+    char client_key[CM_MAX_PATH_LEN] = {0};
+    char client_csr[CM_MAX_PATH_LEN] = {0};
+    char client_crt[CM_MAX_PATH_LEN] = {0};
+    char ca_cert[CM_MAX_PATH_LEN] = {0};
+    char ca_key[CM_MAX_PATH_LEN] = {0};
+    char pass_file[CM_MAX_PATH_LEN] = {0};
+    char dst_cacert[CM_MAX_PATH_LEN] = {0};
+    char src_cacert[CM_MAX_PATH_LEN] = {0};
+    char days_str[GR_DAYS_STR_LEN] = {0};
+    char *genrsa_argv[9];
+    char *req_argv[16];
+    char *x509_argv[20];
+
+    if (validate_certs_shell_path(root_certs_path) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
+    if (validate_certs_shell_path(certs_path) != CM_SUCCESS) {
+        return CM_ERROR;
+    }
 
     if (check_root_certs_exist(root_certs_path) != CM_SUCCESS) {
         return CM_ERROR;
@@ -931,7 +1297,6 @@ static status_t create_client_certs(const char *certs_path, const char *root_cer
         }
     }
 
-    /* Decrypt CA password from ca.pass.enc */
     ret = snprintf_s(ca_pass_file, sizeof(ca_pass_file), sizeof(ca_pass_file) - 1, "%s/ca.pass.enc", root_certs_path);
     GR_SECUREC_SS_RETURN_IF_ERROR(ret, CM_ERROR);
 
@@ -940,59 +1305,105 @@ static status_t create_client_certs(const char *certs_path, const char *root_cer
         return CM_ERROR;
     }
 
-    /* Create temporary password file for shell command */
-    ret = snprintf_s(tmp_pass_file, sizeof(tmp_pass_file), sizeof(tmp_pass_file) - 1, "%s/.ca_pass.tmp", root_certs_path);
-    GR_SECUREC_SS_RETURN_IF_ERROR(ret, CM_ERROR);
+    if (generate_cert_password(client_password, sizeof(client_password)) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        return CM_ERROR;
+    }
 
-    tmp_fp = fopen(tmp_pass_file, "w");
-    if (tmp_fp != NULL) {
-        if (fprintf(tmp_fp, "%s", ca_password) < 0) {
-            GR_PRINT_ERROR("Failed to write CA password to temporary file %s\n", tmp_pass_file);
-            fclose(tmp_fp);
+    if (snprintf_s(conf_file, sizeof(conf_file), sizeof(conf_file) - 1, "%s/openssl.cnf", root_certs_path) < 0 ||
+        snprintf_s(client_key, sizeof(client_key), sizeof(client_key) - 1, "%s/client.key", certs_path) < 0 ||
+        snprintf_s(client_csr, sizeof(client_csr), sizeof(client_csr) - 1, "%s/client.csr", certs_path) < 0 ||
+        snprintf_s(client_crt, sizeof(client_crt), sizeof(client_crt) - 1, "%s/client.crt", certs_path) < 0 ||
+        snprintf_s(ca_cert, sizeof(ca_cert), sizeof(ca_cert) - 1, "%s/demoCA/cacert.pem", root_certs_path) < 0 ||
+        snprintf_s(ca_key, sizeof(ca_key), sizeof(ca_key) - 1, "%s/demoCA/private/cakey.pem", root_certs_path) < 0 ||
+        snprintf_s(pass_file, sizeof(pass_file), sizeof(pass_file) - 1, "%s/client.key.pass", certs_path) < 0 ||
+        snprintf_s(src_cacert, sizeof(src_cacert), sizeof(src_cacert) - 1, "%s/cacert.pem", root_certs_path) < 0 ||
+        snprintf_s(dst_cacert, sizeof(dst_cacert), sizeof(dst_cacert) - 1, "%s/cacert.pem", certs_path) < 0 ||
+        snprintf_s(days_str, sizeof(days_str), sizeof(days_str) - 1, "%d", days) < 0) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(client_password, sizeof(client_password), 0, sizeof(client_password));
+        GR_PRINT_ERROR("Failed to build create client certs paths.\n");
+        return CM_ERROR;
+    }
+
+    genrsa_argv[0] = "openssl";
+    genrsa_argv[1] = "genrsa";
+    genrsa_argv[2] = "-aes256";
+    genrsa_argv[3] = "-passout";
+    genrsa_argv[4] = "stdin";
+    genrsa_argv[5] = "-out";
+    genrsa_argv[6] = client_key;
+    genrsa_argv[7] = GR_OPENSSL_KEY_BITS_STR;
+    genrsa_argv[8] = NULL;
+    if (run_openssl_with_stdin(genrsa_argv, client_password, conf_file) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(client_password, sizeof(client_password), 0, sizeof(client_password));
+        GR_PRINT_ERROR("Failed to generate client key.\n");
+        return CM_ERROR;
+    }
+
+    req_argv[0] = "openssl";
+    req_argv[1] = "req";
+    req_argv[2] = "-new";
+    req_argv[3] = "-key";
+    req_argv[4] = client_key;
+    req_argv[5] = "-passin";
+    req_argv[6] = "stdin";
+    req_argv[7] = "-out";
+    req_argv[8] = client_csr;
+    req_argv[9] = "-subj";
+    req_argv[10] = "/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=client";
+    req_argv[11] = NULL;
+    if (run_openssl_with_stdin(req_argv, client_password, conf_file) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(client_password, sizeof(client_password), 0, sizeof(client_password));
+        GR_PRINT_ERROR("Failed to generate client CSR.\n");
+        return CM_ERROR;
+    }
+
+    x509_argv[0] = "openssl";
+    x509_argv[1] = "x509";
+    x509_argv[2] = "-req";
+    x509_argv[3] = "-days";
+    x509_argv[4] = days_str;
+    x509_argv[5] = "-in";
+    x509_argv[6] = client_csr;
+    x509_argv[7] = "-CA";
+    x509_argv[8] = ca_cert;
+    x509_argv[9] = "-CAkey";
+    x509_argv[10] = ca_key;
+    x509_argv[11] = "-passin";
+    x509_argv[12] = "stdin";
+    x509_argv[13] = "-CAcreateserial";
+    x509_argv[14] = "-out";
+    x509_argv[15] = client_crt;
+    x509_argv[16] = NULL;
+    if (run_openssl_with_stdin(x509_argv, ca_password, conf_file) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(client_password, sizeof(client_password), 0, sizeof(client_password));
+        GR_PRINT_ERROR("Failed to generate client cert.\n");
+        return CM_ERROR;
+    }
+
+    if (strcmp(root_certs_path, certs_path) != 0) {
+        if (copy_regular_file(src_cacert, dst_cacert) != CM_SUCCESS) {
             (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+            (void)memset_s(client_password, sizeof(client_password), 0, sizeof(client_password));
             return CM_ERROR;
         }
-        fclose(tmp_fp);
-        if (chmod(tmp_pass_file, S_IRUSR | S_IWUSR) != 0) {
-            GR_PRINT_ERROR("Failed to set permissions on temporary file %s: %s\n", tmp_pass_file, strerror(errno));
-        }
-    } else {
-        GR_PRINT_ERROR("Failed to create temporary password file %s: %s\n", tmp_pass_file, strerror(errno));
-        return CM_ERROR;
     }
 
-    snprintf(cmd, sizeof(cmd),
-        "cd %s && "
-        "client_password=$(openssl rand -base64 32); "
-        "ca_password=$(cat .ca_pass.tmp 2>/dev/null); "
-        "if [ -z \"$ca_password\" ]; then echo 'Error: Failed to read CA password from .ca_pass.tmp' >&2; exit 1; fi && "
-        "export OPENSSL_CONF=%s/openssl.cnf; "
-        "echo $client_password | openssl genrsa -aes256 -passout stdin -out %s/client.key 2048 && "
-        "echo $client_password | openssl req -new -key %s/client.key -passin stdin -out %s/client.csr -subj \"/C=CN/ST=NULL/L=NULL/O=NULL/OU=NULL/CN=client\" && "
-        "echo $ca_password | openssl x509 -req -days %d -in %s/client.csr -CA demoCA/cacert.pem -CAkey demoCA/private/cakey.pem -passin stdin -CAcreateserial -out %s/client.crt && "
-        "echo $client_password > %s/client.key.pass && if [ \"%s\" != \"%s\" ]; then cat cacert.pem > %s/cacert.pem; fi",
-        root_certs_path, root_certs_path, certs_path, certs_path, certs_path, days, certs_path,
-        certs_path, certs_path, root_certs_path, certs_path, certs_path);
-    if (system(cmd) != 0) {
-        GR_PRINT_ERROR("Failed to create client certs: %s\n", strerror(errno));
+    if (write_password_file(pass_file, client_password) != CM_SUCCESS) {
+        (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
+        (void)memset_s(client_password, sizeof(client_password), 0, sizeof(client_password));
         return CM_ERROR;
     }
-
-    if (unlink(tmp_pass_file) != 0) {
-        GR_PRINT_ERROR("Failed to remove file %s: %s\n", tmp_pass_file, strerror(errno));
-        return CM_ERROR;
-    }
-
-    /* Clear CA password from memory */
     (void)memset_s(ca_password, sizeof(ca_password), 0, sizeof(ca_password));
-
-    /* Encrypt the password file: save as client.key.enc and remove client.key.pass */
-    if (snprintf_s(key_file, sizeof(key_file), sizeof(key_file) - 1, "%s/client.key.pass", certs_path) >= 0) {
-        if (encrypt_password_file(key_file) != CM_SUCCESS) {
-            return CM_ERROR;
-        }
+    (void)memset_s(client_password, sizeof(client_password), 0, sizeof(client_password));
+    if (encrypt_password_file(pass_file) != CM_SUCCESS) {
+        (void)unlink(pass_file);
+        return CM_ERROR;
     }
-
     return CM_SUCCESS;
 }
 
@@ -1023,6 +1434,10 @@ static status_t get_config_file_path(const char *type, char *config_file_path, s
     const char *gr_home = getenv("GR_HOME");
     if (!gr_home) {
         printf("Please set GR_HOME environment variable.\n");
+        return CM_ERROR;
+    }
+    if (validate_certs_shell_path(gr_home) != CM_SUCCESS) {
+        GR_PRINT_ERROR("Environment variable GR_HOME contains invalid characters.\n");
         return CM_ERROR;
     }
     if (config_file_path == NULL || path_len == 0) {
@@ -1057,6 +1472,10 @@ static status_t get_ssl_path(const char *config_file_path, char *ssl_conf_path, 
         GR_PRINT_ERROR("Environment variant GR_HOME not found!\n");
         return CM_ERROR;
     }
+    if (validate_certs_shell_path(gr_home) != CM_SUCCESS) {
+        GR_PRINT_ERROR("Environment variable GR_HOME contains invalid characters.\n");
+        return CM_ERROR;
+    }
 
     /* Prefer SER_SSL_CA from already loaded server config (gr_load_config) */
     char file_path[CM_MAX_PATH_LEN] = {0};
@@ -1081,6 +1500,11 @@ static status_t get_ssl_path(const char *config_file_path, char *ssl_conf_path, 
         file_path[--len] = '\0';
     }
 
+    if (validate_certs_shell_path(file_path) != CM_SUCCESS) {
+        GR_PRINT_ERROR("SSL CA path contains invalid characters.\n");
+        return CM_ERROR;
+    }
+
     char *last_slash = strrchr(file_path, '/');
     if (last_slash != NULL) {
         size_t dir_len = last_slash - file_path;
@@ -1098,6 +1522,11 @@ static status_t get_ssl_path(const char *config_file_path, char *ssl_conf_path, 
         } else {
             return CM_ERROR;
         }
+    }
+
+    if (validate_certs_shell_path(ssl_conf_path) != CM_SUCCESS) {
+        GR_PRINT_ERROR("SSL certificate path contains invalid characters.\n");
+        return CM_ERROR;
     }
 
     return CM_SUCCESS;
