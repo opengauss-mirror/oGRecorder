@@ -170,7 +170,7 @@ echo "build GR SUCCESS"
 os_name=$(source /etc/os-release && echo ${NAME} | tr ' ' '_')
 os_version=$(source /etc/os-release && echo ${VERSION_ID})
 arch=$(uname -m)
-gr_version="7.0.0-RC2"
+gr_version="7.0.0"
 pkg_name="openGauss-oGRecorder-${gr_version}-${os_name}${os_version}-${arch}.tar.gz"
 
 if [ "$pkg_flag"x == "ON"x ]; then
